@@ -95,7 +95,7 @@ struct WeightSelectorRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.white)
-                    .frame(height: 100)
+                    .frame(height: 130)
                 
                 VStack(spacing: 0) {
                     // Top viewport window showing current weight
@@ -117,20 +117,20 @@ struct WeightSelectorRow: View {
                     // Wheel picker for weight selection
                     WheelPicker(
                         config: WheelPicker.Config(
-                            count: 16, // 20 to 100 (80 range / 5 step = 16)
-                            steps: 5,  // 5 units between major ticks
+                            count: 198, // 20 to 2000 lbs (1980 range / 10 = 198 major intervals)
+                            steps: 10,  // 10 units between major ticks (major ticks every 10 lbs)
                             spacing: 8, // Spacing between ticks
-                            multiplier: 5, // Each major tick represents 5kg
+                            multiplier: 10, // Each major tick represents 10 lbs
                             showsText: true
                         ),
                         value: .init(
-                            get: { (weight - 20) / 5 }, // Convert weight to picker value (start from 20)
+                            get: { weight - 20 }, // Convert weight to picker value (start from 20)
                             set: { newValue in
-                                weight = (newValue * 5) + 20 // Convert picker value back to weight
+                                weight = newValue + 20 // Convert picker value back to weight
                             }
                         )
                     )
-                    .frame(height: 40)
+                    .frame(height: 70)
                     .environmentObject(themeManager)
                 }
             }
@@ -192,7 +192,7 @@ struct WheelPicker: View {
                     
                     ForEach(0...totalSteps, id: \.self) { index in
                         let remainder = index % config.steps
-                        let weightValue = 20 + (index * config.multiplier / config.steps)
+                        let weightValue = 20 + index
                         
                         Rectangle()
                             .fill(themeManager.wheelPickerColor)
@@ -203,7 +203,7 @@ struct WheelPicker: View {
                                     Text("\(Int(weightValue))")
                                         .font(.caption)
                                         .fontWeight(.semibold)
-                                        .foregroundColor(themeManager.wheelPickerColor)
+                                        .foregroundColor(.black)
                                         .fixedSize()
                                         .offset(y: 25)
                                 }
