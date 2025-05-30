@@ -9,6 +9,28 @@ import Supabase
 import SwiftUI
 import UIKit
 
+// Exercise model with name and default preferences
+struct Exercise {
+    let name: String
+    let defaultWeight: CGFloat
+    let defaultReps: CGFloat
+    let defaultRPE: CGFloat
+    var setsCompleted: Int = 0
+    
+    static let allExercises: [Exercise] = [
+        Exercise(name: "Bench Press", defaultWeight: 50, defaultReps: 8, defaultRPE: 60),
+        Exercise(name: "Squat", defaultWeight: 80, defaultReps: 10, defaultRPE: 70),
+        Exercise(name: "Deadlift", defaultWeight: 100, defaultReps: 6, defaultRPE: 80),
+        Exercise(name: "Overhead Press", defaultWeight: 35, defaultReps: 8, defaultRPE: 65),
+        Exercise(name: "Pull-ups", defaultWeight: 0, defaultReps: 12, defaultRPE: 70),
+        Exercise(name: "Barbell Row", defaultWeight: 60, defaultReps: 10, defaultRPE: 75),
+        Exercise(name: "Incline Bench", defaultWeight: 40, defaultReps: 8, defaultRPE: 65),
+        Exercise(name: "Dips", defaultWeight: 0, defaultReps: 15, defaultRPE: 70),
+        Exercise(name: "Romanian Deadlift", defaultWeight: 70, defaultReps: 12, defaultRPE: 70),
+        Exercise(name: "Leg Press", defaultWeight: 120, defaultReps: 15, defaultRPE: 75)
+    ]
+}
+
 // Simple ThemeManager for the WheelPicker
 class ThemeManager: ObservableObject {
     @Published var wheelPickerColor: Color = .gray
@@ -21,14 +43,20 @@ struct ContentView: View {
 }
 
 struct ExerciseView: View {
-    @State private var weights: [CGFloat] = [50, 8, 60] // Default values: 50lbs, 8reps, 60%RPE
+    @State private var exercises = Exercise.allExercises
+    @State private var currentExerciseIndex: Int = 0
+    @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
     @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
-    @State private var setsCompleted: Int = 0 // Track sets completed for the day
     
-    // Haptic feedback generator for SET button
+    // Haptic feedback generators
     private let setButtonFeedback = UIImpactFeedbackGenerator(style: .medium)
+    private let navigationFeedback = UIImpactFeedbackGenerator(style: .light)
+    
+    private var currentExercise: Exercise {
+        exercises[currentExerciseIndex]
+    }
     
     var body: some View {
         ZStack {
@@ -41,24 +69,25 @@ struct ExerciseView: View {
                     // Title with set counter
                     VStack {
                         HStack(spacing: 8) {
-                            Text("Bench Press")
+                            Text(currentExercise.name)
                                 .font(.title2)
                                 .fontWeight(.medium)
                                 .foregroundColor(.black)
+                                .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
                             
                             // Green circular set counter - only visible after first set
-                            if setsCompleted > 0 {
+                            if currentExercise.setsCompleted > 0 {
                                 Circle()
                                     .fill(Color.green)
                                     .frame(width: 30, height: 30)
                                     .overlay(
-                                        Text("\(setsCompleted)")
+                                        Text("\(currentExercise.setsCompleted)")
                                             .font(.caption)
                                             .fontWeight(.bold)
                                             .foregroundColor(.white)
                                     )
                                     .transition(.scale.combined(with: .opacity))
-                                    .animation(.bouncy(duration: 0.3), value: setsCompleted)
+                                    .animation(.bouncy(duration: 0.3), value: currentExercise.setsCompleted)
                             }
                         }
                         .padding(.top, 35)
@@ -77,54 +106,95 @@ struct ExerciseView: View {
                     .padding(.horizontal, 0)
                     .padding(.vertical, 8)
                     
-                    // Green SET button
-                    Button(action: {
-                        // Increment set counter
-                        setsCompleted += 1
-                        
-                        // SET button action with haptic feedback and animation
-                        setButtonFeedback.impactOccurred()
-                        
-                        withAnimation(.easeInOut(duration: 0.1)) {
-                            isSetButtonPressed = true
+                    // Navigation buttons with SET button in the center
+                    HStack(spacing: 20) {
+                        // Left navigation button
+                        Button(action: {
+                            saveCurrentExerciseData()
+                            navigationFeedback.impactOccurred()
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentExerciseIndex = (currentExerciseIndex - 1 + exercises.count) % exercises.count
+                                loadExerciseData()
+                            }
+                        }) {
+                            Image(systemName: "chevron.left")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                                .frame(width: 44, height: 44)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Circle())
                         }
                         
-                        // Show radial burst effect
-                        withAnimation(.easeOut(duration: 0.15)) {
-                            showRadialBurst = true
-                        }
-                        
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        // Green SET button
+                        Button(action: {
+                            // Increment set counter for current exercise
+                            exercises[currentExerciseIndex].setsCompleted += 1
+                            
+                            // SET button action with haptic feedback and animation
+                            setButtonFeedback.impactOccurred()
+                            
                             withAnimation(.easeInOut(duration: 0.1)) {
-                                isSetButtonPressed = false
+                                isSetButtonPressed = true
                             }
-                        }
-                        
-                        // Hide burst after short delay for quick pulse
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            
+                            // Show radial burst effect
                             withAnimation(.easeOut(duration: 0.15)) {
-                                showRadialBurst = false
+                                showRadialBurst = true
                             }
+                            
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.1)) {
+                                    isSetButtonPressed = false
+                                }
+                            }
+                            
+                            // Hide burst after short delay for quick pulse
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                withAnimation(.easeOut(duration: 0.15)) {
+                                    showRadialBurst = false
+                                }
+                            }
+                            
+                            print("SET pressed for \(currentExercise.name) with weights: \(weights), Sets completed: \(currentExercise.setsCompleted)")
+                        }) {
+                            Circle()
+                                .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.8))
+                                .frame(width: 70, height: 70)
+                                .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.8 : 0.6), radius: 8, x: 0, y: 0)
+                                .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.6 : 0.4), radius: 16, x: 0, y: 0)
+                                .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.4 : 0.2), radius: 24, x: 0, y: 0)
+                                .overlay(
+                                    Text("SET")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.black)
+                                )
+                                .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
                         }
                         
-                        print("SET pressed with weights: \(weights), Sets completed: \(setsCompleted)")
-                    }) {
-                        Circle()
-                            .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.8))
-                            .frame(width: 70, height: 70)
-                            .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.8 : 0.6), radius: 8, x: 0, y: 0)
-                            .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.6 : 0.4), radius: 16, x: 0, y: 0)
-                            .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.4 : 0.2), radius: 24, x: 0, y: 0)
-                            .overlay(
-                                Text("SET")
-                                    .font(.subheadline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.black)
-                            )
-                            .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
+                        // Right navigation button
+                        Button(action: {
+                            saveCurrentExerciseData()
+                            navigationFeedback.impactOccurred()
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentExerciseIndex = (currentExerciseIndex + 1) % exercises.count
+                                loadExerciseData()
+                            }
+                        }) {
+                            Image(systemName: "chevron.right")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.blue)
+                                .frame(width: 44, height: 44)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Circle())
+                        }
                     }
                     .onAppear {
                         setButtonFeedback.prepare()
+                        navigationFeedback.prepare()
+                        loadExerciseData() // Load initial exercise data
                     }
                     .padding(.top, 25)
                     .padding(.bottom, 20)
@@ -150,6 +220,18 @@ struct ExerciseView: View {
                 }
             }
         )
+    }
+    
+    // Save current exercise data when switching exercises
+    private func saveCurrentExerciseData() {
+        // The weights array is automatically maintained through bindings
+        // Set counts are already saved in the exercises array
+    }
+    
+    // Load exercise data when switching to a new exercise
+    private func loadExerciseData() {
+        let exercise = currentExercise
+        weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
     }
 }
 
