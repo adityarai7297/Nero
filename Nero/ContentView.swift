@@ -21,7 +21,7 @@ struct ContentView: View {
 }
 
 struct ExerciseView: View {
-    @State private var weights: [CGFloat] = [50, 50, 50] // Weight values for each row
+    @State private var weights: [CGFloat] = [50, 8, 60] // Default values: 50lbs, 8reps, 60%RPE
     @StateObject private var themeManager = ThemeManager()
     
     var body: some View {
@@ -103,11 +103,12 @@ enum ExerciseComponentType {
             )
         case .repetitions:
             return WheelPicker.Config(
-                count: 25,   // 0 to 100 reps (25 intervals of 4)
-                steps: 4,    // 4 small ticks between major ticks
-                spacing: 8,  // Same spacing as weight scale
-                multiplier: 4, // Each major tick represents 4 reps
-                showsText: true
+                count: 100,  // 0 to 100 reps
+                steps: 1,    // Single increments
+                spacing: 35, // Same spacing as RPE scale
+                multiplier: 1, // Each tick represents 1 rep
+                showsText: true,
+                showTextOnlyOnEven: true // New property for reps
             )
         case .rpe:
             return WheelPicker.Config(
@@ -243,13 +244,18 @@ struct WheelPicker: View {
                             .frame(maxHeight: 20, alignment: .bottom)
                             .overlay(alignment: .bottom) {
                                 if remainder == 0 && config.showsText {
-                                    Text("\((index / config.steps) * config.multiplier)")
-                                        .font(.caption)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.black)
-                                        .textScale(.secondary)
-                                        .fixedSize()
-                                        .offset(y: 20)
+                                    let value = (index / config.steps) * config.multiplier
+                                    let shouldShowText = config.showTextOnlyOnEven ? (value % 2 == 0) : true
+                                    
+                                    if shouldShowText {
+                                        Text("\(value)")
+                                            .font(.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.black)
+                                            .textScale(.secondary)
+                                            .fixedSize()
+                                            .offset(y: 20)
+                                    }
                                 }
                             }
                     }
@@ -300,6 +306,7 @@ struct WheelPicker: View {
         var spacing: CGFloat
         var multiplier: Int
         var showsText: Bool = true
+        var showTextOnlyOnEven: Bool = false
     }
 }
 
