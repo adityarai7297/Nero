@@ -9,6 +9,22 @@ import Supabase
 import SwiftUI
 import UIKit
 
+// Individual set model with all the details
+struct WorkoutSet: Identifiable {
+    let id = UUID()
+    var exerciseName: String
+    var weight: CGFloat
+    var reps: CGFloat
+    var rpe: CGFloat
+    var timestamp: Date
+    
+    var formattedTime: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: timestamp)
+    }
+}
+
 // Exercise model with name and default preferences
 struct Exercise {
     let name: String
@@ -49,6 +65,8 @@ struct ExerciseView: View {
     @StateObject private var themeManager = ThemeManager()
     @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
+    @State private var allSets: [WorkoutSet] = [] // Track all sets for the day
+    @State private var showingSetsModal: Bool = false // Control modal presentation
     
     // Haptic feedback generators
     private let setButtonFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -75,19 +93,23 @@ struct ExerciseView: View {
                                 .foregroundColor(.black)
                                 .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
                             
-                            // Green circular set counter - only visible after first set
+                            // Green circular set counter - only visible after first set and now tappable
                             if currentExercise.setsCompleted > 0 {
-                                Circle()
-                                    .fill(Color.green)
-                                    .frame(width: 30, height: 30)
-                                    .overlay(
-                                        Text("\(currentExercise.setsCompleted)")
-                                            .font(.caption)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white)
-                                    )
-                                    .transition(.scale.combined(with: .opacity))
-                                    .animation(.bouncy(duration: 0.3), value: currentExercise.setsCompleted)
+                                Button(action: {
+                                    showingSetsModal = true
+                                }) {
+                                    Circle()
+                                        .fill(Color.green)
+                                        .frame(width: 30, height: 30)
+                                        .overlay(
+                                            Text("\(currentExercise.setsCompleted)")
+                                                .font(.caption)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.white)
+                                        )
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                                .animation(.bouncy(duration: 0.3), value: currentExercise.setsCompleted)
                             }
                         }
                         .padding(.top, 35)
@@ -128,6 +150,18 @@ struct ExerciseView: View {
                         
                         // Green SET button
                         Button(action: {
+                            // Create a new set with current values
+                            let newSet = WorkoutSet(
+                                exerciseName: currentExercise.name,
+                                weight: weights[0],
+                                reps: weights[1],
+                                rpe: weights[2],
+                                timestamp: Date()
+                            )
+                            
+                            // Add to all sets
+                            allSets.append(newSet)
+                            
                             // Increment set counter for current exercise
                             exercises[currentExerciseIndex].setsCompleted += 1
                             
@@ -220,6 +254,16 @@ struct ExerciseView: View {
                 }
             }
         )
+        .sheet(isPresented: $showingSetsModal) {
+            SetsModalView(
+                allSets: $allSets,
+                exercises: $exercises,
+                onSetDeleted: { deletedSet in
+                    updateExerciseSetCounts()
+                }
+            )
+            .environmentObject(themeManager)
+        }
     }
     
     // Save current exercise data when switching exercises
@@ -232,6 +276,310 @@ struct ExerciseView: View {
     private func loadExerciseData() {
         let exercise = currentExercise
         weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
+    }
+    
+    // Update exercise set counts based on actual sets in allSets array
+    private func updateExerciseSetCounts() {
+        for index in exercises.indices {
+            let exerciseName = exercises[index].name
+            exercises[index].setsCompleted = allSets.filter { $0.exerciseName == exerciseName }.count
+        }
+    }
+}
+
+// Modal view to show all sets for the day
+struct SetsModalView: View {
+    @Binding var allSets: [WorkoutSet]
+    @Binding var exercises: [Exercise]
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var themeManager: ThemeManager
+    let onSetDeleted: (WorkoutSet) -> Void
+    
+    @State private var editingSet: WorkoutSet?
+    @State private var showingEditSheet = false
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                if allSets.isEmpty {
+                    // Empty state
+                    VStack(spacing: 16) {
+                        Image(systemName: "list.bullet.clipboard")
+                            .font(.system(size: 48))
+                            .foregroundColor(.gray)
+                        
+                        Text("No sets completed today")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.gray)
+                        
+                        Text("Complete a set to see it here")
+                            .font(.body)
+                            .foregroundColor(.gray.opacity(0.8))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // List of sets
+                    List {
+                        ForEach(allSets.sorted(by: { $0.timestamp > $1.timestamp })) { set in
+                            SetRowView(
+                                set: set,
+                                onEdit: {
+                                    editingSet = set
+                                    showingEditSheet = true
+                                },
+                                onDelete: {
+                                    deleteSet(set)
+                                }
+                            )
+                        }
+                    }
+                    .listStyle(PlainListStyle())
+                }
+            }
+            .navigationTitle("Today's Sets")
+            .navigationBarTitleDisplayMode(.large)
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .sheet(isPresented: $showingEditSheet) {
+            if let editingSet = editingSet {
+                EditSetView(
+                    set: editingSet,
+                    onSave: { updatedSet in
+                        updateSet(updatedSet)
+                        showingEditSheet = false
+                    },
+                    onCancel: {
+                        showingEditSheet = false
+                    }
+                )
+                .environmentObject(themeManager)
+            }
+        }
+    }
+    
+    private func deleteSet(_ set: WorkoutSet) {
+        withAnimation {
+            allSets.removeAll { $0.id == set.id }
+            onSetDeleted(set)
+        }
+    }
+    
+    private func updateSet(_ updatedSet: WorkoutSet) {
+        if let index = allSets.firstIndex(where: { $0.id == updatedSet.id }) {
+            allSets[index] = updatedSet
+        }
+    }
+}
+
+// Individual set row view
+struct SetRowView: View {
+    let set: WorkoutSet
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(set.exerciseName)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .lineLimit(1)
+                    
+                    Text(set.formattedTime)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.leading, 8)
+                }
+                
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Text("\(Int(set.weight))")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("lbs")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text("\(Int(set.reps))")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("reps")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text("\(Int(set.rpe))")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Text("% RPE")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Spacer()
+                }
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Button(action: {
+                    onEdit()
+                }) {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .frame(width: 32, height: 32)
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Button(action: {
+                    onDelete()
+                }) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .frame(width: 32, height: 32)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+}
+
+// Edit set view
+struct EditSetView: View {
+    let set: WorkoutSet
+    let onSave: (WorkoutSet) -> Void
+    let onCancel: () -> Void
+    
+    @State private var weightText: String
+    @State private var repsText: String
+    @State private var rpeText: String
+    
+    init(set: WorkoutSet, onSave: @escaping (WorkoutSet) -> Void, onCancel: @escaping () -> Void) {
+        self.set = set
+        self.onSave = onSave
+        self.onCancel = onCancel
+        self._weightText = State(initialValue: "\(Int(set.weight))")
+        self._repsText = State(initialValue: "\(Int(set.reps))")
+        self._rpeText = State(initialValue: "\(Int(set.rpe))")
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section {
+                    Text(set.exerciseName)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets())
+                        .padding(.vertical, 8)
+                }
+                
+                Section("Set Details") {
+                    HStack {
+                        Text("Weight")
+                            .frame(width: 60, alignment: .leading)
+                        TextField("Weight", text: $weightText)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        Text("lbs")
+                            .foregroundColor(.gray)
+                    }
+                    
+                    HStack {
+                        Text("Reps")
+                            .frame(width: 60, alignment: .leading)
+                        TextField("Reps", text: $repsText)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        Text("reps")
+                            .foregroundColor(.gray)
+                    }
+                    
+                    HStack {
+                        Text("RPE")
+                            .frame(width: 60, alignment: .leading)
+                        TextField("RPE", text: $rpeText)
+                            .keyboardType(.numberPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                        Text("% RPE")
+                            .foregroundColor(.gray)
+                    }
+                }
+                
+                Section {
+                    HStack {
+                        Text("Time")
+                            .frame(width: 60, alignment: .leading)
+                        Text(set.formattedTime)
+                            .foregroundColor(.gray)
+                        Spacer()
+                    }
+                }
+            }
+            .navigationTitle("Edit Set")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveChanges()
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(!isValidInput)
+                }
+            }
+        }
+    }
+    
+    private var isValidInput: Bool {
+        guard let weight = Double(weightText), weight > 0,
+              let reps = Double(repsText), reps > 0,
+              let rpe = Double(rpeText), rpe >= 0, rpe <= 100 else {
+            return false
+        }
+        return true
+    }
+    
+    private func saveChanges() {
+        guard let weight = Double(weightText),
+              let reps = Double(repsText),
+              let rpe = Double(rpeText) else {
+            return
+        }
+        
+        var updatedSet = set
+        updatedSet.weight = CGFloat(weight)
+        updatedSet.reps = CGFloat(reps)
+        updatedSet.rpe = CGFloat(rpe)
+        onSave(updatedSet)
     }
 }
 
@@ -474,4 +822,5 @@ struct WheelPicker: View {
 #Preview {
     ContentView()
 }
+
 
