@@ -8,6 +8,7 @@
 import Supabase
 import SwiftUI
 import UIKit
+import IrregularGradient
 
 // Individual set model with all the details
 struct WorkoutSet: Identifiable {
@@ -78,8 +79,20 @@ struct ExerciseView: View {
     
     var body: some View {
         ZStack {
-            // White background that extends to all edges
-            Color.white.ignoresSafeArea()
+            // Beautiful irregular gradient background
+            RoundedRectangle(cornerRadius: 0)
+                .irregularGradient(
+                    colors: [
+                        Color.blue.opacity(0.3),
+                        Color.purple.opacity(0.2),
+                        Color.pink.opacity(0.2),
+                        Color.indigo.opacity(0.3),
+                        Color.cyan.opacity(0.2),
+                        Color.teal.opacity(0.2)
+                    ],
+                    backgroundColor: Color.white
+                )
+                .ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Main container content

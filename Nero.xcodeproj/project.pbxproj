@@ -13,6 +13,7 @@
 		404A0A152DDBD0FF004B72B8 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 404A0A142DDBD0FF004B72B8 /* Realtime */; };
 		404A0A172DDBD0FF004B72B8 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 404A0A162DDBD0FF004B72B8 /* Storage */; };
 		4099CE652DE91BF400D3D0CD /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 4099CE642DE91BF400D3D0CD /* Supabase */; };
+		4099CE682DEA493F00D3D0CD /* IrregularGradient in Frameworks */ = {isa = PBXBuildFile; productRef = 4099CE672DEA493F00D3D0CD /* IrregularGradient */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,6 +38,7 @@
 				4099CE652DE91BF400D3D0CD /* Supabase in Frameworks */,
 				404A0A0F2DDBD0FF004B72B8 /* Auth in Frameworks */,
 				404A0A172DDBD0FF004B72B8 /* Storage in Frameworks */,
+				4099CE682DEA493F00D3D0CD /* IrregularGradient in Frameworks */,
 				404A0A152DDBD0FF004B72B8 /* Realtime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -94,6 +96,7 @@
 				404A0A142DDBD0FF004B72B8 /* Realtime */,
 				404A0A162DDBD0FF004B72B8 /* Storage */,
 				4099CE642DE91BF400D3D0CD /* Supabase */,
+				4099CE672DEA493F00D3D0CD /* IrregularGradient */,
 			);
 			productName = Nero;
 			productReference = 404A09F32DDBACEB004B72B8 /* Nero.app */;
@@ -125,6 +128,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				404A0A0D2DDBD0FF004B72B8 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				4099CE662DEA493F00D3D0CD /* XCRemoteSwiftPackageReference "IrregularGradient" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 404A09F42DDBACEB004B72B8 /* Products */;
@@ -366,6 +370,14 @@
 				minimumVersion = 2.5.1;
 			};
 		};
+		4099CE662DEA493F00D3D0CD /* XCRemoteSwiftPackageReference "IrregularGradient" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/joogps/IrregularGradient";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -398,6 +410,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 404A0A0D2DDBD0FF004B72B8 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		4099CE672DEA493F00D3D0CD /* IrregularGradient */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4099CE662DEA493F00D3D0CD /* XCRemoteSwiftPackageReference "IrregularGradient" */;
+			productName = IrregularGradient;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
