@@ -23,6 +23,11 @@ struct ContentView: View {
 struct ExerciseView: View {
     @State private var weights: [CGFloat] = [50, 8, 60] // Default values: 50lbs, 8reps, 60%RPE
     @StateObject private var themeManager = ThemeManager()
+    @State private var isSetButtonPressed: Bool = false
+    @State private var showRadialBurst: Bool = false
+    
+    // Haptic feedback generator for SET button
+    private let setButtonFeedback = UIImpactFeedbackGenerator(style: .medium)
     
     var body: some View {
         ZStack {
@@ -56,18 +61,49 @@ struct ExerciseView: View {
                     
                     // Green SET button
                     Button(action: {
-                        // SET button action
+                        // SET button action with haptic feedback and animation
+                        setButtonFeedback.impactOccurred()
+                        
+                        withAnimation(.easeInOut(duration: 0.1)) {
+                            isSetButtonPressed = true
+                        }
+                        
+                        // Show radial burst effect
+                        withAnimation(.easeOut(duration: 0.8)) {
+                            showRadialBurst = true
+                        }
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeInOut(duration: 0.1)) {
+                                isSetButtonPressed = false
+                            }
+                        }
+                        
+                        // Hide burst after short delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                showRadialBurst = false
+                            }
+                        }
+                        
                         print("SET pressed with weights: \(weights)")
                     }) {
                         Circle()
-                            .fill(Color.green.opacity(0.8))
+                            .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.8))
                             .frame(width: 70, height: 70)
+                            .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.8 : 0.6), radius: 8, x: 0, y: 0)
+                            .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.6 : 0.4), radius: 16, x: 0, y: 0)
+                            .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.4 : 0.2), radius: 24, x: 0, y: 0)
                             .overlay(
                                 Text("SET")
                                     .font(.subheadline)
                                     .fontWeight(.bold)
                                     .foregroundColor(.black)
                             )
+                            .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
+                    }
+                    .onAppear {
+                        setButtonFeedback.prepare()
                     }
                     .padding(.top, 25)
                     .padding(.bottom, 20)
@@ -75,6 +111,24 @@ struct ExerciseView: View {
                 .padding(.horizontal, 0)
             }
         }
+        .overlay(
+            // Radial burst effect overlay - doesn't affect layout
+            Group {
+                if showRadialBurst {
+                    RoundedRectangle(cornerRadius: 40)
+                        .stroke(
+                            Color.green,
+                            lineWidth: showRadialBurst ? 20 : 4
+                        )
+                        .blur(radius: 25)
+                        .opacity(showRadialBurst ? 1.0 : 0.0)
+                        .animation(.easeOut(duration: 0.15), value: showRadialBurst)
+                        .allowsHitTesting(false)
+                        .zIndex(999)
+                        .ignoresSafeArea(.all)
+                }
+            }
+        )
     }
 }
 
