@@ -69,7 +69,7 @@ struct ExerciseView: View {
                         }
                         
                         // Show radial burst effect
-                        withAnimation(.easeOut(duration: 0.8)) {
+                        withAnimation(.easeOut(duration: 0.15)) {
                             showRadialBurst = true
                         }
                         
@@ -79,9 +79,9 @@ struct ExerciseView: View {
                             }
                         }
                         
-                        // Hide burst after short delay
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            withAnimation(.easeOut(duration: 0.3)) {
+                        // Hide burst after short delay for quick pulse
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                            withAnimation(.easeOut(duration: 0.15)) {
                                 showRadialBurst = false
                             }
                         }
@@ -118,9 +118,9 @@ struct ExerciseView: View {
                     RoundedRectangle(cornerRadius: 40)
                         .stroke(
                             Color.green,
-                            lineWidth: showRadialBurst ? 20 : 4
+                            lineWidth: showRadialBurst ? 8 : 2
                         )
-                        .blur(radius: 25)
+                        .blur(radius: 8)
                         .opacity(showRadialBurst ? 1.0 : 0.0)
                         .animation(.easeOut(duration: 0.15), value: showRadialBurst)
                         .allowsHitTesting(false)
