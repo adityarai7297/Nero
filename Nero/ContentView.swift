@@ -116,7 +116,9 @@ enum ExerciseComponentType {
                 steps: 1,    // 1 interval between ticks
                 spacing: 35, // Much bigger spacing for RPE
                 multiplier: 10,
-                showsText: true
+                showsText: true,
+                showTextOnlyOnEven: true, // Will show on 0, 20, 40, 60, 80, 100
+                evenInterval: 20 // Show text every 20 units
             )
         }
     }
@@ -245,7 +247,8 @@ struct WheelPicker: View {
                             .overlay(alignment: .bottom) {
                                 if remainder == 0 && config.showsText {
                                     let value = (index / config.steps) * config.multiplier
-                                    let shouldShowText = config.showTextOnlyOnEven ? (value % 2 == 0) : true
+                                    let shouldShowText = config.showTextOnlyOnEven ? 
+                                        (value % (config.evenInterval > 0 ? config.evenInterval : 2) == 0) : true
                                     
                                     if shouldShowText {
                                         Text("\(value)")
@@ -307,6 +310,7 @@ struct WheelPicker: View {
         var multiplier: Int
         var showsText: Bool = true
         var showTextOnlyOnEven: Bool = false
+        var evenInterval: Int = 0
     }
 }
 
