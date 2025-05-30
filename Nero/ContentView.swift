@@ -30,15 +30,8 @@ struct ContentView: View {
                         Text("Bench Press")
                             .font(.largeTitle)
                             .fontWeight(.medium)
-                            .foregroundColor(.white)
+                            .foregroundColor(.black)
                             .padding(.top, 30)
-                        
-                        // Divider line
-                        Rectangle()
-                            .fill(Color.gray)
-                            .frame(height: 1)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 10)
                     }
                     
                     // Three rows of weight selectors
@@ -48,14 +41,8 @@ struct ContentView: View {
                                 .environmentObject(themeManager)
                         }
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 0)
                     .padding(.vertical, 20)
-                    
-                    // Bottom divider
-                    Rectangle()
-                        .fill(Color.gray)
-                        .frame(height: 1)
-                        .padding(.horizontal, 20)
                     
                     // Green SET button
                     Button(action: {
@@ -76,9 +63,9 @@ struct ContentView: View {
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 25)
-                        .fill(Color.gray.opacity(0.3))
+                        .fill(Color.white)
                 )
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 0)
                 .padding(.vertical, 40)
             }
         }
@@ -91,49 +78,43 @@ struct WeightSelectorRow: View {
     
     var body: some View {
         VStack(spacing: 15) {
-            // Weight viewport and wheel picker
+            // Weight viewport 
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
-                    .frame(height: 130)
-                
-                VStack(spacing: 0) {
-                    // Top viewport window showing current weight
-                    ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 100, height: 50)
+                    .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.gray.opacity(0.1))
-                            .frame(width: 100, height: 50)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.blue, lineWidth: 2)
-                            )
-                        
-                        Text("\(Int(weight))")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.black)
-                    }
-                    .padding(.top, 10)
-                    
-                    // Wheel picker for weight selection
-                    WheelPicker(
-                        config: WheelPicker.Config(
-                            count: 198, // 20 to 2000 lbs (1980 range / 10 = 198 major intervals)
-                            steps: 10,  // 10 units between major ticks (major ticks every 10 lbs)
-                            spacing: 8, // Spacing between ticks
-                            multiplier: 10, // Each major tick represents 10 lbs
-                            showsText: true
-                        ),
-                        value: .init(
-                            get: { weight - 20 }, // Convert weight to picker value (start from 20)
-                            set: { newValue in
-                                weight = newValue + 20 // Convert picker value back to weight
-                            }
-                        )
+                            .stroke(Color.blue, lineWidth: 2)
                     )
-                    .frame(height: 70)
-                    .environmentObject(themeManager)
-                }
+                
+                Text("\(Int(weight))")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(.black)
+                    .contentTransition(.numericText())
+                    .animation(.bouncy(duration: 0.3), value: weight)
             }
+            .padding(.top, 10)
+            
+            // Edge-to-edge wheel picker for weight selection
+            WheelPicker(
+                config: WheelPicker.Config(
+                    count: 198, // 20 to 2000 lbs (1980 range / 10 = 198 major intervals)
+                    steps: 10,  // 10 units between major ticks (major ticks every 10 lbs)
+                    spacing: 8, // Spacing between ticks
+                    multiplier: 10, // Each major tick represents 10 lbs
+                    showsText: true
+                ),
+                value: .init(
+                    get: { weight - 20 }, // Convert weight to picker value (start from 20)
+                    set: { newValue in
+                        weight = newValue + 20 // Convert picker value back to weight
+                    }
+                )
+            )
+            .frame(height: 70)
+            .background(Color.white)
+            .environmentObject(themeManager)
             
             // Three weight preset buttons
             HStack(spacing: 15) {
@@ -141,6 +122,7 @@ struct WeightSelectorRow: View {
                 WeightButton(value: 50, currentWeight: $weight)
                 WeightButton(value: 70, currentWeight: $weight)
             }
+            .padding(.horizontal, 20)
         }
     }
 }
@@ -192,7 +174,6 @@ struct WheelPicker: View {
                     
                     ForEach(0...totalSteps, id: \.self) { index in
                         let remainder = index % config.steps
-                        let weightValue = 20 + index
                         
                         Rectangle()
                             .fill(themeManager.wheelPickerColor)
@@ -200,12 +181,13 @@ struct WheelPicker: View {
                             .frame(maxHeight: 20, alignment: .bottom)
                             .overlay(alignment: .bottom) {
                                 if remainder == 0 && config.showsText {
-                                    Text("\(Int(weightValue))")
+                                    Text("\(20 + (index / config.steps) * config.multiplier)")
                                         .font(.caption)
                                         .fontWeight(.semibold)
                                         .foregroundColor(.black)
+                                        .textScale(.secondary)
                                         .fixedSize()
-                                        .offset(y: 25)
+                                        .offset(y: 20)
                                 }
                             }
                     }
@@ -216,28 +198,24 @@ struct WheelPicker: View {
             .scrollIndicators(.hidden)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: .init(get: {
-                let position: Int? = isLoaded ? Int(value * CGFloat(config.steps)) / config.multiplier : nil
+                let position: Int? = isLoaded ? Int(value) : nil
                 return position
             }, set: { newValue in
                 if let newValue {
-                    value = (CGFloat(newValue) / CGFloat(config.steps)) * CGFloat(config.multiplier)
+                    value = CGFloat(newValue)
 
-                    // Trigger more frequent haptic feedback when scrolling past smaller dividers
-                    if abs(value - lastHapticValue) >= CGFloat(config.multiplier) / CGFloat(config.steps) {
-                        feedbackGenerator.impactOccurred() // Trigger haptic feedback
-                        lastHapticValue = value // Update last haptic value
+                    // Trigger haptic feedback when scrolling past major dividers
+                    if abs(value - lastHapticValue) >= CGFloat(config.multiplier) {
+                        feedbackGenerator.impactOccurred()
+                        lastHapticValue = value
                     }
                 }
             }))
             .overlay(alignment: .center) {
-                // Center indicator line - using VStack for proper centering
-                VStack {
-                    Spacer()
-                    Rectangle()
-                        .fill(Color.blue)
-                        .frame(width: 2, height: 30)
-                    Spacer()
-                }
+                Rectangle()
+                    .fill(Color.blue)
+                    .frame(width: 2, height: 40)
+                    .padding(.bottom, 20)
             }
             .safeAreaPadding(.horizontal, horizontalPadding)
             .onAppear {
