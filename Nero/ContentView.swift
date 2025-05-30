@@ -46,19 +46,20 @@ struct ExerciseView: View {
                                 .fontWeight(.medium)
                                 .foregroundColor(.black)
                             
-                            // Green circular set counter
-                            Circle()
-                                .fill(Color.green)
-                                .frame(width: 30, height: 30)
-                                .overlay(
-                                    Text("\(setsCompleted)")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.white)
-                                )
-                                .scaleEffect(setsCompleted > 0 ? 1.0 : 0.8)
-                                .opacity(setsCompleted > 0 ? 1.0 : 0.6)
-                                .animation(.bouncy(duration: 0.3), value: setsCompleted)
+                            // Green circular set counter - only visible after first set
+                            if setsCompleted > 0 {
+                                Circle()
+                                    .fill(Color.green)
+                                    .frame(width: 30, height: 30)
+                                    .overlay(
+                                        Text("\(setsCompleted)")
+                                            .font(.caption)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.white)
+                                    )
+                                    .transition(.scale.combined(with: .opacity))
+                                    .animation(.bouncy(duration: 0.3), value: setsCompleted)
+                            }
                         }
                         .padding(.top, 35)
                         .padding(.bottom, 5)
