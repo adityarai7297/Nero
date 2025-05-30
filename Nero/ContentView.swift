@@ -20,10 +20,11 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            // White background that extends to all edges
+            Color.white.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Main container with dark gray background
+                // Main container content
                 VStack(spacing: 12) {
                     // Title
                     VStack {
@@ -31,12 +32,12 @@ struct ContentView: View {
                             .font(.title2)
                             .fontWeight(.medium)
                             .foregroundColor(.black)
-                            .padding(.top, 65)
+                            .padding(.top, 35)
                             .padding(.bottom, 5)
                     }
                     
                     // Three rows of weight selectors
-                    VStack(spacing: 18) {
+                    VStack(spacing: 32) {
                         ForEach(0..<3, id: \.self) { index in
                             WeightSelectorRow(weight: $weights[index])
                                 .environmentObject(themeManager)
@@ -52,23 +53,18 @@ struct ContentView: View {
                     }) {
                         Circle()
                             .fill(Color.green.opacity(0.8))
-                            .frame(width: 80, height: 80)
+                            .frame(width: 70, height: 70)
                             .overlay(
                                 Text("SET")
-                                    .font(.headline)
+                                    .font(.subheadline)
                                     .fontWeight(.bold)
                                     .foregroundColor(.black)
                             )
                     }
-                    .padding(.vertical, 10)
+                    .padding(.top, 25)
                     .padding(.bottom, 20)
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 25)
-                        .fill(Color.white)
-                )
                 .padding(.horizontal, 0)
-                .ignoresSafeArea(edges: [.top, .bottom])
             }
         }
     }
@@ -84,14 +80,14 @@ struct WeightSelectorRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.gray.opacity(0.1))
-                    .frame(width: 100, height: 50)
+                    .frame(width: 60, height: 40)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.blue, lineWidth: 2)
                     )
                 
                 Text("\(Int(weight))")
-                    .font(.system(size: 28, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.black)
                     .contentTransition(.numericText())
                     .animation(.bouncy(duration: 0.3), value: weight)
@@ -139,10 +135,10 @@ struct WeightButton: View {
         }) {
             RoundedRectangle(cornerRadius: 8)
                 .fill(currentWeight == CGFloat(value) ? Color.blue : Color.blue.opacity(0.7))
-                .frame(width: 70, height: 50)
+                .frame(width: 60, height: 40)
                 .overlay(
                     Text("\(value)")
-                        .font(.headline)
+                        .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                 )
