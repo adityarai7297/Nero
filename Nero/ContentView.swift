@@ -24,25 +24,26 @@ struct ContentView: View {
             
             VStack(spacing: 0) {
                 // Main container with dark gray background
-                VStack(spacing: 20) {
+                VStack(spacing: 12) {
                     // Title
                     VStack {
                         Text("Bench Press")
-                            .font(.largeTitle)
+                            .font(.title2)
                             .fontWeight(.medium)
                             .foregroundColor(.black)
-                            .padding(.top, 30)
+                            .padding(.top, 65)
+                            .padding(.bottom, 5)
                     }
                     
                     // Three rows of weight selectors
-                    VStack(spacing: 30) {
+                    VStack(spacing: 18) {
                         ForEach(0..<3, id: \.self) { index in
                             WeightSelectorRow(weight: $weights[index])
                                 .environmentObject(themeManager)
                         }
                     }
                     .padding(.horizontal, 0)
-                    .padding(.vertical, 20)
+                    .padding(.vertical, 8)
                     
                     // Green SET button
                     Button(action: {
@@ -59,14 +60,15 @@ struct ContentView: View {
                                     .foregroundColor(.black)
                             )
                     }
-                    .padding(.vertical, 30)
+                    .padding(.vertical, 10)
+                    .padding(.bottom, 20)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 25)
                         .fill(Color.white)
                 )
                 .padding(.horizontal, 0)
-                .padding(.vertical, 40)
+                .ignoresSafeArea(edges: [.top, .bottom])
             }
         }
     }
@@ -77,7 +79,7 @@ struct WeightSelectorRow: View {
     @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 12) {
             // Weight viewport 
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
@@ -94,7 +96,7 @@ struct WeightSelectorRow: View {
                     .contentTransition(.numericText())
                     .animation(.bouncy(duration: 0.3), value: weight)
             }
-            .padding(.top, 10)
+            .padding(.top, 5)
             
             // Edge-to-edge wheel picker for weight selection
             WheelPicker(
