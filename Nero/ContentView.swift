@@ -15,6 +15,12 @@ class ThemeManager: ObservableObject {
 }
 
 struct ContentView: View {
+    var body: some View {
+        ExerciseView()
+    }
+}
+
+struct ExerciseView: View {
     @State private var weights: [CGFloat] = [50, 50, 50] // Weight values for each row
     @StateObject private var themeManager = ThemeManager()
     
@@ -36,12 +42,14 @@ struct ContentView: View {
                             .padding(.bottom, 5)
                     }
                     
-                    // Three rows of weight selectors
+                    // Three rows of different components
                     VStack(spacing: 32) {
-                        ForEach(0..<3, id: \.self) { index in
-                            WeightSelectorRow(weight: $weights[index])
-                                .environmentObject(themeManager)
-                        }
+                        ExerciseComponent(value: $weights[0], type: .weight)
+                            .environmentObject(themeManager)
+                        ExerciseComponent(value: $weights[1], type: .repetitions)
+                            .environmentObject(themeManager)
+                        ExerciseComponent(value: $weights[2], type: .rpe)
+                            .environmentObject(themeManager)
                     }
                     .padding(.horizontal, 0)
                     .padding(.vertical, 8)
@@ -70,13 +78,69 @@ struct ContentView: View {
     }
 }
 
-struct WeightSelectorRow: View {
-    @Binding var weight: CGFloat
+enum ExerciseComponentType {
+    case weight
+    case repetitions
+    case rpe
+    
+    var label: String {
+        switch self {
+        case .weight: return "lbs"
+        case .repetitions: return "reps"
+        case .rpe: return "% RPE"
+        }
+    }
+    
+    var wheelConfig: WheelPicker.Config {
+        switch self {
+        case .weight:
+            return WheelPicker.Config(
+                count: 200, // 0 to 2000 lbs (200 intervals of 10)
+                steps: 10,   // 10 small ticks between major ticks
+                spacing: 8,
+                multiplier: 10, // Each major tick represents 10 lbs
+                showsText: true
+            )
+        case .repetitions:
+            return WheelPicker.Config(
+                count: 25,   // 0 to 100 reps (25 intervals of 4)
+                steps: 4,    // 4 small ticks between major ticks
+                spacing: 8,  // Same spacing as weight scale
+                multiplier: 4, // Each major tick represents 4 reps
+                showsText: true
+            )
+        case .rpe:
+            return WheelPicker.Config(
+                count: 10,   // 0 to 100 (10 intervals of 10)
+                steps: 1,    // 1 interval between ticks
+                spacing: 35, // Much bigger spacing for RPE
+                multiplier: 10,
+                showsText: true
+            )
+        }
+    }
+    
+    var presetValues: [Int] {
+        switch self {
+        case .weight: return [30, 50, 70]
+        case .repetitions: return [5, 10, 15]
+        case .rpe: return [70, 80, 90]
+        }
+    }
+    
+    var minValue: CGFloat {
+        return 0
+    }
+}
+
+struct ExerciseComponent: View {
+    @Binding var value: CGFloat
+    let type: ExerciseComponentType
     @EnvironmentObject var themeManager: ThemeManager
     
     var body: some View {
         VStack(spacing: 12) {
-            // Weight viewport 
+            // Value viewport with label
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.gray.opacity(0.1))
@@ -86,27 +150,27 @@ struct WeightSelectorRow: View {
                             .stroke(Color.blue, lineWidth: 2)
                     )
                 
-                Text("\(Int(weight))")
+                Text("\(Int(value))")
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.black)
                     .contentTransition(.numericText())
-                    .animation(.bouncy(duration: 0.3), value: weight)
+                    .animation(.bouncy(duration: 0.3), value: value)
+            }
+            .overlay(alignment: .leading) {
+                Text(type.label)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.gray)
+                    .offset(x: 70) // 60px (box width) + 10px spacing
             }
             .padding(.top, 5)
             
-            // Edge-to-edge wheel picker for weight selection
+            // Edge-to-edge wheel picker
             WheelPicker(
-                config: WheelPicker.Config(
-                    count: 198, // 20 to 2000 lbs (1980 range / 10 = 198 major intervals)
-                    steps: 10,  // 10 units between major ticks (major ticks every 10 lbs)
-                    spacing: 8, // Spacing between ticks
-                    multiplier: 10, // Each major tick represents 10 lbs
-                    showsText: true
-                ),
+                config: type.wheelConfig,
                 value: .init(
-                    get: { weight - 20 }, // Convert weight to picker value (start from 20)
+                    get: { value - type.minValue },
                     set: { newValue in
-                        weight = newValue + 20 // Convert picker value back to weight
+                        value = newValue + type.minValue
                     }
                 )
             )
@@ -114,27 +178,27 @@ struct WeightSelectorRow: View {
             .background(Color.white)
             .environmentObject(themeManager)
             
-            // Three weight preset buttons
+            // Three preset buttons
             HStack(spacing: 15) {
-                WeightButton(value: 30, currentWeight: $weight)
-                WeightButton(value: 50, currentWeight: $weight)
-                WeightButton(value: 70, currentWeight: $weight)
+                ForEach(type.presetValues, id: \.self) { presetValue in
+                    PresetButton(value: presetValue, currentValue: $value)
+                }
             }
             .padding(.horizontal, 20)
         }
     }
 }
 
-struct WeightButton: View {
+struct PresetButton: View {
     let value: Int
-    @Binding var currentWeight: CGFloat
+    @Binding var currentValue: CGFloat
     
     var body: some View {
         Button(action: {
-            currentWeight = CGFloat(value)
+            currentValue = CGFloat(value)
         }) {
             RoundedRectangle(cornerRadius: 8)
-                .fill(currentWeight == CGFloat(value) ? Color.blue : Color.blue.opacity(0.7))
+                .fill(currentValue == CGFloat(value) ? Color.blue : Color.blue.opacity(0.7))
                 .frame(width: 60, height: 40)
                 .overlay(
                     Text("\(value)")
@@ -143,8 +207,8 @@ struct WeightButton: View {
                         .foregroundColor(.white)
                 )
         }
-        .scaleEffect(currentWeight == CGFloat(value) ? 1.1 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: currentWeight)
+        .scaleEffect(currentValue == CGFloat(value) ? 1.1 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: currentValue)
     }
 }
 
@@ -179,7 +243,7 @@ struct WheelPicker: View {
                             .frame(maxHeight: 20, alignment: .bottom)
                             .overlay(alignment: .bottom) {
                                 if remainder == 0 && config.showsText {
-                                    Text("\(20 + (index / config.steps) * config.multiplier)")
+                                    Text("\((index / config.steps) * config.multiplier)")
                                         .font(.caption)
                                         .fontWeight(.semibold)
                                         .foregroundColor(.black)
@@ -196,16 +260,16 @@ struct WheelPicker: View {
             .scrollIndicators(.hidden)
             .scrollTargetBehavior(.viewAligned)
             .scrollPosition(id: .init(get: {
-                let position: Int? = isLoaded ? Int(value) : nil
+                let position: Int? = isLoaded ? Int(value * CGFloat(config.steps)) / config.multiplier : nil
                 return position
             }, set: { newValue in
                 if let newValue {
-                    value = CGFloat(newValue)
+                    value = (CGFloat(newValue) / CGFloat(config.steps)) * CGFloat(config.multiplier)
 
-                    // Trigger haptic feedback when scrolling past major dividers
-                    if abs(value - lastHapticValue) >= CGFloat(config.multiplier) {
-                        feedbackGenerator.impactOccurred()
-                        lastHapticValue = value
+                    // Trigger more frequent haptic feedback when scrolling past smaller dividers
+                    if abs(value - lastHapticValue) >= CGFloat(config.multiplier) / CGFloat(config.steps) {
+                        feedbackGenerator.impactOccurred() // Trigger haptic feedback
+                        lastHapticValue = value // Update last haptic value
                     }
                 }
             }))
