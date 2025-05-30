@@ -25,6 +25,7 @@ struct ExerciseView: View {
     @StateObject private var themeManager = ThemeManager()
     @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
+    @State private var setsCompleted: Int = 0 // Track sets completed for the day
     
     // Haptic feedback generator for SET button
     private let setButtonFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -37,14 +38,30 @@ struct ExerciseView: View {
             VStack(spacing: 0) {
                 // Main container content
                 VStack(spacing: 12) {
-                    // Title
+                    // Title with set counter
                     VStack {
-                        Text("Bench Press")
-                            .font(.title2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.black)
-                            .padding(.top, 35)
-                            .padding(.bottom, 5)
+                        HStack(spacing: 8) {
+                            Text("Bench Press")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.black)
+                            
+                            // Green circular set counter
+                            Circle()
+                                .fill(Color.green)
+                                .frame(width: 30, height: 30)
+                                .overlay(
+                                    Text("\(setsCompleted)")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                )
+                                .scaleEffect(setsCompleted > 0 ? 1.0 : 0.8)
+                                .opacity(setsCompleted > 0 ? 1.0 : 0.6)
+                                .animation(.bouncy(duration: 0.3), value: setsCompleted)
+                        }
+                        .padding(.top, 35)
+                        .padding(.bottom, 5)
                     }
                     
                     // Three rows of different components
@@ -61,6 +78,9 @@ struct ExerciseView: View {
                     
                     // Green SET button
                     Button(action: {
+                        // Increment set counter
+                        setsCompleted += 1
+                        
                         // SET button action with haptic feedback and animation
                         setButtonFeedback.impactOccurred()
                         
@@ -86,7 +106,7 @@ struct ExerciseView: View {
                             }
                         }
                         
-                        print("SET pressed with weights: \(weights)")
+                        print("SET pressed with weights: \(weights), Sets completed: \(setsCompleted)")
                     }) {
                         Circle()
                             .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.8))
