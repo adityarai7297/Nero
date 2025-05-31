@@ -1,15 +1,6 @@
 {
-  "originHash" : "2c1a13e503783d96490d6bac65753183df35069447b8c905c9b1c06e0607308b",
+  "originHash" : "a2b47b975283c007063016d75469b395d89f8763da1d376160fb8c6dcfdb6109",
   "pins" : [
-    {
-      "identity" : "irregulargradient",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/joogps/IrregularGradient",
-      "state" : {
-        "revision" : "84cbf2dd9ecf1e98e592e0718310f90fef52d6be",
-        "version" : "2.1.0"
-      }
-    },
     {
       "identity" : "supabase-swift",
       "kind" : "remoteSourceControl",

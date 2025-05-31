@@ -13,6 +13,7 @@ import IrregularGradient
 // Individual set model with all the details
 struct WorkoutSet: Identifiable {
     let id = UUID()
+    var databaseId: Int? // Track the Supabase database ID
     var exerciseName: String
     var weight: CGFloat
     var reps: CGFloat
@@ -50,7 +51,7 @@ struct Exercise {
 
 // Simple ThemeManager for the WheelPicker
 class ThemeManager: ObservableObject {
-    @Published var wheelPickerColor: Color = .gray
+    @Published var wheelPickerColor: Color = .black.opacity(0.7)
 }
 
 struct ContentView: View {
@@ -60,13 +61,12 @@ struct ContentView: View {
 }
 
 struct ExerciseView: View {
-    @State private var exercises = Exercise.allExercises
+    @StateObject private var workoutService = WorkoutService()
     @State private var currentExerciseIndex: Int = 0
     @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
     @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
-    @State private var allSets: [WorkoutSet] = [] // Track all sets for the day
     @State private var showingSetsModal: Bool = false // Control modal presentation
     
     // Haptic feedback generators
@@ -74,25 +74,16 @@ struct ExerciseView: View {
     private let navigationFeedback = UIImpactFeedbackGenerator(style: .light)
     
     private var currentExercise: Exercise {
-        exercises[currentExerciseIndex]
+        guard !workoutService.exercises.isEmpty else {
+            return Exercise(name: "Loading...", defaultWeight: 0, defaultReps: 0, defaultRPE: 0)
+        }
+        return workoutService.exercises[currentExerciseIndex]
     }
     
     var body: some View {
         ZStack {
-            // Beautiful irregular gradient background
-            RoundedRectangle(cornerRadius: 0)
-                .irregularGradient(
-                    colors: [
-                        Color.blue.opacity(0.3),
-                        Color.purple.opacity(0.2),
-                        Color.pink.opacity(0.2),
-                        Color.indigo.opacity(0.3),
-                        Color.cyan.opacity(0.2),
-                        Color.teal.opacity(0.2)
-                    ],
-                    backgroundColor: Color.white
-                )
-                .ignoresSafeArea()
+            // White background that extends to all edges
+            Color.white.ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Main container content
@@ -102,8 +93,9 @@ struct ExerciseView: View {
                         HStack(spacing: 8) {
                             Text(currentExercise.name)
                                 .font(.title2)
-                                .fontWeight(.medium)
+                                .fontWeight(.bold)
                                 .foregroundColor(.black)
+                                .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
                                 .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
                             
                             // Green circular set counter - only visible after first set and now tappable
@@ -114,6 +106,7 @@ struct ExerciseView: View {
                                     Circle()
                                         .fill(Color.green)
                                         .frame(width: 30, height: 30)
+                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
                                         .overlay(
                                             Text("\(currentExercise.setsCompleted)")
                                                 .font(.caption)
@@ -148,7 +141,7 @@ struct ExerciseView: View {
                             saveCurrentExerciseData()
                             navigationFeedback.impactOccurred()
                             withAnimation(.easeInOut(duration: 0.3)) {
-                                currentExerciseIndex = (currentExerciseIndex - 1 + exercises.count) % exercises.count
+                                currentExerciseIndex = (currentExerciseIndex - 1 + workoutService.exercises.count) % workoutService.exercises.count
                                 loadExerciseData()
                             }
                         }) {
@@ -157,14 +150,16 @@ struct ExerciseView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(.blue)
                                 .frame(width: 44, height: 44)
-                                .background(Color.blue.opacity(0.1))
+                                .background(Color.white.opacity(0.9))
                                 .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
                         }
                         
                         // Green SET button
                         Button(action: {
                             // Create a new set with current values
                             let newSet = WorkoutSet(
+                                databaseId: nil, // New set, will be set by the service
                                 exerciseName: currentExercise.name,
                                 weight: weights[0],
                                 reps: weights[1],
@@ -172,50 +167,51 @@ struct ExerciseView: View {
                                 timestamp: Date()
                             )
                             
-                            // Add to all sets
-                            allSets.append(newSet)
-                            
-                            // Increment set counter for current exercise
-                            exercises[currentExerciseIndex].setsCompleted += 1
-                            
-                            // SET button action with haptic feedback and animation
-                            setButtonFeedback.impactOccurred()
-                            
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                isSetButtonPressed = true
-                            }
-                            
-                            // Show radial burst effect
-                            withAnimation(.easeOut(duration: 0.15)) {
-                                showRadialBurst = true
-                            }
-                            
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                withAnimation(.easeInOut(duration: 0.1)) {
-                                    isSetButtonPressed = false
+                            // Save to Supabase
+                            Task {
+                                let success = await workoutService.saveWorkoutSet(newSet)
+                                if success {
+                                    // SET button action with haptic feedback and animation
+                                    await MainActor.run {
+                                        setButtonFeedback.impactOccurred()
+                                        
+                                        withAnimation(.easeInOut(duration: 0.1)) {
+                                            isSetButtonPressed = true
+                                        }
+                                        
+                                        // Show radial burst effect
+                                        withAnimation(.easeOut(duration: 0.15)) {
+                                            showRadialBurst = true
+                                        }
+                                        
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                            withAnimation(.easeInOut(duration: 0.1)) {
+                                                isSetButtonPressed = false
+                                            }
+                                        }
+                                        
+                                        // Hide burst after short delay for quick pulse
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                            withAnimation(.easeOut(duration: 0.15)) {
+                                                showRadialBurst = false
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             
-                            // Hide burst after short delay for quick pulse
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                withAnimation(.easeOut(duration: 0.15)) {
-                                    showRadialBurst = false
-                                }
-                            }
-                            
-                            print("SET pressed for \(currentExercise.name) with weights: \(weights), Sets completed: \(currentExercise.setsCompleted)")
+                            print("SET pressed for \(currentExercise.name) with weights: \(weights)")
                         }) {
                             Circle()
-                                .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.8))
+                                .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.85))
                                 .frame(width: 70, height: 70)
-                                .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.8 : 0.6), radius: 8, x: 0, y: 0)
-                                .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.6 : 0.4), radius: 16, x: 0, y: 0)
-                                .shadow(color: Color.green.opacity(isSetButtonPressed ? 0.4 : 0.2), radius: 24, x: 0, y: 0)
+                                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                                 .overlay(
                                     Text("SET")
                                         .font(.subheadline)
                                         .fontWeight(.bold)
                                         .foregroundColor(.black)
+                                        .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 1)
                                 )
                                 .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
                         }
@@ -225,7 +221,7 @@ struct ExerciseView: View {
                             saveCurrentExerciseData()
                             navigationFeedback.impactOccurred()
                             withAnimation(.easeInOut(duration: 0.3)) {
-                                currentExerciseIndex = (currentExerciseIndex + 1) % exercises.count
+                                currentExerciseIndex = (currentExerciseIndex + 1) % workoutService.exercises.count
                                 loadExerciseData()
                             }
                         }) {
@@ -234,8 +230,9 @@ struct ExerciseView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(.blue)
                                 .frame(width: 44, height: 44)
-                                .background(Color.blue.opacity(0.1))
+                                .background(Color.white.opacity(0.9))
                                 .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
                         }
                     }
                     .onAppear {
@@ -269,13 +266,25 @@ struct ExerciseView: View {
         )
         .sheet(isPresented: $showingSetsModal) {
             SetsModalView(
-                allSets: $allSets,
-                exercises: $exercises,
-                onSetDeleted: { deletedSet in
-                    updateExerciseSetCounts()
-                }
+                allSets: workoutService.todaySets,
+                workoutService: workoutService
             )
             .environmentObject(themeManager)
+        }
+        .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
+            Button("OK") { workoutService.errorMessage = nil }
+        } message: {
+            if let errorMessage = workoutService.errorMessage {
+                Text(errorMessage)
+            }
+        }
+        .overlay {
+            if workoutService.isLoading {
+                ProgressView("Loading exercises...")
+                    .padding()
+                    .background(Color.white.opacity(0.9))
+                    .cornerRadius(10)
+            }
         }
     }
     
@@ -290,23 +299,14 @@ struct ExerciseView: View {
         let exercise = currentExercise
         weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
     }
-    
-    // Update exercise set counts based on actual sets in allSets array
-    private func updateExerciseSetCounts() {
-        for index in exercises.indices {
-            let exerciseName = exercises[index].name
-            exercises[index].setsCompleted = allSets.filter { $0.exerciseName == exerciseName }.count
-        }
-    }
 }
 
 // Modal view to show all sets for the day
 struct SetsModalView: View {
-    @Binding var allSets: [WorkoutSet]
-    @Binding var exercises: [Exercise]
+    let allSets: [WorkoutSet]
+    let workoutService: WorkoutService
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var themeManager: ThemeManager
-    let onSetDeleted: (WorkoutSet) -> Void
     
     @State private var editingSet: WorkoutSet?
     @State private var showingEditSheet = false
@@ -366,6 +366,7 @@ struct SetsModalView: View {
             if let editingSet = editingSet {
                 EditSetView(
                     set: editingSet,
+                    workoutService: workoutService,
                     onSave: { updatedSet in
                         updateSet(updatedSet)
                         showingEditSheet = false
@@ -380,15 +381,20 @@ struct SetsModalView: View {
     }
     
     private func deleteSet(_ set: WorkoutSet) {
-        withAnimation {
-            allSets.removeAll { $0.id == set.id }
-            onSetDeleted(set)
+        Task {
+            let success = await workoutService.deleteWorkoutSet(set)
+            if !success {
+                // Error handling is done in the service
+            }
         }
     }
     
     private func updateSet(_ updatedSet: WorkoutSet) {
-        if let index = allSets.firstIndex(where: { $0.id == updatedSet.id }) {
-            allSets[index] = updatedSet
+        Task {
+            let success = await workoutService.updateWorkoutSet(updatedSet)
+            if !success {
+                // Error handling is done in the service
+            }
         }
     }
 }
@@ -482,6 +488,7 @@ struct SetRowView: View {
 // Edit set view
 struct EditSetView: View {
     let set: WorkoutSet
+    let workoutService: WorkoutService
     let onSave: (WorkoutSet) -> Void
     let onCancel: () -> Void
     
@@ -489,8 +496,9 @@ struct EditSetView: View {
     @State private var repsText: String
     @State private var rpeText: String
     
-    init(set: WorkoutSet, onSave: @escaping (WorkoutSet) -> Void, onCancel: @escaping () -> Void) {
+    init(set: WorkoutSet, workoutService: WorkoutService, onSave: @escaping (WorkoutSet) -> Void, onCancel: @escaping () -> Void) {
         self.set = set
+        self.workoutService = workoutService
         self.onSave = onSave
         self.onCancel = onCancel
         self._weightText = State(initialValue: "\(Int(set.weight))")
@@ -664,11 +672,12 @@ struct ExerciseComponent: View {
             // Value viewport with label
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.1))
+                    .fill(Color.white.opacity(0.95))
                     .frame(width: 60, height: 40)
+                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.blue, lineWidth: 2)
+                            .stroke(Color.blue.opacity(0.8), lineWidth: 2)
                     )
                 
                 Text("\(Int(value))")
@@ -679,8 +688,9 @@ struct ExerciseComponent: View {
             }
             .overlay(alignment: .leading) {
                 Text(type.label)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.gray)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.black)
+                    .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
                     .offset(x: 70) // 60px (box width) + 10px spacing
             }
             .padding(.top, 5)
@@ -696,7 +706,7 @@ struct ExerciseComponent: View {
                 )
             )
             .frame(height: 70)
-            .background(Color.white)
+            .background(Color.clear)
             .environmentObject(themeManager)
             
             // Three preset buttons
@@ -719,12 +729,13 @@ struct PresetButton: View {
             currentValue = CGFloat(value)
         }) {
             RoundedRectangle(cornerRadius: 8)
-                .fill(currentValue == CGFloat(value) ? Color.blue : Color.blue.opacity(0.7))
+                .fill(currentValue == CGFloat(value) ? Color.blue : Color.blue.opacity(0.8))
                 .frame(width: 60, height: 40)
+                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
                 .overlay(
                     Text("\(value)")
                         .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                         .foregroundColor(.white)
                 )
         }
@@ -771,8 +782,9 @@ struct WheelPicker: View {
                                     if shouldShowText {
                                         Text("\(value)")
                                             .font(.caption)
-                                            .fontWeight(.semibold)
+                                            .fontWeight(.bold)
                                             .foregroundColor(.black)
+                                            .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
                                             .textScale(.secondary)
                                             .fixedSize()
                                             .offset(y: 20)
@@ -829,6 +841,34 @@ struct WheelPicker: View {
         var showsText: Bool = true
         var showTextOnlyOnEven: Bool = false
         var evenInterval: Int = 0
+    }
+}
+
+// Color extension to support hex colors
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
