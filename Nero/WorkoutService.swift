@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import SwiftUI
 
 // Database models
 struct DBExercise: Codable {
@@ -184,8 +185,13 @@ class WorkoutService: ObservableObject {
                 .eq("id", value: databaseId)
                 .execute()
             
+            // Add a small delay to let the animation play
+            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
             await MainActor.run {
-                self.todaySets.removeAll { $0.id == workoutSet.id }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    self.todaySets.removeAll { $0.id == workoutSet.id }
+                }
                 self.updateSetCounts()
             }
             

@@ -10,8 +10,236 @@ import SwiftUI
 import UIKit
 import IrregularGradient
 
+// Next-Set Recommendations Algorithm
+struct NextSetRecommendations {
+    let weightOptions: [Int]
+    let repOptions: [Int] 
+    let rpeOptions: [Double]
+    
+    static func calculate(from lastSet: WorkoutSet) -> NextSetRecommendations {
+        let weight = Double(lastSet.weight)
+        let reps = Int(lastSet.reps)
+        let rpe = Double(lastSet.rpe) // RPE is already in percentage form (e.g. 75)
+        
+        return calculate(weight: weight, reps: reps, rpe: rpe)
+    }
+    
+    static func calculate(weight: Double, reps: Int, rpe: Double) -> NextSetRecommendations {
+        // Determine RPE band (rpe is in percentage form: 50-100)
+        let rpeBand = getRPEBand(rpe)
+        
+        // Get weight recommendations
+        let weightOptions = calculateWeightOptions(weight: weight, rpeBand: rpeBand)
+        
+        // Get rep recommendations  
+        let repOptions = calculateRepOptions(reps: reps, rpeBand: rpeBand)
+        
+        // Get RPE recommendations (keep in percentage form)
+        let rpeOptions = calculateRPEOptions(rpe: rpe, rpeBand: rpeBand)
+        
+        return NextSetRecommendations(
+            weightOptions: weightOptions,
+            repOptions: repOptions,
+            rpeOptions: rpeOptions
+        )
+    }
+    
+    private static func getRPEBand(_ rpe: Double) -> RPEBand {
+        if rpe <= 65 { return .veryLight }      // ≤ 6.5 -> ≤ 65%
+        else if rpe <= 75 { return .light }    // ≤ 7.5 -> ≤ 75%  
+        else if rpe <= 85 { return .moderate } // ≤ 8.5 -> ≤ 85%
+        else if rpe <= 95 { return .heavy }    // ≤ 9.5 -> ≤ 95%
+        else { return .veryHeavy }             // > 9.5 -> > 95%
+    }
+    
+    private static func calculateWeightOptions(weight: Double, rpeBand: RPEBand) -> [Int] {
+        let deltas = getWeightDeltas(rpeBand)
+        var options: [Int] = []
+        
+        for delta in deltas {
+            let target = weight * (1.0 + delta)
+            let rounded = roundWeight(target, delta: delta)
+            options.append(rounded)
+        }
+        
+        // Remove duplicates and ensure spacing
+        return enforceDuplicatesAndSpacing(options)
+    }
+    
+    private static func calculateRepOptions(reps: Int, rpeBand: RPEBand) -> [Int] {
+        let deltas = getRepDeltas(rpeBand)
+        var options: [Int] = []
+        
+        for delta in deltas {
+            let target = max(1, reps + delta) // Ensure at least 1 rep
+            options.append(target)
+        }
+        
+        // Remove duplicates and sort
+        var uniqueOptions = Array(Set(options)).sorted()
+        
+        // If we have fewer than 3 unique options, add more
+        while uniqueOptions.count < 3 {
+            if uniqueOptions.count == 1 {
+                let current = uniqueOptions[0]
+                // Add one below (if possible) and one above
+                if current > 1 {
+                    uniqueOptions.insert(current - 1, at: 0)
+                }
+                uniqueOptions.append(current + 1)
+            } else if uniqueOptions.count == 2 {
+                // Add one more option
+                let first = uniqueOptions[0]
+                let second = uniqueOptions[1]
+                if first > 1 {
+                    uniqueOptions.insert(first - 1, at: 0)
+                } else {
+                    uniqueOptions.append(second + 1)
+                }
+            }
+        }
+        
+        // Remove duplicates again and sort
+        uniqueOptions = Array(Set(uniqueOptions)).sorted()
+        
+        return Array(uniqueOptions.prefix(3)) // Take first 3
+    }
+    
+    private static func calculateRPEOptions(rpe: Double, rpeBand: RPEBand) -> [Double] {
+        let deltas = getRPEDeltas(rpeBand)
+        var options: [Double] = []
+        
+        for delta in deltas {
+            let target = max(50.0, min(100.0, rpe + delta)) // Clip between 50 and 100
+            let rounded = round(target / 5.0) * 5.0 // Round to nearest multiple of 5
+            options.append(rounded)
+        }
+        
+        // Remove duplicates and sort
+        var uniqueOptions = Array(Set(options)).sorted()
+        
+        // If we have fewer than 3 unique options due to rounding/clamping, add more
+        while uniqueOptions.count < 3 {
+            if uniqueOptions.count == 1 {
+                // Add options above and below if possible
+                let current = uniqueOptions[0]
+                if current > 50 {
+                    uniqueOptions.insert(current - 5.0, at: 0)
+                }
+                if current < 100 {
+                    uniqueOptions.append(current + 5.0)
+                }
+            } else if uniqueOptions.count == 2 {
+                // Add one more option
+                let first = uniqueOptions[0]
+                let second = uniqueOptions[1]
+                if first > 50 {
+                    uniqueOptions.insert(first - 5.0, at: 0)
+                } else if second < 100 {
+                    uniqueOptions.append(second + 5.0)
+                }
+            }
+        }
+        
+        // Ensure values are within bounds and return exactly 3
+        uniqueOptions = uniqueOptions.compactMap { value in
+            let clampedValue = max(50.0, min(100.0, value))
+            return clampedValue
+        }
+        
+        // Remove any duplicates that might have been created by clamping
+        uniqueOptions = Array(Set(uniqueOptions)).sorted()
+        
+        // If still fewer than 3, pad with reasonable defaults (multiples of 5)
+        while uniqueOptions.count < 3 {
+            if uniqueOptions.isEmpty {
+                let baseRPE = round(rpe / 5.0) * 5.0 // Round current RPE to multiple of 5
+                uniqueOptions = [baseRPE - 5.0, baseRPE, baseRPE + 5.0].map { max(50.0, min(100.0, $0)) }
+            } else if uniqueOptions.count == 1 {
+                let current = uniqueOptions[0]
+                uniqueOptions = [max(50.0, current - 5.0), current, min(100.0, current + 5.0)]
+            } else if uniqueOptions.count == 2 {
+                let second = uniqueOptions[1]
+                let newValue = min(100.0, second + 5.0)
+                uniqueOptions.append(newValue)
+            }
+        }
+        
+        return Array(Set(uniqueOptions)).sorted().prefix(3).map { $0 }
+    }
+    
+    private static func getWeightDeltas(_ band: RPEBand) -> [Double] {
+        switch band {
+        case .veryLight: return [-0.025, 0.05, 0.075]   // -2.5%, +5%, +7.5% 
+        case .light:     return [-0.025, 0.05, 0.075]   // -2.5%, +5%, +7.5%
+        case .moderate:  return [-0.025, 0.025, 0.05]   // -2.5%, +2.5%, +5%
+        case .heavy:     return [-0.05, 0.0, 0.05]      // -5%, 0%, +5%
+        case .veryHeavy: return [-0.10, -0.05, 0.0]     // -10%, -5%, 0%
+        }
+    }
+    
+    private static func getRepDeltas(_ band: RPEBand) -> [Int] {
+        switch band {
+        case .veryLight: return [-1, 2, 3]   // -1, +2, +3
+        case .light:     return [-1, 1, 2]   // -1, +1, +2
+        case .moderate:  return [-1, 0, 1]   // -1, 0, +1
+        case .heavy:     return [-1, 0, 1]   // -1, 0, +1
+        case .veryHeavy: return [-2, -1, 0]  // -2, -1, 0
+        }
+    }
+    
+    private static func getRPEDeltas(_ band: RPEBand) -> [Double] {
+        switch band {
+        case .veryLight: return [-5.0, 5.0, 10.0]     // -5%, +5%, +10%
+        case .light:     return [-5.0, 5.0, 10.0]     // -5%, +5%, +10%
+        case .moderate:  return [-5.0, 0.0, 5.0]      // -5%, 0%, +5%
+        case .heavy:     return [-5.0, 0.0, 5.0]      // -5%, 0%, +5%
+        case .veryHeavy: return [-10.0, -5.0, 0.0]    // -10%, -5%, 0%
+        }
+    }
+    
+    private static func roundWeight(_ target: Double, delta: Double) -> Int {
+        let increment = 5.0
+        
+        if delta > 0 {
+            // Round up to next multiple of 5
+            return Int(ceil(target / increment) * increment)
+        } else if delta < 0 {
+            // Round down to previous multiple of 5
+            return Int(floor(target / increment) * increment)
+        } else {
+            // Round to nearest multiple of 5
+            return Int(round(target / increment) * increment)
+        }
+    }
+    
+    private static func enforceDuplicatesAndSpacing(_ options: [Int]) -> [Int] {
+        var result = Array(Set(options)).sorted()
+        
+        // Ensure spacing of at least 5
+        var i = 0
+        while i < result.count - 1 {
+            if result[i + 1] - result[i] < 5 {
+                // Shift the heavier one up by 5
+                result[i + 1] = result[i] + 5
+            }
+            i += 1
+        }
+        
+        return Array(result.prefix(3)) // Return first 3
+    }
+    
+    private enum RPEBand {
+        case veryLight  // ≤ 6.5
+        case light      // ≤ 7.5
+        case moderate   // ≤ 8.5
+        case heavy      // ≤ 9.5
+        case veryHeavy  // > 9.5
+    }
+}
+
 // Individual set model with all the details
-struct WorkoutSet: Identifiable {
+struct WorkoutSet: Identifiable, Equatable {
     let id = UUID()
     var databaseId: Int? // Track the Supabase database ID
     var exerciseName: String
@@ -24,6 +252,17 @@ struct WorkoutSet: Identifiable {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: timestamp)
+    }
+    
+    // Equatable conformance
+    static func == (lhs: WorkoutSet, rhs: WorkoutSet) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.databaseId == rhs.databaseId &&
+               lhs.exerciseName == rhs.exerciseName &&
+               lhs.weight == rhs.weight &&
+               lhs.reps == rhs.reps &&
+               lhs.rpe == rhs.rpe &&
+               lhs.timestamp == rhs.timestamp
     }
 }
 
@@ -68,6 +307,13 @@ struct ExerciseView: View {
     @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
     @State private var showingSetsModal: Bool = false // Control modal presentation
+    
+    // Dynamic recommendation state
+    @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
+        weightOptions: [30, 50, 70],
+        repOptions: [5, 10, 15], 
+        rpeOptions: [7.0, 8.0, 9.0]
+    )
     
     // Haptic feedback generators
     private let setButtonFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -124,11 +370,11 @@ struct ExerciseView: View {
                     
                     // Three rows of different components
                     VStack(spacing: 32) {
-                        ExerciseComponent(value: $weights[0], type: .weight)
+                        ExerciseComponent(value: $weights[0], type: .weight, recommendations: currentRecommendations)
                             .environmentObject(themeManager)
-                        ExerciseComponent(value: $weights[1], type: .repetitions)
+                        ExerciseComponent(value: $weights[1], type: .repetitions, recommendations: currentRecommendations)
                             .environmentObject(themeManager)
-                        ExerciseComponent(value: $weights[2], type: .rpe)
+                        ExerciseComponent(value: $weights[2], type: .rpe, recommendations: currentRecommendations)
                             .environmentObject(themeManager)
                     }
                     .padding(.horizontal, 0)
@@ -174,6 +420,9 @@ struct ExerciseView: View {
                                     // SET button action with haptic feedback and animation
                                     await MainActor.run {
                                         setButtonFeedback.impactOccurred()
+                                        
+                                        // Update recommendations immediately after successful save
+                                        updateRecommendationsAfterSet()
                                         
                                         withAnimation(.easeInOut(duration: 0.1)) {
                                             isSetButtonPressed = true
@@ -239,6 +488,7 @@ struct ExerciseView: View {
                         setButtonFeedback.prepare()
                         navigationFeedback.prepare()
                         loadExerciseData() // Load initial exercise data
+                        updateRecommendationsForCurrentExercise() // Load initial recommendations
                     }
                     .padding(.top, 25)
                     .padding(.bottom, 20)
@@ -286,6 +536,10 @@ struct ExerciseView: View {
                     .cornerRadius(10)
             }
         }
+        .onChange(of: workoutService.todaySets) { oldSets, newSets in
+            // Update recommendations when today's sets change (load, add, edit, delete)
+            updateRecommendationsForCurrentExercise()
+        }
     }
     
     // Save current exercise data when switching exercises
@@ -298,6 +552,44 @@ struct ExerciseView: View {
     private func loadExerciseData() {
         let exercise = currentExercise
         weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
+        
+        // Update recommendations based on the latest set for this exercise
+        updateRecommendationsForCurrentExercise()
+    }
+    
+    // Update recommendations based on the latest set for the current exercise
+    private func updateRecommendationsForCurrentExercise() {
+        let exerciseName = currentExercise.name
+        let latestSet = workoutService.todaySets
+            .filter { $0.exerciseName == exerciseName }
+            .sorted { $0.timestamp > $1.timestamp }
+            .first
+        
+        if let latestSet = latestSet {
+            // Use the latest set to calculate recommendations
+            currentRecommendations = NextSetRecommendations.calculate(from: latestSet)
+        } else {
+            // No sets yet, use default recommendations
+            currentRecommendations = NextSetRecommendations(
+                weightOptions: [30, 50, 70],
+                repOptions: [5, 10, 15],
+                rpeOptions: [7.0, 8.0, 9.0]
+            )
+        }
+    }
+    
+    // Update recommendations after logging a new set
+    private func updateRecommendationsAfterSet() {
+        // Create a temporary set with current values to calculate recommendations
+        let tempSet = WorkoutSet(
+            exerciseName: currentExercise.name,
+            weight: weights[0],
+            reps: weights[1], 
+            rpe: weights[2],
+            timestamp: Date()
+        )
+        
+        currentRecommendations = NextSetRecommendations.calculate(from: tempSet)
     }
 }
 
@@ -310,6 +602,7 @@ struct SetsModalView: View {
     
     @State private var editingSet: WorkoutSet?
     @State private var showingEditSheet = false
+    @State private var deletingSetIds: Set<UUID> = [] // Track sets being deleted
     
     var body: some View {
         NavigationView {
@@ -337,6 +630,7 @@ struct SetsModalView: View {
                         ForEach(allSets.sorted(by: { $0.timestamp > $1.timestamp })) { set in
                             SetRowView(
                                 set: set,
+                                isDeleting: deletingSetIds.contains(set.id),
                                 onEdit: {
                                     editingSet = set
                                     showingEditSheet = true
@@ -381,10 +675,24 @@ struct SetsModalView: View {
     }
     
     private func deleteSet(_ set: WorkoutSet) {
+        // Add visual feedback immediately
+        withAnimation(.easeInOut(duration: 0.3)) {
+            deletingSetIds.insert(set.id)
+        }
+        
         Task {
             let success = await workoutService.deleteWorkoutSet(set)
+            
+            // Always remove from deletingSetIds after operation completes
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    deletingSetIds.remove(set.id)
+                }
+            }
+            
             if !success {
                 // Error handling is done in the service
+                // Could add additional UI feedback here if needed
             }
         }
     }
@@ -402,6 +710,7 @@ struct SetsModalView: View {
 // Individual set row view
 struct SetRowView: View {
     let set: WorkoutSet
+    let isDeleting: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
     
@@ -413,6 +722,7 @@ struct SetRowView: View {
                         .font(.headline)
                         .fontWeight(.semibold)
                         .lineLimit(1)
+                        .foregroundColor(isDeleting ? .gray : .primary)
                     
                     Text(set.formattedTime)
                         .font(.caption)
@@ -425,6 +735,7 @@ struct SetRowView: View {
                         Text("\(Int(set.weight))")
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .foregroundColor(isDeleting ? .gray : .primary)
                         Text("lbs")
                             .font(.caption)
                             .foregroundColor(.gray)
@@ -434,6 +745,7 @@ struct SetRowView: View {
                         Text("\(Int(set.reps))")
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .foregroundColor(isDeleting ? .gray : .primary)
                         Text("reps")
                             .font(.caption)
                             .foregroundColor(.gray)
@@ -443,6 +755,7 @@ struct SetRowView: View {
                         Text("\(Int(set.rpe))")
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .foregroundColor(isDeleting ? .gray : .primary)
                         Text("% RPE")
                             .font(.caption)
                             .foregroundColor(.gray)
@@ -466,22 +779,34 @@ struct SetRowView: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(isDeleting)
+                .opacity(isDeleting ? 0.3 : 1.0)
                 
                 Button(action: {
                     onDelete()
                 }) {
-                    Image(systemName: "trash")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .frame(width: 32, height: 32)
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(Circle())
+                    if isDeleting {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .frame(width: 32, height: 32)
+                    } else {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .frame(width: 32, height: 32)
+                            .background(Color.red.opacity(0.1))
+                            .clipShape(Circle())
+                    }
                 }
                 .buttonStyle(PlainButtonStyle())
+                .disabled(isDeleting)
             }
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .opacity(isDeleting ? 0.6 : 1.0)
+        .scaleEffect(isDeleting ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.3), value: isDeleting)
     }
 }
 
@@ -649,14 +974,6 @@ enum ExerciseComponentType {
         }
     }
     
-    var presetValues: [Int] {
-        switch self {
-        case .weight: return [30, 50, 70]
-        case .repetitions: return [5, 10, 15]
-        case .rpe: return [70, 80, 90]
-        }
-    }
-    
     var minValue: CGFloat {
         return 0
     }
@@ -666,6 +983,19 @@ struct ExerciseComponent: View {
     @Binding var value: CGFloat
     let type: ExerciseComponentType
     @EnvironmentObject var themeManager: ThemeManager
+    let recommendations: NextSetRecommendations
+    
+    // Get recommendation values based on component type
+    private var recommendationValues: [Int] {
+        switch type {
+        case .weight:
+            return recommendations.weightOptions
+        case .repetitions:
+            return recommendations.repOptions
+        case .rpe:
+            return recommendations.rpeOptions.map { Int(round($0)) } // Round RPE to nearest integer
+        }
+    }
     
     var body: some View {
         VStack(spacing: 12) {
@@ -709,9 +1039,9 @@ struct ExerciseComponent: View {
             .background(Color.clear)
             .environmentObject(themeManager)
             
-            // Three preset buttons
+            // Three preset buttons with dynamic recommendations
             HStack(spacing: 15) {
-                ForEach(type.presetValues, id: \.self) { presetValue in
+                ForEach(recommendationValues, id: \.self) { presetValue in
                     PresetButton(value: presetValue, currentValue: $value)
                 }
             }
