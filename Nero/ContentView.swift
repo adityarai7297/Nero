@@ -19,222 +19,41 @@ struct NextSetRecommendations {
     static func calculate(from lastSet: WorkoutSet) -> NextSetRecommendations {
         let weight = Double(lastSet.weight)
         let reps = Int(lastSet.reps)
-        let rpe = Double(lastSet.rpe) // RPE is already in percentage form (e.g. 75)
+        let rpe = Double(lastSet.rpe) // RPE is in percentage form (e.g. 75)
         
         return calculate(weight: weight, reps: reps, rpe: rpe)
     }
     
     static func calculate(weight: Double, reps: Int, rpe: Double) -> NextSetRecommendations {
-        // Determine RPE band (rpe is in percentage form: 50-100)
-        let rpeBand = getRPEBand(rpe)
+        // Weight recommendations: -20, -10, +10, +20
+        let weightDeltas = [-20, -10, 10, 20]
+        let weightOptions = weightDeltas.compactMap { delta -> Int? in
+            let newWeight = weight + Double(delta)
+            return newWeight > 0 ? Int(newWeight) : nil // Ensure positive weight
+        }
         
-        // Get weight recommendations
-        let weightOptions = calculateWeightOptions(weight: weight, rpeBand: rpeBand)
+        // Reps recommendations: -2, +2 from last rep count
+        let repDeltas = [-2, 2]
+        let repOptions = repDeltas.compactMap { delta -> Int? in
+            let newReps = reps + delta
+            return newReps > 0 ? newReps : nil // Ensure at least 1 rep
+        }
         
-        // Get rep recommendations  
-        let repOptions = calculateRepOptions(reps: reps, rpeBand: rpeBand)
-        
-        // Get RPE recommendations (keep in percentage form)
-        let rpeOptions = calculateRPEOptions(rpe: rpe, rpeBand: rpeBand)
+        // RPE recommendations: -10, +10 from last RPE (in percentage form)
+        let rpeDeltas = [-10.0, 10.0]
+        let rpeOptions = rpeDeltas.compactMap { delta -> Double? in
+            let newRPE = rpe + delta
+            if newRPE >= 50.0 && newRPE <= 100.0 { // Keep within 50-100% range
+                return newRPE
+            }
+            return nil
+        }
         
         return NextSetRecommendations(
             weightOptions: weightOptions,
             repOptions: repOptions,
             rpeOptions: rpeOptions
         )
-    }
-    
-    private static func getRPEBand(_ rpe: Double) -> RPEBand {
-        if rpe <= 65 { return .veryLight }      // ≤ 6.5 -> ≤ 65%
-        else if rpe <= 75 { return .light }    // ≤ 7.5 -> ≤ 75%  
-        else if rpe <= 85 { return .moderate } // ≤ 8.5 -> ≤ 85%
-        else if rpe <= 95 { return .heavy }    // ≤ 9.5 -> ≤ 95%
-        else { return .veryHeavy }             // > 9.5 -> > 95%
-    }
-    
-    private static func calculateWeightOptions(weight: Double, rpeBand: RPEBand) -> [Int] {
-        let deltas = getWeightDeltas(rpeBand)
-        var options: [Int] = []
-        
-        for delta in deltas {
-            let target = weight * (1.0 + delta)
-            let rounded = roundWeight(target, delta: delta)
-            options.append(rounded)
-        }
-        
-        // Remove duplicates and ensure spacing
-        return enforceDuplicatesAndSpacing(options)
-    }
-    
-    private static func calculateRepOptions(reps: Int, rpeBand: RPEBand) -> [Int] {
-        let deltas = getRepDeltas(rpeBand)
-        var options: [Int] = []
-        
-        for delta in deltas {
-            let target = max(1, reps + delta) // Ensure at least 1 rep
-            options.append(target)
-        }
-        
-        // Remove duplicates and sort
-        var uniqueOptions = Array(Set(options)).sorted()
-        
-        // If we have fewer than 3 unique options, add more
-        while uniqueOptions.count < 3 {
-            if uniqueOptions.count == 1 {
-                let current = uniqueOptions[0]
-                // Add one below (if possible) and one above
-                if current > 1 {
-                    uniqueOptions.insert(current - 1, at: 0)
-                }
-                uniqueOptions.append(current + 1)
-            } else if uniqueOptions.count == 2 {
-                // Add one more option
-                let first = uniqueOptions[0]
-                let second = uniqueOptions[1]
-                if first > 1 {
-                    uniqueOptions.insert(first - 1, at: 0)
-                } else {
-                    uniqueOptions.append(second + 1)
-                }
-            }
-        }
-        
-        // Remove duplicates again and sort
-        uniqueOptions = Array(Set(uniqueOptions)).sorted()
-        
-        return Array(uniqueOptions.prefix(3)) // Take first 3
-    }
-    
-    private static func calculateRPEOptions(rpe: Double, rpeBand: RPEBand) -> [Double] {
-        let deltas = getRPEDeltas(rpeBand)
-        var options: [Double] = []
-        
-        for delta in deltas {
-            let target = max(50.0, min(100.0, rpe + delta)) // Clip between 50 and 100
-            let rounded = round(target / 5.0) * 5.0 // Round to nearest multiple of 5
-            options.append(rounded)
-        }
-        
-        // Remove duplicates and sort
-        var uniqueOptions = Array(Set(options)).sorted()
-        
-        // If we have fewer than 3 unique options due to rounding/clamping, add more
-        while uniqueOptions.count < 3 {
-            if uniqueOptions.count == 1 {
-                // Add options above and below if possible
-                let current = uniqueOptions[0]
-                if current > 50 {
-                    uniqueOptions.insert(current - 5.0, at: 0)
-                }
-                if current < 100 {
-                    uniqueOptions.append(current + 5.0)
-                }
-            } else if uniqueOptions.count == 2 {
-                // Add one more option
-                let first = uniqueOptions[0]
-                let second = uniqueOptions[1]
-                if first > 50 {
-                    uniqueOptions.insert(first - 5.0, at: 0)
-                } else if second < 100 {
-                    uniqueOptions.append(second + 5.0)
-                }
-            }
-        }
-        
-        // Ensure values are within bounds and return exactly 3
-        uniqueOptions = uniqueOptions.compactMap { value in
-            let clampedValue = max(50.0, min(100.0, value))
-            return clampedValue
-        }
-        
-        // Remove any duplicates that might have been created by clamping
-        uniqueOptions = Array(Set(uniqueOptions)).sorted()
-        
-        // If still fewer than 3, pad with reasonable defaults (multiples of 5)
-        while uniqueOptions.count < 3 {
-            if uniqueOptions.isEmpty {
-                let baseRPE = round(rpe / 5.0) * 5.0 // Round current RPE to multiple of 5
-                uniqueOptions = [baseRPE - 5.0, baseRPE, baseRPE + 5.0].map { max(50.0, min(100.0, $0)) }
-            } else if uniqueOptions.count == 1 {
-                let current = uniqueOptions[0]
-                uniqueOptions = [max(50.0, current - 5.0), current, min(100.0, current + 5.0)]
-            } else if uniqueOptions.count == 2 {
-                let second = uniqueOptions[1]
-                let newValue = min(100.0, second + 5.0)
-                uniqueOptions.append(newValue)
-            }
-        }
-        
-        return Array(Set(uniqueOptions)).sorted().prefix(3).map { $0 }
-    }
-    
-    private static func getWeightDeltas(_ band: RPEBand) -> [Double] {
-        switch band {
-        case .veryLight: return [-0.025, 0.05, 0.075]   // -2.5%, +5%, +7.5% 
-        case .light:     return [-0.025, 0.05, 0.075]   // -2.5%, +5%, +7.5%
-        case .moderate:  return [-0.025, 0.025, 0.05]   // -2.5%, +2.5%, +5%
-        case .heavy:     return [-0.05, 0.0, 0.05]      // -5%, 0%, +5%
-        case .veryHeavy: return [-0.10, -0.05, 0.0]     // -10%, -5%, 0%
-        }
-    }
-    
-    private static func getRepDeltas(_ band: RPEBand) -> [Int] {
-        switch band {
-        case .veryLight: return [-1, 2, 3]   // -1, +2, +3
-        case .light:     return [-1, 1, 2]   // -1, +1, +2
-        case .moderate:  return [-1, 0, 1]   // -1, 0, +1
-        case .heavy:     return [-1, 0, 1]   // -1, 0, +1
-        case .veryHeavy: return [-2, -1, 0]  // -2, -1, 0
-        }
-    }
-    
-    private static func getRPEDeltas(_ band: RPEBand) -> [Double] {
-        switch band {
-        case .veryLight: return [-5.0, 5.0, 10.0]     // -5%, +5%, +10%
-        case .light:     return [-5.0, 5.0, 10.0]     // -5%, +5%, +10%
-        case .moderate:  return [-5.0, 0.0, 5.0]      // -5%, 0%, +5%
-        case .heavy:     return [-5.0, 0.0, 5.0]      // -5%, 0%, +5%
-        case .veryHeavy: return [-10.0, -5.0, 0.0]    // -10%, -5%, 0%
-        }
-    }
-    
-    private static func roundWeight(_ target: Double, delta: Double) -> Int {
-        let increment = 5.0
-        
-        if delta > 0 {
-            // Round up to next multiple of 5
-            return Int(ceil(target / increment) * increment)
-        } else if delta < 0 {
-            // Round down to previous multiple of 5
-            return Int(floor(target / increment) * increment)
-        } else {
-            // Round to nearest multiple of 5
-            return Int(round(target / increment) * increment)
-        }
-    }
-    
-    private static func enforceDuplicatesAndSpacing(_ options: [Int]) -> [Int] {
-        var result = Array(Set(options)).sorted()
-        
-        // Ensure spacing of at least 5
-        var i = 0
-        while i < result.count - 1 {
-            if result[i + 1] - result[i] < 5 {
-                // Shift the heavier one up by 5
-                result[i + 1] = result[i] + 5
-            }
-            i += 1
-        }
-        
-        return Array(result.prefix(3)) // Return first 3
-    }
-    
-    private enum RPEBand {
-        case veryLight  // ≤ 6.5
-        case light      // ≤ 7.5
-        case moderate   // ≤ 8.5
-        case heavy      // ≤ 9.5
-        case veryHeavy  // > 9.5
     }
 }
 
@@ -310,9 +129,9 @@ struct ExerciseView: View {
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
-        weightOptions: [30, 50, 70],
-        repOptions: [5, 10, 15], 
-        rpeOptions: [7.0, 8.0, 9.0]
+        weightOptions: [123, 135, 145, 155], // 4 options
+        repOptions: [8, 12], // 2 options
+        rpeOptions: [60.0, 80.0] // 2 options
     )
     
     // Haptic feedback generators
@@ -571,9 +390,9 @@ struct ExerciseView: View {
         } else {
             // No sets yet, use default recommendations
             currentRecommendations = NextSetRecommendations(
-                weightOptions: [30, 50, 70],
-                repOptions: [5, 10, 15],
-                rpeOptions: [7.0, 8.0, 9.0]
+                weightOptions: [123, 135, 145, 155], // 4 options
+                repOptions: [8, 12], // 2 options
+                rpeOptions: [60.0, 80.0] // 2 options
             )
         }
     }
@@ -1039,7 +858,7 @@ struct ExerciseComponent: View {
             .background(Color.clear)
             .environmentObject(themeManager)
             
-            // Three preset buttons with dynamic recommendations
+            // Preset buttons with dynamic recommendations (variable count)
             HStack(spacing: 15) {
                 ForEach(recommendationValues, id: \.self) { presetValue in
                     PresetButton(value: presetValue, currentValue: $value)
