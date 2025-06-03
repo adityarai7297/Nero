@@ -29,6 +29,7 @@ struct DBWorkoutSet: Codable {
     let rpe: Int
     let completedAt: Date?
     let createdAt: Date?
+    let userId: UUID?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -38,6 +39,7 @@ struct DBWorkoutSet: Codable {
         case rpe
         case completedAt = "completed_at"
         case createdAt = "created_at"
+        case userId = "user_id"
     }
 }
 
@@ -47,9 +49,26 @@ class WorkoutService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    private var currentUserId: UUID?
+    
     init() {
         loadExercises()
-        loadTodaySets()
+        checkUserAndLoadSets()
+    }
+    
+    func setUser(_ userId: UUID?) {
+        currentUserId = userId
+        checkUserAndLoadSets()
+    }
+    
+    private func checkUserAndLoadSets() {
+        if currentUserId != nil {
+            loadTodaySets()
+        } else {
+            // Clear sets if no user
+            todaySets = []
+            updateSetCounts()
+        }
     }
     
     // MARK: - Exercise Operations
@@ -96,6 +115,12 @@ class WorkoutService: ObservableObject {
     // MARK: - Workout Set Operations
     
     func loadTodaySets() {
+        guard let userId = currentUserId else {
+            todaySets = []
+            updateSetCounts()
+            return
+        }
+        
         Task {
             do {
                 let today = Calendar.current.startOfDay(for: Date())
@@ -104,6 +129,7 @@ class WorkoutService: ObservableObject {
                 let response: [DBWorkoutSet] = try await supabase
                     .from("workout_sets")
                     .select()
+                    .eq("user_id", value: userId.uuidString)
                     .gte("completed_at", value: today.ISO8601Format())
                     .lt("completed_at", value: tomorrow.ISO8601Format())
                     .order("completed_at", ascending: false)
@@ -135,6 +161,13 @@ class WorkoutService: ObservableObject {
     }
     
     func saveWorkoutSet(_ workoutSet: WorkoutSet) async -> Bool {
+        guard let userId = currentUserId else {
+            await MainActor.run {
+                self.errorMessage = "Cannot save workout set: user not authenticated"
+            }
+            return false
+        }
+        
         let dbSet = DBWorkoutSet(
             id: nil,
             exerciseName: workoutSet.exerciseName,
@@ -142,7 +175,8 @@ class WorkoutService: ObservableObject {
             reps: Int(workoutSet.reps),
             rpe: Int(workoutSet.rpe),
             completedAt: workoutSet.timestamp,
-            createdAt: nil
+            createdAt: nil,
+            userId: userId
         )
         
         do {
@@ -174,6 +208,13 @@ class WorkoutService: ObservableObject {
         guard let databaseId = workoutSet.databaseId else {
             await MainActor.run {
                 self.errorMessage = "Cannot delete set: missing database ID"
+            }
+            return false
+        }
+        
+        guard currentUserId != nil else {
+            await MainActor.run {
+                self.errorMessage = "Cannot delete set: user not authenticated"
             }
             return false
         }
@@ -212,6 +253,13 @@ class WorkoutService: ObservableObject {
             return false
         }
         
+        guard let userId = currentUserId else {
+            await MainActor.run {
+                self.errorMessage = "Cannot update set: user not authenticated"
+            }
+            return false
+        }
+        
         let updatedDBSet = DBWorkoutSet(
             id: databaseId,
             exerciseName: workoutSet.exerciseName,
@@ -219,7 +267,8 @@ class WorkoutService: ObservableObject {
             reps: Int(workoutSet.reps),
             rpe: Int(workoutSet.rpe),
             completedAt: workoutSet.timestamp,
-            createdAt: nil // Will be preserved by Supabase
+            createdAt: nil, // Will be preserved by Supabase
+            userId: userId
         )
         
         do {

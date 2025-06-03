@@ -113,19 +113,26 @@ class ThemeManager: ObservableObject {
 }
 
 struct ContentView: View {
+    @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var themeManager: ThemeManager
+    
     var body: some View {
         ExerciseView()
+            .environmentObject(authService)
+            .environmentObject(themeManager)
     }
 }
 
 struct ExerciseView: View {
     @StateObject private var workoutService = WorkoutService()
+    @EnvironmentObject var authService: AuthService
     @State private var currentExerciseIndex: Int = 0
     @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
     @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
     @State private var showingSetsModal: Bool = false // Control modal presentation
+    @State private var showingLogoutAlert: Bool = false
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -147,192 +154,14 @@ struct ExerciseView: View {
     
     var body: some View {
         ZStack {
-            // White background that extends to all edges
             Color.white.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Main container content
-                VStack(spacing: 12) {
-                    // Title with set counter
-                    VStack {
-                        HStack(spacing: 8) {
-                            Text(currentExercise.name)
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.black)
-                                .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
-                                .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
-                            
-                            // Green circular set counter - only visible after first set and now tappable
-                            if currentExercise.setsCompleted > 0 {
-                                Button(action: {
-                                    showingSetsModal = true
-                                }) {
-                                    Circle()
-                                        .fill(Color.green)
-                                        .frame(width: 30, height: 30)
-                                        .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                                        .overlay(
-                                            Text("\(currentExercise.setsCompleted)")
-                                                .font(.caption)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.white)
-                                        )
-                                }
-                                .transition(.scale.combined(with: .opacity))
-                                .animation(.bouncy(duration: 0.3), value: currentExercise.setsCompleted)
-                            }
-                        }
-                        .padding(.top, 35)
-                        .padding(.bottom, 5)
-                    }
-                    
-                    // Three rows of different components
-                    VStack(spacing: 32) {
-                        ExerciseComponent(value: $weights[0], type: .weight, recommendations: currentRecommendations)
-                            .environmentObject(themeManager)
-                        ExerciseComponent(value: $weights[1], type: .repetitions, recommendations: currentRecommendations)
-                            .environmentObject(themeManager)
-                        ExerciseComponent(value: $weights[2], type: .rpe, recommendations: currentRecommendations)
-                            .environmentObject(themeManager)
-                    }
-                    .padding(.horizontal, 0)
-                    .padding(.vertical, 8)
-                    
-                    // Navigation buttons with SET button in the center
-                    HStack(spacing: 20) {
-                        // Left navigation button
-                        Button(action: {
-                            saveCurrentExerciseData()
-                            navigationFeedback.impactOccurred()
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                currentExerciseIndex = (currentExerciseIndex - 1 + workoutService.exercises.count) % workoutService.exercises.count
-                                loadExerciseData()
-                            }
-                        }) {
-                            Image(systemName: "chevron.left")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.blue)
-                                .frame(width: 44, height: 44)
-                                .background(Color.white.opacity(0.9))
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
-                        }
-                        
-                        // Green SET button
-                        Button(action: {
-                            // Create a new set with current values
-                            let newSet = WorkoutSet(
-                                databaseId: nil, // New set, will be set by the service
-                                exerciseName: currentExercise.name,
-                                weight: weights[0],
-                                reps: weights[1],
-                                rpe: weights[2],
-                                timestamp: Date()
-                            )
-                            
-                            // Save to Supabase
-                            Task {
-                                let success = await workoutService.saveWorkoutSet(newSet)
-                                if success {
-                                    // SET button action with haptic feedback and animation
-                                    await MainActor.run {
-                                        setButtonFeedback.impactOccurred()
-                                        
-                                        // Update recommendations immediately after successful save
-                                        updateRecommendationsAfterSet()
-                                        
-                                        withAnimation(.easeInOut(duration: 0.1)) {
-                                            isSetButtonPressed = true
-                                        }
-                                        
-                                        // Show radial burst effect
-                                        withAnimation(.easeOut(duration: 0.15)) {
-                                            showRadialBurst = true
-                                        }
-                                        
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                            withAnimation(.easeInOut(duration: 0.1)) {
-                                                isSetButtonPressed = false
-                                            }
-                                        }
-                                        
-                                        // Hide burst after short delay for quick pulse
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                            withAnimation(.easeOut(duration: 0.15)) {
-                                                showRadialBurst = false
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            print("SET pressed for \(currentExercise.name) with weights: \(weights)")
-                        }) {
-                            Circle()
-                                .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.85))
-                                .frame(width: 70, height: 70)
-                                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
-                                .overlay(
-                                    Text("SET")
-                                        .font(.subheadline)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.black)
-                                        .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 1)
-                                )
-                                .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
-                        }
-                        
-                        // Right navigation button
-                        Button(action: {
-                            saveCurrentExerciseData()
-                            navigationFeedback.impactOccurred()
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                currentExerciseIndex = (currentExerciseIndex + 1) % workoutService.exercises.count
-                                loadExerciseData()
-                            }
-                        }) {
-                            Image(systemName: "chevron.right")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.blue)
-                                .frame(width: 44, height: 44)
-                                .background(Color.white.opacity(0.9))
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
-                        }
-                    }
-                    .onAppear {
-                        setButtonFeedback.prepare()
-                        navigationFeedback.prepare()
-                        loadExerciseData() // Load initial exercise data
-                        updateRecommendationsForCurrentExercise() // Load initial recommendations
-                    }
-                    .padding(.top, 25)
-                    .padding(.bottom, 20)
-                }
-                .padding(.horizontal, 0)
+                TopBarView()
+                MainExerciseContentView()
             }
         }
-        .overlay(
-            // Radial burst effect overlay - doesn't affect layout
-            Group {
-                if showRadialBurst {
-                    RoundedRectangle(cornerRadius: 40)
-                        .stroke(
-                            Color.green,
-                            lineWidth: showRadialBurst ? 8 : 2
-                        )
-                        .blur(radius: 8)
-                        .opacity(showRadialBurst ? 1.0 : 0.0)
-                        .animation(.easeOut(duration: 0.15), value: showRadialBurst)
-                        .allowsHitTesting(false)
-                        .zIndex(999)
-                        .ignoresSafeArea(.all)
-                }
-            }
-        )
+        .overlay(RadialBurstOverlay())
         .sheet(isPresented: $showingSetsModal) {
             SetsModalView(
                 allSets: workoutService.todaySets,
@@ -347,6 +176,16 @@ struct ExerciseView: View {
                 Text(errorMessage)
             }
         }
+        .alert("Sign Out", isPresented: $showingLogoutAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Sign Out", role: .destructive) {
+                Task {
+                    await authService.signOut()
+                }
+            }
+        } message: {
+            Text("Are you sure you want to sign out?")
+        }
         .overlay {
             if workoutService.isLoading {
                 ProgressView("Loading exercises...")
@@ -356,8 +195,193 @@ struct ExerciseView: View {
             }
         }
         .onChange(of: workoutService.todaySets) { oldSets, newSets in
-            // Update recommendations when today's sets change (load, add, edit, delete)
             updateRecommendationsForCurrentExercise()
+        }
+    }
+    
+    // MARK: - Component Views
+    
+    @ViewBuilder
+    private func TopBarView() -> some View {
+        HStack {
+            Spacer()
+            
+            Button(action: {
+                showingLogoutAlert = true
+            }) {
+                Image(systemName: "person.circle")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 5)
+    }
+    
+    @ViewBuilder
+    private func MainExerciseContentView() -> some View {
+        VStack(spacing: 12) {
+            ExerciseTitleView()
+            ExerciseComponentsView()
+            NavigationButtonsView()
+        }
+        .padding(.horizontal, 0)
+    }
+    
+    @ViewBuilder
+    private func ExerciseTitleView() -> some View {
+        VStack {
+            HStack(spacing: 8) {
+                Text(currentExercise.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.black)
+                    .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                    .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
+                
+                if currentExercise.setsCompleted > 0 {
+                    SetCounterButton()
+                }
+            }
+            .padding(.top, 15)
+            .padding(.bottom, 5)
+        }
+    }
+    
+    @ViewBuilder
+    private func SetCounterButton() -> some View {
+        Button(action: {
+            showingSetsModal = true
+        }) {
+            Circle()
+                .fill(Color.green)
+                .frame(width: 30, height: 30)
+                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
+                .overlay(
+                    Text("\(currentExercise.setsCompleted)")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                )
+        }
+        .transition(.scale.combined(with: .opacity))
+        .animation(.bouncy(duration: 0.3), value: currentExercise.setsCompleted)
+    }
+    
+    @ViewBuilder
+    private func ExerciseComponentsView() -> some View {
+        VStack(spacing: 32) {
+            ExerciseComponent(value: $weights[0], type: .weight, recommendations: currentRecommendations)
+                .environmentObject(themeManager)
+            ExerciseComponent(value: $weights[1], type: .repetitions, recommendations: currentRecommendations)
+                .environmentObject(themeManager)
+            ExerciseComponent(value: $weights[2], type: .rpe, recommendations: currentRecommendations)
+                .environmentObject(themeManager)
+        }
+        .padding(.horizontal, 0)
+        .padding(.vertical, 8)
+    }
+    
+    @ViewBuilder
+    private func NavigationButtonsView() -> some View {
+        HStack(spacing: 20) {
+            LeftNavigationButton()
+            SetButton()
+            RightNavigationButton()
+        }
+        .onAppear {
+            setButtonFeedback.prepare()
+            navigationFeedback.prepare()
+            loadExerciseData()
+            updateRecommendationsForCurrentExercise()
+            workoutService.setUser(authService.user?.id)
+        }
+        .onChange(of: authService.user) { _, newUser in
+            workoutService.setUser(newUser?.id)
+        }
+        .padding(.top, 25)
+        .padding(.bottom, 20)
+    }
+    
+    @ViewBuilder
+    private func LeftNavigationButton() -> some View {
+        Button(action: {
+            saveCurrentExerciseData()
+            navigationFeedback.impactOccurred()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentExerciseIndex = (currentExerciseIndex - 1 + workoutService.exercises.count) % workoutService.exercises.count
+                loadExerciseData()
+            }
+        }) {
+            Image(systemName: "chevron.left")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.blue)
+                .frame(width: 44, height: 44)
+                .background(Color.white.opacity(0.9))
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+        }
+    }
+    
+    @ViewBuilder
+    private func SetButton() -> some View {
+        Button(action: {
+            handleSetButtonTap()
+        }) {
+            Circle()
+                .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.85))
+                .frame(width: 70, height: 70)
+                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
+                .overlay(
+                    Text("SET")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                        .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 1)
+                )
+                .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
+        }
+    }
+    
+    @ViewBuilder
+    private func RightNavigationButton() -> some View {
+        Button(action: {
+            saveCurrentExerciseData()
+            navigationFeedback.impactOccurred()
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentExerciseIndex = (currentExerciseIndex + 1) % workoutService.exercises.count
+                loadExerciseData()
+            }
+        }) {
+            Image(systemName: "chevron.right")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.blue)
+                .frame(width: 44, height: 44)
+                .background(Color.white.opacity(0.9))
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+        }
+    }
+    
+    @ViewBuilder
+    private func RadialBurstOverlay() -> some View {
+        Group {
+            if showRadialBurst {
+                RoundedRectangle(cornerRadius: 40)
+                    .stroke(
+                        Color.green,
+                        lineWidth: showRadialBurst ? 8 : 2
+                    )
+                    .blur(radius: 8)
+                    .opacity(showRadialBurst ? 1.0 : 0.0)
+                    .animation(.easeOut(duration: 0.15), value: showRadialBurst)
+                    .allowsHitTesting(false)
+                    .zIndex(999)
+                    .ignoresSafeArea(.all)
+            }
         }
     }
     
@@ -409,6 +433,62 @@ struct ExerciseView: View {
         )
         
         currentRecommendations = NextSetRecommendations.calculate(from: tempSet)
+    }
+    
+    private func handleSetButtonTap() {
+        // Create a new set with current values
+        let newSet = WorkoutSet(
+            databaseId: nil, // New set, will be set by the service
+            exerciseName: currentExercise.name,
+            weight: weights[0],
+            reps: weights[1],
+            rpe: weights[2],
+            timestamp: Date()
+        )
+        
+        print("SET pressed for \(currentExercise.name) with weights: \(weights)")
+        
+        // Save to Supabase
+        Task {
+            let success = await workoutService.saveWorkoutSet(newSet)
+            if success {
+                await handleSuccessfulSetSave()
+            }
+        }
+    }
+    
+    private func handleSuccessfulSetSave() async {
+        await MainActor.run {
+            // Haptic feedback
+            setButtonFeedback.impactOccurred()
+            
+            // Update recommendations immediately after successful save
+            updateRecommendationsAfterSet()
+            
+            // Start button press animation
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isSetButtonPressed = true
+            }
+            
+            // Show radial burst effect
+            withAnimation(.easeOut(duration: 0.15)) {
+                showRadialBurst = true
+            }
+            
+            // Reset button press state
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isSetButtonPressed = false
+                }
+            }
+            
+            // Hide burst after short delay for quick pulse
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    showRadialBurst = false
+                }
+            }
+        }
     }
 }
 

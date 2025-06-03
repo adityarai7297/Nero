@@ -15,8 +15,23 @@ The Supabase client is already configured in `SupabaseClient.swift` with:
 - URL: https://zohjfuyehgzxscdtqsoo.supabase.co
 - API Key: The anon/public key (already configured)
 
+## Authentication Setup
+
+### 1. Enable Email Authentication
+In your Supabase Dashboard:
+1. Go to Authentication > Settings
+2. Ensure "Enable email confirmations" is enabled (recommended)
+3. Configure email templates if desired
+4. Set up any additional auth providers if needed
+
+### 2. Configure App URLs (for email verification)
+In Authentication > URL Configuration:
+- Site URL: `your-app-scheme://` (for deep linking)
+- Redirect URLs: Add your app's redirect URLs
+
 ## Database Schema
 
+### Initial Setup
 Run these SQL commands in your Supabase Dashboard > SQL Editor:
 
 ### 1. Create Exercises Table
@@ -31,7 +46,7 @@ CREATE TABLE exercises (
 );
 ```
 
-### 2. Create Workout Sets Table
+### 2. Create Workout Sets Table (Updated with User Authentication)
 ```sql
 CREATE TABLE workout_sets (
   id SERIAL PRIMARY KEY,
@@ -40,8 +55,12 @@ CREATE TABLE workout_sets (
   reps INTEGER NOT NULL,
   rpe INTEGER NOT NULL,
   completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL
 );
+
+-- Add index for better performance
+CREATE INDEX idx_workout_sets_user_id ON workout_sets(user_id);
 ```
 
 ### 3. Insert Default Exercises
@@ -59,14 +78,60 @@ INSERT INTO exercises (name, default_weight, default_reps, default_rpe) VALUES
 ('Leg Press', 120, 15, 75);
 ```
 
-### 4. Enable Row Level Security (Optional but Recommended)
+### 4. Enable Row Level Security with User Authentication
 ```sql
+-- Enable RLS
 ALTER TABLE exercises ENABLE ROW LEVEL SECURITY;
 ALTER TABLE workout_sets ENABLE ROW LEVEL SECURITY;
 
--- Allow read access to exercises for everyone
+-- Exercises policies (public read access)
 CREATE POLICY "Allow read access to exercises" ON exercises FOR SELECT USING (true);
 
--- Allow full access to workout_sets for everyone (you can add user authentication later)
-CREATE POLICY "Allow full access to workout_sets" ON workout_sets FOR ALL USING (true);
-``` 
+-- Workout sets policies (user-specific access)
+CREATE POLICY "Users can view their own workout sets" 
+ON workout_sets FOR SELECT 
+USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own workout sets" 
+ON workout_sets FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own workout sets" 
+ON workout_sets FOR UPDATE 
+USING (auth.uid() = user_id) 
+WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own workout sets" 
+ON workout_sets FOR DELETE 
+USING (auth.uid() = user_id);
+```
+
+## Migration for Existing Installations
+
+If you already have the app running and want to add user authentication, run the SQL commands in `DATABASE_MIGRATION.sql`:
+
+1. Open Supabase Dashboard > SQL Editor
+2. Copy and paste the contents of `DATABASE_MIGRATION.sql`
+3. Execute the commands
+4. If you have existing workout sets, uncomment and modify the backfill command with a valid user ID
+
+## App Features
+
+### Authentication
+- ✅ User registration with email/password
+- ✅ User login with email/password  
+- ✅ Session management
+- ✅ Logout functionality
+- ✅ Beautiful authentication UI
+
+### Data Security
+- ✅ Row Level Security (RLS) enabled
+- ✅ Users can only see their own workout data
+- ✅ Automatic user_id assignment to new workout sets
+- ✅ Secure authentication state management
+
+### Workout Tracking
+- ✅ Exercise management
+- ✅ Set logging with user attribution
+- ✅ Personal workout history
+- ✅ Real-time data synchronization 
