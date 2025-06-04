@@ -118,6 +118,91 @@ struct AuthView: View {
                     .opacity(authService.isLoading || !isFormValid ? 0.6 : 1.0)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
+                    
+                    // Divider with "or" text
+                    HStack {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 1)
+                        
+                        Text("or")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 12)
+                        
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(height: 1)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 16)
+                    
+                    // Social login buttons
+                    VStack(spacing: 12) {
+                        // Google Sign-In button
+                        Button(action: {
+                            Task {
+                                await authService.signInWithGoogle()
+                            }
+                        }) {
+                            HStack {
+                                AsyncImage(url: URL(string: "https://developers.google.com/identity/images/g-logo.png")) { image in
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                } placeholder: {
+                                    Image(systemName: "globe")
+                                        .font(.title3)
+                                        .foregroundColor(.primary)
+                                }
+                                .frame(width: 20, height: 20)
+                                
+                                Text("Continue with Google")
+                                    .font(.headline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color(.systemGray6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(Color(.systemGray4), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .disabled(authService.isLoading)
+                        .opacity(authService.isLoading ? 0.6 : 1.0)
+                        
+                        // Apple Sign-In button
+                        Button(action: {
+                            Task {
+                                await authService.signInWithApple()
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "applelogo")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                                
+                                Text("Continue with Apple")
+                                    .font(.headline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.black)
+                            )
+                        }
+                        .disabled(authService.isLoading)
+                        .opacity(authService.isLoading ? 0.6 : 1.0)
+                    }
+                    .padding(.horizontal, 24)
                 }
                 .padding(.vertical, 32)
                 .background(

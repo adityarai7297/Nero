@@ -133,6 +133,7 @@ struct ExerciseView: View {
     @State private var showRadialBurst: Bool = false
     @State private var showingSetsModal: Bool = false // Control modal presentation
     @State private var showingLogoutAlert: Bool = false
+    @State private var showingSideMenu: Bool = false // Control side menu presentation
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -157,8 +158,14 @@ struct ExerciseView: View {
             Color.white.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                TopBarView()
                 MainExerciseContentView()
+            }
+            
+            // Side Menu Overlay
+            if showingSideMenu {
+                SideMenuView()
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .zIndex(999)
             }
         }
         .overlay(RadialBurstOverlay())
@@ -197,55 +204,58 @@ struct ExerciseView: View {
         .onChange(of: workoutService.todaySets) { oldSets, newSets in
             updateRecommendationsForCurrentExercise()
         }
+        .onTapGesture {
+            // Close side menu when tapping outside
+            if showingSideMenu {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showingSideMenu = false
+                }
+            }
+        }
     }
     
     // MARK: - Component Views
     
     @ViewBuilder
-    private func TopBarView() -> some View {
-        HStack {
-            Spacer()
-            
-            Button(action: {
-                showingLogoutAlert = true
-            }) {
-                Image(systemName: "person.circle")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 10)
-        .padding(.bottom, 5)
-    }
-    
-    @ViewBuilder
-    private func MainExerciseContentView() -> some View {
-        VStack(spacing: 12) {
-            ExerciseTitleView()
-            ExerciseComponentsView()
-            NavigationButtonsView()
-        }
-        .padding(.horizontal, 0)
-    }
-    
-    @ViewBuilder
     private func ExerciseTitleView() -> some View {
         VStack {
-            HStack(spacing: 8) {
-                Text(currentExercise.name)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
-                    .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
-                    .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
+            HStack {
+                // Center the exercise name
+                Spacer()
                 
-                if currentExercise.setsCompleted > 0 {
-                    SetCounterButton()
+                HStack(spacing: 8) {
+                    Text(currentExercise.name)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                        .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                        .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
+                    
+                    if currentExercise.setsCompleted > 0 {
+                        SetCounterButton()
+                    }
                 }
+                
+                Spacer()
             }
             .padding(.top, 15)
             .padding(.bottom, 5)
+            .padding(.horizontal, 20)
+            .overlay(alignment: .leading) {
+                // Hamburger menu icon positioned on the left without affecting centering
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu.toggle()
+                    }
+                }) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                        .frame(width: 44, height: 44) // Larger touch area
+                        .contentShape(Rectangle()) // Make entire frame touchable
+                }
+                .padding(.leading, 20)
+            }
         }
     }
     
@@ -489,6 +499,78 @@ struct ExerciseView: View {
                 }
             }
         }
+    }
+    
+    @ViewBuilder
+    private func SideMenuView() -> some View {
+        HStack {
+            // Side menu content
+            VStack(alignment: .leading, spacing: 0) {
+                // Menu items (removed header with Nero text and email)
+                VStack(spacing: 0) {
+                    // Sign Out option
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
+                        // Small delay to let menu close animation finish
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingLogoutAlert = true
+                        }
+                    }) {
+                        HStack(spacing: 16) {
+                            Image(systemName: "rectangle.portrait.and.arrow.right")
+                                .font(.title3)
+                                .foregroundColor(.red)
+                                .frame(width: 24)
+                            
+                            Text("Sign Out")
+                                .font(.body)
+                                .fontWeight(.medium)
+                                .foregroundColor(.red)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 16)
+                        .background(Color.clear)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer()
+                }
+                .padding(.top, 60) // Add some top padding to position the sign out option nicely
+                
+                Spacer()
+            }
+            .frame(width: 280)
+            .background(
+                Color(.systemBackground)
+                    .shadow(color: .black.opacity(0.1), radius: 10, x: 5, y: 0)
+            )
+            .ignoresSafeArea()
+            
+            Spacer()
+        }
+        .background(
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu = false
+                    }
+                }
+        )
+    }
+    
+    @ViewBuilder
+    private func MainExerciseContentView() -> some View {
+        VStack(spacing: 12) {
+            ExerciseTitleView()
+            ExerciseComponentsView()
+            NavigationButtonsView()
+        }
+        .padding(.horizontal, 0)
     }
 }
 

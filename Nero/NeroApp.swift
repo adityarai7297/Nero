@@ -17,6 +17,16 @@ struct NeroApp: App {
             MainAppView()
                 .environmentObject(authService)
                 .environmentObject(themeManager)
+                .onOpenURL { url in
+                    // Handle OAuth callback for Google/Apple Sign-In
+                    Task {
+                        do {
+                            try await supabase.auth.session(from: url)
+                        } catch {
+                            print("OAuth callback error: \(error)")
+                        }
+                    }
+                }
         }
     }
 }

@@ -114,4 +114,54 @@ class AuthService: ObservableObject {
             }
         }
     }
+    
+    func signInWithGoogle() async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let response = try await supabase.auth.signInWithOAuth(
+                provider: .google,
+                redirectTo: URL(string: "com.yourapp.nero://login")
+            )
+            
+            // OAuth sign-in will handle the redirect, so we return true here
+            // The actual user will be set when the app receives the callback
+            await MainActor.run {
+                self.isLoading = false
+            }
+            return true
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
+            }
+            return false
+        }
+    }
+    
+    func signInWithApple() async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let response = try await supabase.auth.signInWithOAuth(
+                provider: .apple,
+                redirectTo: URL(string: "com.yourapp.nero://login")
+            )
+            
+            // OAuth sign-in will handle the redirect, so we return true here
+            // The actual user will be set when the app receives the callback
+            await MainActor.run {
+                self.isLoading = false
+            }
+            return true
+        } catch {
+            await MainActor.run {
+                self.errorMessage = error.localizedDescription
+                self.isLoading = false
+            }
+            return false
+        }
+    }
 } 
