@@ -1244,14 +1244,7 @@ struct GameStyleMenuButton: View {
                     .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [color.opacity(0.6), color.opacity(0.2)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 2
-                            )
+                            .stroke(color, lineWidth: 2)
                     )
             )
             .scaleEffect(isPressed ? 0.95 : 1.0)
