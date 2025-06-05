@@ -503,13 +503,40 @@ struct ExerciseView: View {
     
     @ViewBuilder
     private func SideMenuView() -> some View {
-        HStack {
-            // Side menu content
-            VStack(alignment: .leading, spacing: 0) {
-                // Menu items (removed header with Nero text and email)
-                VStack(spacing: 0) {
-                    // Sign Out option
-                    Button(action: {
+        ZStack {
+            // Blur background overlay
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .background(.ultraThinMaterial)
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu = false
+                    }
+                }
+            
+            // Centered menu content
+            VStack(spacing: 32) {
+                Spacer()
+                
+                VStack(spacing: 24) {
+                    // Edit Workout Plan button
+                    GameStyleMenuButton(
+                        title: "Edit Workout Plan",
+                        icon: "dumbbell.fill",
+                        color: .cyan
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
+                        // TODO: Add edit workout plan functionality
+                    }
+                    
+                    // Sign Out button
+                    GameStyleMenuButton(
+                        title: "Sign Out",
+                        icon: "power",
+                        color: .red
+                    ) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSideMenu = false
                         }
@@ -517,49 +544,13 @@ struct ExerciseView: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             showingLogoutAlert = true
                         }
-                    }) {
-                        HStack(spacing: 16) {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.title3)
-                                .foregroundColor(.red)
-                                .frame(width: 24)
-                            
-                            Text("Sign Out")
-                                .font(.body)
-                                .fontWeight(.medium)
-                                .foregroundColor(.red)
-                            
-                            Spacer()
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 16)
-                        .background(Color.clear)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    Spacer()
                 }
-                .padding(.top, 60) // Add some top padding to position the sign out option nicely
                 
                 Spacer()
             }
-            .frame(width: 280)
-            .background(
-                Color(.systemBackground)
-            )
-            .ignoresSafeArea()
-            
-            Spacer()
+            .frame(maxWidth: .infinity)
         }
-        .background(
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showingSideMenu = false
-                    }
-                }
-        )
     }
     
     @ViewBuilder
@@ -1182,6 +1173,98 @@ extension Color {
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+}
+
+// Video game style menu button component
+struct GameStyleMenuButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = false
+                }
+                action()
+            }
+        }) {
+            HStack(spacing: 16) {
+                // Icon with glow effect
+                ZStack {
+                    // Glow background
+                    Circle()
+                        .fill(color.opacity(0.3))
+                        .frame(width: 50, height: 50)
+                        .blur(radius: 8)
+                    
+                    // Icon
+                    Image(systemName: icon)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    Circle()
+                                        .stroke(color.opacity(0.5), lineWidth: 2)
+                                )
+                        )
+                }
+                
+                // Title text
+                Text(title)
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .white.opacity(0.8)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                
+                Spacer()
+            }
+            .padding(.horizontal, 32)
+            .padding(.vertical, 20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [color.opacity(0.6), color.opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 2
+                            )
+                    )
+            )
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isPressed)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .frame(maxWidth: 300)
     }
 }
 
