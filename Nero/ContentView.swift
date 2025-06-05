@@ -160,11 +160,17 @@ struct ExerciseView: View {
             VStack(spacing: 0) {
                 MainExerciseContentView()
             }
+            .blur(radius: showingSideMenu ? 10 : 0) // Add blur effect to main content
+            .scaleEffect(showingSideMenu ? 0.95 : 1.0) // Slightly scale down main content
+            .animation(.easeInOut(duration: 0.3), value: showingSideMenu)
             
             // Side Menu Overlay
             if showingSideMenu {
                 SideMenuView()
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                     .zIndex(999)
             }
         }
@@ -503,64 +509,161 @@ struct ExerciseView: View {
     
     @ViewBuilder
     private func SideMenuView() -> some View {
-        HStack {
-            // Side menu content
+        HStack(spacing: 0) {
+            // Side menu panel
             VStack(alignment: .leading, spacing: 0) {
-                // Menu items (removed header with Nero text and email)
+                // Header section with user info
+                VStack(alignment: .leading, spacing: 12) {
+                    // App title
+                    HStack {
+                        Image(systemName: "dumbbell.fill")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                        
+                        Text("Nero")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                    }
+                    
+                    // User email
+                    if let user = authService.user {
+                        Text(user.email)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 4)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 60)
+                .padding(.bottom, 32)
+                
+                // Menu items
                 VStack(spacing: 0) {
-                    // Sign Out option
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
+                    // Profile section (placeholder for future features)
+                    MenuItemButton(
+                        icon: "person.circle",
+                        title: "Profile",
+                        action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Future: Navigate to profile
                         }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingLogoutAlert = true
+                    )
+                    
+                    MenuItemButton(
+                        icon: "chart.bar.fill",
+                        title: "Statistics",
+                        action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Future: Navigate to statistics
                         }
-                    }) {
-                        HStack(spacing: 16) {
-                            Image(systemName: "rectangle.portrait.and.arrow.right")
-                                .font(.title3)
-                                .foregroundColor(.red)
-                                .frame(width: 24)
-                            
-                            Text("Sign Out")
-                                .font(.body)
-                                .fontWeight(.medium)
-                                .foregroundColor(.red)
-                            
-                            Spacer()
+                    )
+                    
+                    MenuItemButton(
+                        icon: "gear",
+                        title: "Settings",
+                        action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Future: Navigate to settings
                         }
+                    )
+                    
+                    // Divider
+                    Divider()
                         .padding(.horizontal, 24)
                         .padding(.vertical, 16)
-                        .background(Color.clear)
-                    }
-                    .buttonStyle(PlainButtonStyle())
                     
-                    Spacer()
+                    // Sign Out option
+                    MenuItemButton(
+                        icon: "rectangle.portrait.and.arrow.right",
+                        title: "Sign Out",
+                        isDestructive: true,
+                        action: {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingLogoutAlert = true
+                            }
+                        }
+                    )
                 }
-                .padding(.top, 60) // Add some top padding to position the sign out option nicely
                 
                 Spacer()
             }
-            .frame(width: 280)
+            .frame(width: 320)
+            .frame(maxHeight: .infinity)
             .background(
-                Color(.systemBackground)
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 5, y: 0)
+                .ultraThinMaterial,
+                in: Rectangle()
             )
-            .ignoresSafeArea()
+            .overlay(alignment: .trailing) {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(width: 1)
+            }
             
-            Spacer()
-        }
-        .background(
-            Color.black.opacity(0.3)
-                .ignoresSafeArea()
+            // Invisible spacer to fill remaining space and handle tap-to-close
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showingSideMenu = false
                     }
                 }
+        }
+        .background(
+            // Strong blur background
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .background(
+                    Color.black.opacity(0.3)
+                )
+                .ignoresSafeArea(.all)
         )
+    }
+    
+    // Helper view for menu items
+    @ViewBuilder
+    private func MenuItemButton(
+        icon: String,
+        title: String,
+        isDestructive: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 16) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(isDestructive ? .red : .blue)
+                    .frame(width: 24)
+                
+                Text(title)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(isDestructive ? .red : .primary)
+                
+                Spacer()
+                
+                if !isDestructive {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
+            .background(Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
     }
     
     @ViewBuilder
