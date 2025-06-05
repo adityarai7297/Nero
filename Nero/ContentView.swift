@@ -504,8 +504,8 @@ struct ExerciseView: View {
     @ViewBuilder
     private func SideMenuView() -> some View {
         ZStack {
-            // Blur background overlay
-            Color.black.opacity(0.4)
+            // Blur background overlay - keeping white background
+            Color.white.opacity(0.1)
                 .ignoresSafeArea()
                 .background(.ultraThinMaterial)
                 .onTapGesture {
