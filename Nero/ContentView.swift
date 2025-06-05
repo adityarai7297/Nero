@@ -1021,12 +1021,15 @@ struct ExerciseComponent: View {
             .environmentObject(themeManager)
             
             // Preset buttons with dynamic recommendations (variable count)
-            HStack(spacing: 15) {
-                ForEach(recommendationValues, id: \.self) { presetValue in
-                    PresetButton(value: presetValue, currentValue: $value)
+            // Exclude RPE recommendation panels
+            if type != .rpe {
+                HStack(spacing: 15) {
+                    ForEach(recommendationValues, id: \.self) { presetValue in
+                        PresetButton(value: presetValue, currentValue: $value)
+                    }
                 }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
         }
     }
 }
