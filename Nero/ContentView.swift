@@ -1199,35 +1199,20 @@ struct GameStyleMenuButton: View {
             }
         }) {
             HStack(spacing: 16) {
-                // Icon with glow effect
-                ZStack {
-                    // Glow background
-                    Circle()
-                        .fill(color.opacity(0.3))
-                        .frame(width: 50, height: 50)
-                        .blur(radius: 8)
-                    
-                    // Icon
-                    Image(systemName: icon)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [color, color.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                // Icon with solid outline
+                Image(systemName: icon)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(color)
+                    .frame(width: 40, height: 40)
+                    .background(
+                        Circle()
+                            .fill(Color.white)
+                            .overlay(
+                                Circle()
+                                    .stroke(color, lineWidth: 2)
                             )
-                        )
-                        .frame(width: 40, height: 40)
-                        .background(
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay(
-                                    Circle()
-                                        .stroke(color.opacity(0.5), lineWidth: 2)
-                                )
-                        )
-                }
+                    )
                 
                 // Title text
                 Text(title)
