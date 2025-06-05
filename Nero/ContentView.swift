@@ -1233,13 +1233,7 @@ struct GameStyleMenuButton: View {
                 Text(title)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, .white.opacity(0.8)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundColor(.black)
                 
                 Spacer()
             }
