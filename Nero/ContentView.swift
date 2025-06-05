@@ -1207,7 +1207,7 @@ struct GameStyleMenuButton: View {
                     .frame(width: 40, height: 40)
                     .background(
                         Circle()
-                            .fill(Color.white)
+                            .fill(.ultraThinMaterial)
                             .overlay(
                                 Circle()
                                     .stroke(color, lineWidth: 2)
