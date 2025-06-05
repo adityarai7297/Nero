@@ -546,7 +546,6 @@ struct ExerciseView: View {
             .frame(width: 280)
             .background(
                 Color(.systemBackground)
-                    .shadow(color: .black.opacity(0.1), radius: 10, x: 5, y: 0)
             )
             .ignoresSafeArea()
             
