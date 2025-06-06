@@ -134,6 +134,7 @@ struct ExerciseView: View {
     @State private var showingSetsModal: Bool = false // Control modal presentation
     @State private var showingLogoutAlert: Bool = false
     @State private var showingSideMenu: Bool = false // Control side menu presentation
+    @State private var showingWorkoutQuestionnaire: Bool = false // Control workout questionnaire presentation
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -175,6 +176,9 @@ struct ExerciseView: View {
                 workoutService: workoutService
             )
             .environmentObject(themeManager)
+        }
+        .sheet(isPresented: $showingWorkoutQuestionnaire) {
+            WorkoutQuestionnaireView()
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -528,7 +532,10 @@ struct ExerciseView: View {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSideMenu = false
                         }
-                        // TODO: Add edit workout plan functionality
+                        // Small delay to let menu close animation finish
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingWorkoutQuestionnaire = true
+                        }
                     }
                     
                     // Sign Out button
