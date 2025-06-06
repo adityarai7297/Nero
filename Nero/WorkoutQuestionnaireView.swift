@@ -404,7 +404,7 @@ struct WorkoutGoalStep: View {
                         subtitle: goal.description,
                         icon: goal.icon,
                         isSelected: selectedGoal == goal,
-                        color: .green
+                        color: .blue
                     ) {
                         selectedGoal = goal
                     }
@@ -438,7 +438,7 @@ struct WorkoutFrequencyStep: View {
                         subtitle: frequency.description,
                         icon: frequency.icon,
                         isSelected: selectedFrequency == frequency,
-                        color: .orange
+                        color: .blue
                     ) {
                         selectedFrequency = frequency
                     }
@@ -472,7 +472,7 @@ struct TimePerWorkoutStep: View {
                         subtitle: time.description,
                         icon: time.icon,
                         isSelected: selectedTime == time,
-                        color: .purple
+                        color: .blue
                     ) {
                         selectedTime = time
                     }
@@ -506,7 +506,7 @@ struct EquipmentStep: View {
                         subtitle: "",
                         icon: equipment.icon,
                         isSelected: selectedEquipment.contains(equipment),
-                        color: .cyan
+                        color: .blue
                     ) {
                         if selectedEquipment.contains(equipment) {
                             selectedEquipment.remove(equipment)
@@ -549,21 +549,21 @@ struct SummaryStep: View {
                     title: "Primary Goal",
                     value: preferences.workoutGoal.rawValue,
                     icon: preferences.workoutGoal.icon,
-                    color: .green
+                    color: .blue
                 )
                 
                 SummaryRow(
                     title: "Workout Frequency",
                     value: preferences.workoutFrequency.rawValue,
                     icon: preferences.workoutFrequency.icon,
-                    color: .orange
+                    color: .blue
                 )
                 
                 SummaryRow(
                     title: "Time Per Workout",
                     value: preferences.timePerWorkout.rawValue,
                     icon: preferences.timePerWorkout.icon,
-                    color: .purple
+                    color: .blue
                 )
                 
                 if !preferences.availableEquipment.isEmpty {
@@ -571,7 +571,7 @@ struct SummaryStep: View {
                         title: "Available Equipment",
                         value: "\(preferences.availableEquipment.count) selected",
                         icon: "checkmark.circle.fill",
-                        color: .cyan
+                        color: .blue
                     )
                 }
             }
