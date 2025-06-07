@@ -577,6 +577,8 @@ struct WorkoutQuestionnaireView: View {
     @State private var currentStep: Int = 0
     @State private var preferences = WorkoutPreferences()
     @State private var showingConfirmation = false
+    @State private var showingSuccessAlert = false
+    @StateObject private var preferencesService = WorkoutPreferencesService()
     
     private let totalSteps = 19
     
@@ -693,11 +695,52 @@ struct WorkoutQuestionnaireView: View {
         .alert("Save Preferences", isPresented: $showingConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Save") {
-                // TODO: Save preferences to user profile
-                dismiss()
+                Task {
+                    let success = await preferencesService.saveWorkoutPreferences(preferences)
+                    if success {
+                        showingSuccessAlert = true
+                    }
+                }
             }
         } message: {
             Text("This will update your workout plan based on your preferences. You can always change these settings later.")
+        }
+        .alert("Success!", isPresented: $showingSuccessAlert) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            Text("Exercise preferences saved successfully!")
+        }
+        .overlay {
+            if preferencesService.isSaving {
+                ZStack {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                            .scaleEffect(1.5)
+                        
+                        Text("Saving preferences...")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                    }
+                    .padding(32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.ultraThinMaterial)
+                    )
+                }
+            }
+        }
+        .alert("Error", isPresented: .constant(preferencesService.errorMessage != nil)) {
+            Button("OK") {
+                preferencesService.errorMessage = nil
+            }
+        } message: {
+            Text(preferencesService.errorMessage ?? "An error occurred")
         }
     }
     

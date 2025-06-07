@@ -35,6 +35,15 @@ class AuthService: ObservableObject {
             do {
                 let session = try await supabase.auth.session
                 let authUser = session.user
+                
+                // For existing sessions, just ensure profile exists
+                let profileExists = await UserProfileService.ensureUserProfileExists(for: authUser)
+                if profileExists {
+                    print("✅ Session restored for user: \(authUser.email ?? "unknown")")
+                } else {
+                    print("⚠️ Session restored but profile creation failed for: \(authUser.email ?? "unknown")")
+                }
+                
                 await MainActor.run {
                     self.user = User(
                         id: authUser.id,
@@ -57,8 +66,24 @@ class AuthService: ObservableObject {
         errorMessage = nil
         
         do {
+            print("🔄 Creating new user account for: \(email)")
             let response = try await supabase.auth.signUp(email: email, password: password)
             let authUser = response.user
+            
+            // Wait a moment for trigger to execute
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // Verify profile was created by trigger, create manually if needed
+            let profileExists = await UserProfileService.verifyUserProfile(for: authUser)
+            if !profileExists {
+                print("🔧 Trigger didn't create profile, creating manually...")
+                let manualCreation = await UserProfileService.createUserProfile(for: authUser)
+                if !manualCreation {
+                    print("❌ Failed to create user profile both automatically and manually")
+                    // Don't fail the signup - user auth was successful
+                }
+            }
+            
             await MainActor.run {
                 self.user = User(
                     id: authUser.id,
@@ -67,12 +92,15 @@ class AuthService: ObservableObject {
                 )
                 self.isLoading = false
             }
+            
+            print("✅ New user signup completed for: \(email)")
             return true
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
             }
+            print("❌ Signup failed for \(email): \(error.localizedDescription)")
             return false
         }
     }
@@ -82,8 +110,18 @@ class AuthService: ObservableObject {
         errorMessage = nil
         
         do {
+            print("🔄 Signing in user: \(email)")
             let response = try await supabase.auth.signIn(email: email, password: password)
             let authUser = response.user
+            
+            // For sign-in, just ensure profile exists (shouldn't be needed for new users)
+            let profileExists = await UserProfileService.ensureUserProfileExists(for: authUser)
+            if profileExists {
+                print("✅ Profile verified for existing user: \(email)")
+            } else {
+                print("⚠️ Profile issue detected for user: \(email)")
+            }
+            
             await MainActor.run {
                 self.user = User(
                     id: authUser.id,
@@ -92,12 +130,15 @@ class AuthService: ObservableObject {
                 )
                 self.isLoading = false
             }
+            
+            print("✅ Sign in completed for: \(email)")
             return true
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
             }
+            print("❌ Sign in failed for \(email): \(error.localizedDescription)")
             return false
         }
     }
@@ -108,10 +149,12 @@ class AuthService: ObservableObject {
             await MainActor.run {
                 self.user = nil
             }
+            print("✅ User signed out successfully")
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
             }
+            print("❌ Sign out failed: \(error.localizedDescription)")
         }
     }
     
@@ -120,6 +163,7 @@ class AuthService: ObservableObject {
         errorMessage = nil
         
         do {
+            print("🔄 Initiating Google OAuth sign-in...")
             let response = try await supabase.auth.signInWithOAuth(
                 provider: .google,
                 redirectTo: URL(string: "com.yourapp.nero://login")
@@ -130,12 +174,14 @@ class AuthService: ObservableObject {
             await MainActor.run {
                 self.isLoading = false
             }
+            print("✅ Google OAuth initiated successfully")
             return true
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
             }
+            print("❌ Google OAuth failed: \(error.localizedDescription)")
             return false
         }
     }
@@ -145,6 +191,7 @@ class AuthService: ObservableObject {
         errorMessage = nil
         
         do {
+            print("🔄 Initiating Apple OAuth sign-in...")
             let response = try await supabase.auth.signInWithOAuth(
                 provider: .apple,
                 redirectTo: URL(string: "com.yourapp.nero://login")
@@ -155,12 +202,14 @@ class AuthService: ObservableObject {
             await MainActor.run {
                 self.isLoading = false
             }
+            print("✅ Apple OAuth initiated successfully")
             return true
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
                 self.isLoading = false
             }
+            print("❌ Apple OAuth failed: \(error.localizedDescription)")
             return false
         }
     }
