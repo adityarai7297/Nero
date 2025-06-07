@@ -35,7 +35,7 @@ struct WorkoutPreferences {
 enum PrimaryGoal: String, CaseIterable {
     case maximalStrength = "Maximal strength"
     case hypertrophy = "Muscle size (hypertrophy / lean bulk)"
-    case bodyRecomposition = "Body recomposition – lose fat while adding/maintaining muscle"
+    case bodyRecomposition = "Body recomposition – lose fat while adding muscle"
     case muscularEndurance = "Muscular endurance / conditioning"
     case explosivePower = "Explosive power / athleticism"
     case notSure = "Not sure / need guidance"
