@@ -35,8 +35,7 @@ struct WorkoutPreferences {
 enum PrimaryGoal: String, CaseIterable {
     case maximalStrength = "Maximal strength"
     case hypertrophy = "Muscle size (hypertrophy / lean bulk)"
-    case bodyRecomposition = "Body recomposition – lose fat while adding muscle"
-    case fatLossCut = "Fat-loss cut (maintain muscle)"
+    case bodyRecomposition = "Body recomposition – lose fat while adding/maintaining muscle"
     case muscularEndurance = "Muscular endurance / conditioning"
     case explosivePower = "Explosive power / athleticism"
     case notSure = "Not sure / need guidance"
@@ -46,7 +45,6 @@ enum PrimaryGoal: String, CaseIterable {
         case .maximalStrength: return "figure.strengthtraining.traditional"
         case .hypertrophy: return "figure.arms.open"
         case .bodyRecomposition: return "arrow.2.circlepath"
-        case .fatLossCut: return "flame.fill"
         case .muscularEndurance: return "heart.fill"
         case .explosivePower: return "bolt.fill"
         case .notSure: return "questionmark.circle"
@@ -58,10 +56,9 @@ enum PrimaryGoal: String, CaseIterable {
         case .maximalStrength: return "A"
         case .hypertrophy: return "B"
         case .bodyRecomposition: return "C"
-        case .fatLossCut: return "D"
-        case .muscularEndurance: return "E"
-        case .explosivePower: return "F"
-        case .notSure: return "G"
+        case .muscularEndurance: return "D"
+        case .explosivePower: return "E"
+        case .notSure: return "F"
         }
     }
 }
@@ -576,7 +573,6 @@ struct WorkoutQuestionnaireView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var currentStep: Int = 0
     @State private var preferences = WorkoutPreferences()
-    @State private var showingConfirmation = false
     @State private var showingSuccessAlert = false
     @StateObject private var preferencesService = WorkoutPreferencesService()
     
@@ -692,23 +688,8 @@ struct WorkoutQuestionnaireView: View {
                 }
             }
         }
-        .alert("Save Preferences", isPresented: $showingConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Save") {
-                Task {
-                    let success = await preferencesService.saveWorkoutPreferences(preferences)
-                    if success {
-                        showingSuccessAlert = true
-                    }
-                }
-            }
-        } message: {
-            Text("This will update your workout plan based on your preferences. You can always change these settings later.")
-        }
         .alert("Success!", isPresented: $showingSuccessAlert) {
-            Button("OK") {
-                dismiss()
-            }
+            // No buttons - will auto-dismiss
         } message: {
             Text("Exercise preferences saved successfully!")
         }
@@ -786,7 +767,17 @@ struct WorkoutQuestionnaireView: View {
                         currentStep += 1
                     }
                 } else {
-                    showingConfirmation = true
+                    // Directly save preferences without confirmation
+                    Task {
+                        let success = await preferencesService.saveWorkoutPreferences(preferences)
+                        if success {
+                            showingSuccessAlert = true
+                            // Auto-dismiss after 2 seconds
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                dismiss()
+                            }
+                        }
+                    }
                 }
             }) {
                 HStack {
