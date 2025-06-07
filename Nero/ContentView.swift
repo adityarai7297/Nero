@@ -527,7 +527,7 @@ struct ExerciseView: View {
                     GameStyleMenuButton(
                         title: "Edit Workout Plan",
                         icon: "dumbbell.fill",
-                        color: .cyan
+                        color: .blue
                     ) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSideMenu = false

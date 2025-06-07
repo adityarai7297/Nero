@@ -11,9 +11,9 @@ struct AuthView: View {
     
     var body: some View {
         ZStack {
-            // Background gradient
+            // Background gradient - changed from blue-purple to blue-white
             LinearGradient(
-                gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]),
+                gradient: Gradient(colors: [Color.white, Color.blue.opacity(0.05)]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -88,7 +88,7 @@ struct AuthView: View {
                     }
                     .padding(.horizontal, 24)
                     
-                    // Action button
+                    // Action button - changed from blue-purple gradient to solid blue
                     Button(action: handleAuth) {
                         HStack {
                             if authService.isLoading {
@@ -106,13 +106,8 @@ struct AuthView: View {
                         .frame(height: 50)
                         .background(
                             RoundedRectangle(cornerRadius: 12)
-                                .fill(LinearGradient(
-                                    gradient: Gradient(colors: [.blue, .purple]),
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ))
+                                .fill(Color.blue)
                         )
-                        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
                     }
                     .disabled(authService.isLoading || !isFormValid)
                     .opacity(authService.isLoading || !isFormValid ? 0.6 : 1.0)
@@ -176,7 +171,7 @@ struct AuthView: View {
                         .disabled(authService.isLoading)
                         .opacity(authService.isLoading ? 0.6 : 1.0)
                         
-                        // Apple Sign-In button
+                        // Apple Sign-In button - keeping black as it's Apple's brand requirement
                         Button(action: {
                             Task {
                                 await authService.signInWithApple()

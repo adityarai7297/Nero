@@ -322,13 +322,8 @@ struct WorkoutQuestionnaireView: View {
                 .frame(height: 50)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(LinearGradient(
-                            gradient: Gradient(colors: [.blue, .purple]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ))
+                        .fill(Color.blue)
                 )
-                .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
             }
         }
         .padding(.horizontal, 24)
