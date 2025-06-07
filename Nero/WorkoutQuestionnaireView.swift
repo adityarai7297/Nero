@@ -703,73 +703,66 @@ struct WorkoutQuestionnaireView: View {
     
     @ViewBuilder
     private func NavigationButtonsView() -> some View {
-        VStack(spacing: 16) {
-            // Step indicator
-            Text("Question \(currentStep + 1) of \(totalSteps)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 20) {
-                // Back Button
-                if currentStep > 0 {
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            currentStep -= 1
-                        }
-                    }) {
-                        HStack {
-                            Image(systemName: "chevron.left")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            Text("Back")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.white)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.blue, lineWidth: 2)
-                                )
-                        )
-                    }
-                } else {
-                    Spacer()
-                        .frame(maxWidth: .infinity)
-                }
-                
-                // Next/Finish Button
+        HStack(spacing: 20) {
+            // Back Button
+            if currentStep > 0 {
                 Button(action: {
-                    if currentStep < totalSteps - 1 {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            currentStep += 1
-                        }
-                    } else {
-                        showingConfirmation = true
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        currentStep -= 1
                     }
                 }) {
                     HStack {
-                        Text(currentStep < totalSteps - 1 ? "Next" : "Finish")
+                        Image(systemName: "chevron.left")
                             .font(.headline)
                             .fontWeight(.semibold)
-                        if currentStep < totalSteps - 1 {
-                            Image(systemName: "chevron.right")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                        }
+                        Text("Back")
+                            .font(.headline)
+                            .fontWeight(.semibold)
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.blue)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.blue)
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.blue, lineWidth: 2)
+                            )
                     )
                 }
+            } else {
+                Spacer()
+                    .frame(maxWidth: .infinity)
+            }
+            
+            // Next/Finish Button
+            Button(action: {
+                if currentStep < totalSteps - 1 {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        currentStep += 1
+                    }
+                } else {
+                    showingConfirmation = true
+                }
+            }) {
+                HStack {
+                    Text(currentStep < totalSteps - 1 ? "Next" : "Finish")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    if currentStep < totalSteps - 1 {
+                        Image(systemName: "chevron.right")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                    }
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.blue)
+                )
             }
         }
         .padding(.horizontal, 24)
@@ -1127,12 +1120,6 @@ struct QuestionnaireOptionButton: View {
                         Circle()
                             .fill(isSelected ? color : color.opacity(0.1))
                     )
-                
-                // Icon
-                Image(systemName: icon)
-                    .font(.headline)
-                    .foregroundColor(color)
-                    .frame(width: 24)
                 
                 // Content
                 VStack(alignment: .leading, spacing: 2) {
