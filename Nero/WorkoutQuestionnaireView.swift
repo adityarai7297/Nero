@@ -35,7 +35,7 @@ struct WorkoutPreferences {
 enum PrimaryGoal: String, CaseIterable {
     case maximalStrength = "Maximal strength"
     case hypertrophy = "Muscle size (hypertrophy / lean bulk)"
-    case bodyRecomposition = "Body recomposition – lose fat while adding/keeping muscle"
+    case bodyRecomposition = "Body recomposition – lose fat while adding muscle"
     case fatLossCut = "Fat-loss cut (maintain muscle)"
     case muscularEndurance = "Muscular endurance / conditioning"
     case explosivePower = "Explosive power / athleticism"
@@ -61,7 +61,7 @@ enum PrimaryGoal: String, CaseIterable {
         case .fatLossCut: return "D"
         case .muscularEndurance: return "E"
         case .explosivePower: return "F"
-        case .notSure: return "X"
+        case .notSure: return "G"
         }
     }
 }
@@ -89,7 +89,7 @@ enum TrainingExperience: String, CaseIterable {
         case .novice: return "B"
         case .intermediate: return "C"
         case .advanced: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -117,7 +117,7 @@ enum SessionFrequency: String, CaseIterable {
         case .three: return "B"
         case .four: return "C"
         case .fivePlus: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -145,7 +145,7 @@ enum SessionLength: String, CaseIterable {
         case .thirtyToFortyFive: return "B"
         case .fortyFiveToSixty: return "C"
         case .overSixty: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -173,7 +173,7 @@ enum EquipmentAccess: String, CaseIterable {
         case .homeGym: return "B"
         case .adjustableDumbbells: return "C"
         case .bodyweightOnly: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -201,7 +201,7 @@ enum MovementStyles: String, CaseIterable {
         case .bodybuildingIsolation: return "B"
         case .functionalUnilateral: return "C"
         case .olympicLifts: return "D"
-        case .noPreference: return "X"
+        case .noPreference: return "E"
         }
     }
 }
@@ -229,7 +229,7 @@ enum WeeklySplit: String, CaseIterable {
         case .upperLower: return "B"
         case .pushPullLegs: return "C"
         case .broSplit: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -257,7 +257,7 @@ enum VolumeTolerance: String, CaseIterable {
         case .sevenToTwelve: return "B"
         case .thirteenToEighteen: return "C"
         case .nineteenPlus: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -285,7 +285,7 @@ enum RepRanges: String, CaseIterable {
         case .moderate: return "B"
         case .higher: return "C"
         case .mixed: return "D"
-        case .noPreference: return "X"
+        case .noPreference: return "E"
         }
     }
 }
@@ -313,7 +313,7 @@ enum EffortLevel: String, CaseIterable {
         case .rpe78: return "B"
         case .rpe89: return "C"
         case .rpe910: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -341,7 +341,7 @@ enum EatingApproach: String, CaseIterable {
         case .mildDeficit: return "B"
         case .aggressiveDeficit: return "C"
         case .maintenance: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -369,7 +369,7 @@ enum InjuryConsiderations: String, CaseIterable {
         case .shoulderUpper: return "B"
         case .kneeHipAnkle: return "C"
         case .spineCore: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -397,7 +397,7 @@ enum MobilityTime: String, CaseIterable {
         case .fiveMinPrep: return "B"
         case .tenMinMobility: return "C"
         case .whateverRequired: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -425,7 +425,7 @@ enum BusyEquipmentPreference: String, CaseIterable {
         case .swapSimilar: return "B"
         case .swapBodyweight: return "C"
         case .resequence: return "D"
-        case .noPreference: return "X"
+        case .noPreference: return "E"
         }
     }
 }
@@ -453,7 +453,7 @@ enum RestPeriods: String, CaseIterable {
         case .sixtyToNinety: return "B"
         case .ninetyToOneEighty: return "C"
         case .variesByLift: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -481,7 +481,7 @@ enum ProgressionStyle: String, CaseIterable {
         case .addRepsThenWeight: return "B"
         case .addSetsFrequency: return "C"
         case .structuredPeriodization: return "D"
-        case .noPreference: return "X"
+        case .noPreference: return "E"
         }
     }
 }
@@ -509,7 +509,7 @@ enum ExerciseMenuChange: String, CaseIterable {
         case .everyFourWeeks: return "B"
         case .everySixToEight: return "C"
         case .stickWithStaples: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -537,7 +537,7 @@ enum RecoveryResources: String, CaseIterable {
         case .fair: return "B"
         case .good: return "C"
         case .excellent: return "D"
-        case .notSure: return "X"
+        case .notSure: return "E"
         }
     }
 }
@@ -565,7 +565,7 @@ enum ProgrammingFormat: String, CaseIterable {
         case .appBased: return "B"
         case .coachGuided: return "C"
         case .flexibleChoice: return "D"
-        case .noPreference: return "X"
+        case .noPreference: return "E"
         }
     }
 }
@@ -829,7 +829,6 @@ struct PrimaryGoalStep: View {
     var body: some View {
         QuestionStepView(
             title: "Primary physical goal right now?",
-            subtitle: "This helps us tailor your workout plan to your specific objective.",
             options: PrimaryGoal.allCases,
             selectedOption: $selectedGoal
         )
@@ -842,7 +841,6 @@ struct TrainingExperienceStep: View {
     var body: some View {
         QuestionStepView(
             title: "Training experience with free weights & machines?",
-            subtitle: "We'll adjust exercise complexity and progression based on your experience.",
             options: TrainingExperience.allCases,
             selectedOption: $selectedExperience
         )
@@ -855,7 +853,6 @@ struct SessionFrequencyStep: View {
     var body: some View {
         QuestionStepView(
             title: "How many separate resistance sessions can you commit to each week?",
-            subtitle: "Choose a realistic frequency that fits your schedule.",
             options: SessionFrequency.allCases,
             selectedOption: $selectedFrequency
         )
@@ -868,7 +865,6 @@ struct SessionLengthStep: View {
     var body: some View {
         QuestionStepView(
             title: "Typical session length you can reliably spare?",
-            subtitle: "This helps us plan the right amount of exercises per session.",
             options: SessionLength.allCases,
             selectedOption: $selectedLength
         )
@@ -881,7 +877,6 @@ struct EquipmentAccessStep: View {
     var body: some View {
         QuestionStepView(
             title: "Equipment you always have access to:",
-            subtitle: "We'll only recommend exercises you can actually perform.",
             options: EquipmentAccess.allCases,
             selectedOption: $selectedEquipment
         )
@@ -894,7 +889,6 @@ struct MovementStylesStep: View {
     var body: some View {
         QuestionStepView(
             title: "Movement styles you most enjoy (or want emphasized):",
-            subtitle: "Your preferred training style will shape your program.",
             options: MovementStyles.allCases,
             selectedOption: $selectedStyle
         )
@@ -907,7 +901,6 @@ struct WeeklySplitStep: View {
     var body: some View {
         QuestionStepView(
             title: "Preferred weekly split:",
-            subtitle: "How would you like to organize your training sessions?",
             options: WeeklySplit.allCases,
             selectedOption: $selectedSplit
         )
@@ -920,7 +913,6 @@ struct VolumeToleranceStep: View {
     var body: some View {
         QuestionStepView(
             title: "Volume tolerance—working sets per muscle per session:",
-            subtitle: "How many sets can you handle in a single session?",
             options: VolumeTolerance.allCases,
             selectedOption: $selectedVolume
         )
@@ -933,7 +925,6 @@ struct RepRangesStep: View {
     var body: some View {
         QuestionStepView(
             title: "Rep ranges you respond best to (or prefer):",
-            subtitle: "Different rep ranges serve different training goals.",
             options: RepRanges.allCases,
             selectedOption: $selectedRange
         )
@@ -946,7 +937,6 @@ struct EffortLevelStep: View {
     var body: some View {
         QuestionStepView(
             title: "Usual effort level (finish most sets at):",
-            subtitle: "How close to failure do you typically train?",
             options: EffortLevel.allCases,
             selectedOption: $selectedEffort
         )
@@ -959,7 +949,6 @@ struct EatingApproachStep: View {
     var body: some View {
         QuestionStepView(
             title: "Current body-composition eating approach you're willing to follow:",
-            subtitle: "Your nutrition approach should align with your training goals.",
             options: EatingApproach.allCases,
             selectedOption: $selectedApproach
         )
@@ -972,7 +961,6 @@ struct InjuryConsiderationsStep: View {
     var body: some View {
         QuestionStepView(
             title: "Past or present injury considerations:",
-            subtitle: "We'll modify exercises to work around any limitations.",
             options: InjuryConsiderations.allCases,
             selectedOption: $selectedConsideration
         )
@@ -985,7 +973,6 @@ struct MobilityTimeStep: View {
     var body: some View {
         QuestionStepView(
             title: "Mobility / warm-up time you'll actually do each session:",
-            subtitle: "Be realistic about your warm-up commitment.",
             options: MobilityTime.allCases,
             selectedOption: $selectedTime
         )
@@ -998,7 +985,6 @@ struct BusyEquipmentStep: View {
     var body: some View {
         QuestionStepView(
             title: "When equipment is busy, you prefer to:",
-            subtitle: "How adaptable are you when your planned equipment isn't available?",
             options: BusyEquipmentPreference.allCases,
             selectedOption: $selectedPreference
         )
@@ -1011,7 +997,6 @@ struct RestPeriodsStep: View {
     var body: some View {
         QuestionStepView(
             title: "Rest periods that feel best:",
-            subtitle: "How long do you prefer to rest between sets?",
             options: RestPeriods.allCases,
             selectedOption: $selectedPeriod
         )
@@ -1024,7 +1009,6 @@ struct ProgressionStyleStep: View {
     var body: some View {
         QuestionStepView(
             title: "Progression style you enjoy tracking:",
-            subtitle: "How do you prefer to advance in your training?",
             options: ProgressionStyle.allCases,
             selectedOption: $selectedStyle
         )
@@ -1037,7 +1021,6 @@ struct ExerciseMenuChangeStep: View {
     var body: some View {
         QuestionStepView(
             title: "How often should the main exercise menu change?",
-            subtitle: "Some prefer variety, others prefer consistency.",
             options: ExerciseMenuChange.allCases,
             selectedOption: $selectedChange
         )
@@ -1050,7 +1033,6 @@ struct RecoveryResourcesStep: View {
     var body: some View {
         QuestionStepView(
             title: "Recovery resources you consistently get:",
-            subtitle: "Recovery quality affects training capacity and progression.",
             options: RecoveryResources.allCases,
             selectedOption: $selectedResources
         )
@@ -1063,7 +1045,6 @@ struct ProgrammingFormatStep: View {
     var body: some View {
         QuestionStepView(
             title: "Programming format that keeps you motivated:",
-            subtitle: "What training format helps you stay consistent?",
             options: ProgrammingFormat.allCases,
             selectedOption: $selectedFormat
         )
@@ -1074,7 +1055,6 @@ struct ProgrammingFormatStep: View {
 
 struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable>: View where T.RawValue == String, T: QuestionOption {
     let title: String
-    let subtitle: String
     let options: [T]
     @Binding var selectedOption: T
     
@@ -1084,11 +1064,6 @@ struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable>: View whe
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
-                
-                Text(subtitle)
-                    .font(.body)
-                    .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
             }
             
