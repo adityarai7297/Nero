@@ -24,12 +24,45 @@ class AuthService: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     
+    private let firstLaunchKey = "hasLaunchedBefore"
+    
     init() {
+        // Check if this is a fresh installation
+        checkForFreshInstall()
         // Check if user is already logged in
         checkSession()
     }
     
+    private func checkForFreshInstall() {
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: firstLaunchKey)
+        
+        if !hasLaunchedBefore {
+            // This is a fresh install - clear any persisted auth data
+            print("🆕 Fresh app installation detected - clearing any persisted auth data")
+            
+            Task {
+                do {
+                    // Sign out to clear any stored sessions/tokens
+                    try await supabase.auth.signOut()
+                    print("✅ Cleared any persisted auth data for fresh install")
+                } catch {
+                    print("⚠️ Error clearing auth data on fresh install: \(error.localizedDescription)")
+                }
+            }
+            
+            // Mark that the app has been launched
+            UserDefaults.standard.set(true, forKey: firstLaunchKey)
+        }
+    }
+    
     private func checkSession() {
+        // Skip session check if this is a fresh install
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: firstLaunchKey)
+        if !hasLaunchedBefore {
+            isLoading = false
+            return
+        }
+        
         isLoading = true
         Task {
             do {
@@ -156,6 +189,12 @@ class AuthService: ObservableObject {
             }
             print("❌ Sign out failed: \(error.localizedDescription)")
         }
+    }
+    
+    // Method to manually reset first launch (useful for testing)
+    func resetFirstLaunch() {
+        UserDefaults.standard.removeObject(forKey: firstLaunchKey)
+        print("🔄 Reset first launch flag - next app launch will be treated as fresh install")
     }
     
     func signInWithGoogle() async -> Bool {
