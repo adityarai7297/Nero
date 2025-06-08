@@ -546,7 +546,7 @@ struct ExerciseView: View {
                     GameStyleMenuButton(
                         title: "Personal Details",
                         icon: "person.fill",
-                        color: .green
+                        color: .blue
                     ) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSideMenu = false
