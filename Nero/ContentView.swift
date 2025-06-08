@@ -135,6 +135,7 @@ struct ExerciseView: View {
     @State private var showingLogoutAlert: Bool = false
     @State private var showingSideMenu: Bool = false // Control side menu presentation
     @State private var showingWorkoutQuestionnaire: Bool = false // Control workout questionnaire presentation
+    @State private var showingPersonalDetails: Bool = false // Control personal details presentation
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -179,6 +180,9 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingWorkoutQuestionnaire) {
             WorkoutQuestionnaireView()
+        }
+        .sheet(isPresented: $showingPersonalDetails) {
+            PersonalDetailsView()
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -535,6 +539,21 @@ struct ExerciseView: View {
                         // Small delay to let menu close animation finish
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             showingWorkoutQuestionnaire = true
+                        }
+                    }
+                    
+                    // Personal Details button
+                    GameStyleMenuButton(
+                        title: "Personal Details",
+                        icon: "person.fill",
+                        color: .green
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
+                        // Small delay to let menu close animation finish
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingPersonalDetails = true
                         }
                     }
                     
