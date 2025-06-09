@@ -9,6 +9,7 @@ import Supabase
 import SwiftUI
 import UIKit
 import IrregularGradient
+import Neumorphic
 
 // Next-Set Recommendations Algorithm
 struct NextSetRecommendations {
@@ -129,7 +130,6 @@ struct ExerciseView: View {
     @State private var currentExerciseIndex: Int = 0
     @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
-    @State private var isSetButtonPressed: Bool = false
     @State private var showRadialBurst: Bool = false
     @State private var showingSetsModal: Bool = false // Control modal presentation
     @State private var showingLogoutAlert: Bool = false
@@ -231,18 +231,19 @@ struct ExerciseView: View {
                 // Center the exercise name
                 Spacer()
                 
-                HStack(spacing: 8) {
-                    Text(currentExercise.name)
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                        .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
-                        .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
-                    
-                    if currentExercise.setsCompleted > 0 {
-                        SetCounterButton()
+                Text(currentExercise.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.black)
+                    .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                    .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
+                    .overlay(alignment: .trailingLastTextBaseline) {
+                        // Position counter button right next to the text
+                        if currentExercise.setsCompleted > 0 {
+                            SetCounterButton()
+                                .offset(x: 38, y: -2) // Adjust positioning relative to text
+                        }
                     }
-                }
                 
                 Spacer()
             }
@@ -272,19 +273,13 @@ struct ExerciseView: View {
         Button(action: {
             showingSetsModal = true
         }) {
-            Circle()
-                .fill(Color.green)
-                .frame(width: 30, height: 30)
-                .shadow(color: .black.opacity(0.2), radius: 3, x: 0, y: 2)
-                .overlay(
-                    Text("\(currentExercise.setsCompleted)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                )
+            Text("\(currentExercise.setsCompleted)")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.green.opacity(0.8))
         }
-        .transition(.scale.combined(with: .opacity))
-        .animation(.bouncy(duration: 0.3), value: currentExercise.setsCompleted)
+        .softButtonStyle(Circle(), padding: 8, mainColor: Color.white, textColor: .green.opacity(0.8))
+        .frame(width: 30, height: 30)
     }
     
     @ViewBuilder
@@ -303,11 +298,13 @@ struct ExerciseView: View {
     
     @ViewBuilder
     private func NavigationButtonsView() -> some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 40) {
             LeftNavigationButton()
             SetButton()
             RightNavigationButton()
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 40)
         .onAppear {
             setButtonFeedback.prepare()
             navigationFeedback.prepare()
@@ -335,12 +332,10 @@ struct ExerciseView: View {
             Image(systemName: "chevron.left")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.blue)
-                .frame(width: 44, height: 44)
-                .background(Color.white.opacity(0.9))
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+                .foregroundColor(.blue.opacity(0.8))
         }
+        .softButtonStyle(Circle(), padding: 12, mainColor: Color.white, textColor: .blue.opacity(0.8))
+        .frame(width: 44, height: 44)
     }
     
     @ViewBuilder
@@ -348,19 +343,13 @@ struct ExerciseView: View {
         Button(action: {
             handleSetButtonTap()
         }) {
-            Circle()
-                .fill(Color.green.opacity(isSetButtonPressed ? 0.9 : 0.85))
-                .frame(width: 70, height: 70)
-                .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
-                .overlay(
-                    Text("SET")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                        .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 1)
-                )
-                .scaleEffect(isSetButtonPressed ? 0.95 : 1.0)
+            Image(systemName: "plus")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(Color.green.opacity(0.8))
         }
+        .softButtonStyle(Circle(), padding: 23, mainColor: Color.white, textColor: .green.opacity(0.8))
+        .frame(width: 70, height: 70)
     }
     
     @ViewBuilder
@@ -376,12 +365,10 @@ struct ExerciseView: View {
             Image(systemName: "chevron.right")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.blue)
-                .frame(width: 44, height: 44)
-                .background(Color.white.opacity(0.9))
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+                .foregroundColor(.blue.opacity(0.8))
         }
+        .softButtonStyle(Circle(), padding: 12, mainColor: Color.white, textColor: .blue.opacity(0.8))
+        .frame(width: 44, height: 44)
     }
     
     @ViewBuilder
@@ -483,21 +470,9 @@ struct ExerciseView: View {
             // Update recommendations immediately after successful save
             updateRecommendationsAfterSet()
             
-            // Start button press animation
-            withAnimation(.easeInOut(duration: 0.1)) {
-                isSetButtonPressed = true
-            }
-            
             // Show radial burst effect
             withAnimation(.easeOut(duration: 0.15)) {
                 showRadialBurst = true
-            }
-            
-            // Reset button press state
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    isSetButtonPressed = false
-                }
             }
             
             // Hide burst after short delay for quick pulse
