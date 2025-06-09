@@ -287,11 +287,23 @@ struct ExerciseView: View {
     @ViewBuilder
     private func ExerciseComponentsView() -> some View {
         VStack(spacing: 32) {
-            ExerciseComponent(value: $weights[0], type: .weight, recommendations: currentRecommendations)
+            ExerciseComponent(
+                value: $weights[0], 
+                type: .weight, 
+                recommendations: currentRecommendations
+            )
                 .environmentObject(themeManager)
-            ExerciseComponent(value: $weights[1], type: .repetitions, recommendations: currentRecommendations)
+            ExerciseComponent(
+                value: $weights[1], 
+                type: .repetitions, 
+                recommendations: currentRecommendations
+            )
                 .environmentObject(themeManager)
-            ExerciseComponent(value: $weights[2], type: .rpe, recommendations: currentRecommendations)
+            ExerciseComponent(
+                value: $weights[2], 
+                type: .rpe, 
+                recommendations: currentRecommendations
+            )
                 .environmentObject(themeManager)
         }
         .padding(.horizontal, 0)
@@ -1018,7 +1030,10 @@ struct ExerciseComponent: View {
             if type != .rpe {
                 HStack(spacing: 15) {
                     ForEach(recommendationValues, id: \.self) { presetValue in
-                        PresetButton(value: presetValue, currentValue: $value)
+                        PresetButton(
+                            value: presetValue, 
+                            currentValue: $value
+                        )
                     }
                 }
                 .padding(.horizontal, 20)
@@ -1035,19 +1050,20 @@ struct PresetButton: View {
         Button(action: {
             currentValue = CGFloat(value)
         }) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(currentValue == CGFloat(value) ? Color.blue : Color.blue.opacity(0.8))
-                .frame(width: 60, height: 40)
-                .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
-                .overlay(
-                    Text("\(value)")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                )
+            Text("\(value)")
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .foregroundColor(.blue.opacity(0.8))
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
         }
-        .scaleEffect(currentValue == CGFloat(value) ? 1.1 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: currentValue)
+        .softButtonStyle(
+            RoundedRectangle(cornerRadius: 8),
+            padding: 12,
+            mainColor: Color.white,
+            textColor: .blue.opacity(0.8)
+        )
+        .frame(width: 75, height: 40)
     }
 }
 
