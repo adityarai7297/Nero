@@ -988,13 +988,8 @@ struct ExerciseComponent: View {
             // Value viewport with label
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.95))
-                    .frame(width: 60, height: 40)
-                    .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.blue.opacity(0.8), lineWidth: 2)
-                    )
+                    .fill(Color.white)
+                    .softInnerShadow(RoundedRectangle(cornerRadius: 8))
                 
                 Text("\(Int(value))")
                     .font(.system(size: 20, weight: .bold))
@@ -1002,7 +997,8 @@ struct ExerciseComponent: View {
                     .contentTransition(.numericText())
                     .animation(.bouncy(duration: 0.3), value: value)
             }
-            .overlay(alignment: .leading) {
+            .frame(width: 60, height: 40)
+            .overlay(alignment: Alignment.leading) {
                 Text(type.label)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.black)
