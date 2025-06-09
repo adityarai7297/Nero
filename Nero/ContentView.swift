@@ -157,7 +157,7 @@ struct ExerciseView: View {
     
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.offWhite.ignoresSafeArea()
             
             VStack(spacing: 0) {
                 MainExerciseContentView()
@@ -258,7 +258,7 @@ struct ExerciseView: View {
                 .softButtonStyle(
                     Circle(),
                     padding: 12,
-                    mainColor: Color.white,
+                    mainColor: Color.offWhite,
                     textColor: Color.accentBlue.opacity(0.8),
                     pressedEffect: .hard
                 )
@@ -290,7 +290,7 @@ struct ExerciseView: View {
         .softButtonStyle(
             Circle(),
             padding: 10,
-            mainColor: Color.white,
+            mainColor: Color.offWhite,
             textColor: Color.green.opacity(0.8),
             pressedEffect: .hard
         )
@@ -364,7 +364,7 @@ struct ExerciseView: View {
         .softButtonStyle(
             Circle(),
             padding: 12,
-            mainColor: Color.white,
+            mainColor: Color.offWhite,
             textColor: Color.accentBlue.opacity(0.8),
             pressedEffect: .hard
         )
@@ -384,7 +384,7 @@ struct ExerciseView: View {
         .softButtonStyle(
             Circle(),
             padding: 23,
-            mainColor: Color.white,
+            mainColor: Color.offWhite,
             textColor: Color.green.opacity(0.8),
             pressedEffect: .hard
         )
@@ -409,7 +409,7 @@ struct ExerciseView: View {
         .softButtonStyle(
             Circle(),
             padding: 12,
-            mainColor: Color.white,
+            mainColor: Color.offWhite,
             textColor: Color.accentBlue.opacity(0.8),
             pressedEffect: .hard
         )
@@ -1019,7 +1019,7 @@ struct ExerciseComponent: View {
             // Value viewport with label
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white)
+                    .fill(Color.offWhite)
                     .softInnerShadow(
                         RoundedRectangle(cornerRadius: 8),
                         darkShadow: Color.black.opacity(0.3),
@@ -1093,7 +1093,7 @@ struct PresetButton: View {
         .softButtonStyle(
             RoundedRectangle(cornerRadius: 8),
             padding: 12,
-            mainColor: Color.white,
+            mainColor: Color.offWhite,
             textColor: Color.accentBlue.opacity(0.8),
             pressedEffect: .hard
         )
@@ -1255,7 +1255,7 @@ struct GameStyleMenuButton: View {
                 // Icon with solid outline
                 ZStack {
                     Circle()
-                        .fill(Color.white)
+                        .fill(Color.offWhite)
                         .overlay(
                             Circle()
                                 .stroke(color, lineWidth: 2)
@@ -1281,7 +1281,7 @@ struct GameStyleMenuButton: View {
                 Group {
                     if isPressed {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.white)
+                            .fill(Color.offWhite)
                             .softInnerShadow(
                                 RoundedRectangle(cornerRadius: 16),
                                 darkShadow: Color.black.opacity(0.2),
@@ -1291,7 +1291,7 @@ struct GameStyleMenuButton: View {
                             )
                     } else {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.white)
+                            .fill(Color.offWhite)
                             .softOuterShadow()
                     }
                 }
