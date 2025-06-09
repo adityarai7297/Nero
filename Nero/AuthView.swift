@@ -6,270 +6,426 @@ struct AuthView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
-    @State private var showingAlert = false
-    @State private var alertMessage = ""
+    
+    // ID-based shake animation - new ID triggers new animation
+    @State private var emailShakeID = UUID()
+    @State private var passwordShakeID = UUID()
     
     var body: some View {
         ZStack {
-            // Background gradient - changed from blue-purple to blue-white
+            // Background
             LinearGradient(
-                gradient: Gradient(colors: [Color.white, Color.blue.opacity(0.05)]),
+                gradient: Gradient(colors: [.blue.opacity(0.1), .white]),
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 32) {
-                // App branding
-                VStack(spacing: 16) {
-                    Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.blue)
-                    
-                    Text("Nero")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-                    
-                    Text("Track your workouts with precision")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 60)
-                
-                // Auth form
-                VStack(spacing: 20) {
-                    // Toggle between Sign In / Sign Up
-                    Picker("Auth Mode", selection: $isSignUp) {
-                        Text("Sign In").tag(false)
-                        Text("Sign Up").tag(true)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .padding(.horizontal)
-                    
-                    // Form fields
-                    VStack(spacing: 16) {
-                        // Email field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Email")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            TextField("Enter your email", text: $email)
-                                .textFieldStyle(CustomTextFieldStyle())
-                                .keyboardType(.emailAddress)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                        }
+            ScrollView {
+                VStack(spacing: 32) {
+                    // Header
+                    VStack(spacing: 20) {
+                        Image(systemName: "dumbbell.fill")
+                            .font(.system(size: 60, weight: .bold))
+                            .foregroundColor(.blue)
                         
-                        // Password field
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Password")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            
-                            SecureField("Enter your password", text: $password)
-                                .textFieldStyle(CustomTextFieldStyle())
-                        }
+                        Text("Nero")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
                         
-                        // Confirm password (only for sign up)
-                        if isSignUp {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Confirm Password")
-                                    .font(.headline)
-                                    .foregroundColor(.secondary)
-                                
-                                SecureField("Confirm your password", text: $confirmPassword)
-                                    .textFieldStyle(CustomTextFieldStyle())
-                            }
-                            .transition(.opacity.combined(with: .slide))
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    
-                    // Action button - changed from blue-purple gradient to solid blue
-                    Button(action: handleAuth) {
-                        HStack {
-                            if authService.isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
-                            }
-                            
-                            Text(isSignUp ? "Create Account" : "Sign In")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.blue)
-                        )
-                    }
-                    .disabled(authService.isLoading || !isFormValid)
-                    .opacity(authService.isLoading || !isFormValid ? 0.6 : 1.0)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
-                    
-                    // Divider with "or" text
-                    HStack {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(height: 1)
-                        
-                        Text("or")
-                            .font(.caption)
+                        Text("Track your workouts with precision")
+                            .font(.subheadline)
                             .foregroundColor(.secondary)
-                            .padding(.horizontal, 12)
-                        
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(height: 1)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.top, 40)
                     
-                    // Social login buttons
-                    VStack(spacing: 12) {
-                        // Google Sign-In button
-                        Button(action: {
-                            Task {
-                                await authService.signInWithGoogle()
-                            }
-                        }) {
-                            HStack {
-                                AsyncImage(url: URL(string: "https://developers.google.com/identity/images/g-logo.png")) { image in
-                                    image
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                } placeholder: {
-                                    Image(systemName: "globe")
-                                        .font(.title3)
-                                        .foregroundColor(.primary)
-                                }
-                                .frame(width: 20, height: 20)
-                                
-                                Text("Continue with Google")
-                                    .font(.headline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.primary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color(.systemGray6))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .stroke(Color(.systemGray4), lineWidth: 1)
-                                    )
-                            )
-                        }
-                        .disabled(authService.isLoading)
-                        .opacity(authService.isLoading ? 0.6 : 1.0)
-                        
-                        // Apple Sign-In button - keeping black as it's Apple's brand requirement
-                        Button(action: {
-                            Task {
-                                await authService.signInWithApple()
-                            }
-                        }) {
-                            HStack {
-                                Image(systemName: "applelogo")
-                                    .font(.title3)
-                                    .foregroundColor(.white)
-                                
-                                Text("Continue with Apple")
-                                    .font(.headline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 50)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.black)
-                            )
-                        }
-                        .disabled(authService.isLoading)
-                        .opacity(authService.isLoading ? 0.6 : 1.0)
+                    // Main Content - switches based on AuthPhase
+                    switch authService.phase {
+                    case .idle, .error:
+                        loginForm
+                    case .loading:
+                        loginForm
+                            .overlay(loadingOverlay, alignment: .center)
+                    case .success:
+                        EmptyView() // Navigation handled by root app
                     }
-                    .padding(.horizontal, 24)
+                    
+                    Spacer(minLength: 20)
                 }
-                .padding(.vertical, 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(.ultraThinMaterial)
-                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-                )
-                .padding(.horizontal, 24)
-                
-                Spacer()
+                .padding(.vertical, 20)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isSignUp)
-        .alert("Authentication", isPresented: $showingAlert) {
-            Button("OK", role: .cancel) { }
-        } message: {
-            Text(alertMessage)
-        }
-        .onChange(of: authService.errorMessage) { _, newValue in
-            if let error = newValue {
-                alertMessage = error
-                showingAlert = true
+        .onChange(of: authService.phase) { _, newPhase in
+            if case .error(let authError) = newPhase {
+                handleAuthError(authError)
             }
         }
     }
     
+    // MARK: - Login Form
+    
+    private var loginForm: some View {
+        VStack(spacing: 0) {
+            // Mode Selector
+            Picker("Mode", selection: $isSignUp) {
+                Text("Sign In").tag(false)
+                Text("Sign Up").tag(true)
+            }
+            .pickerStyle(SegmentedPickerStyle())
+            .padding(.horizontal, 24)
+            .padding(.top, 24)
+            .onChange(of: isSignUp) { _, _ in
+                authService.resetPhase()
+            }
+            
+            // Form Fields
+            VStack(spacing: 24) {
+                // Email Field
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Email")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Spacer()
+                        
+                        if case .error(let authError) = authService.phase,
+                           isEmailError(authError) {
+                            Text(authError.errorDescription ?? "")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    TextField("Enter your email", text: $email)
+                        .id(emailShakeID) // ID-based shake
+                        .textFieldStyle(ModernFieldStyle(
+                            hasError: isEmailFieldError,
+                            shouldShake: isEmailFieldError
+                        ))
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                        .disableAutocorrection(true)
+                }
+                
+                // Password Field
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Password")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        Spacer()
+                        
+                        if case .error(let authError) = authService.phase,
+                           isPasswordError(authError) {
+                            Text(authError.errorDescription ?? "")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.red)
+                        }
+                    }
+                    
+                    SecureField("Enter your password", text: $password)
+                        .id(passwordShakeID) // ID-based shake
+                        .textFieldStyle(ModernFieldStyle(
+                            hasError: isPasswordFieldError,
+                            shouldShake: isPasswordFieldError
+                        ))
+                }
+                
+                // Confirm Password (Sign Up only)
+                if isSignUp {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Confirm Password")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        
+                        SecureField("Confirm your password", text: $confirmPassword)
+                            .textFieldStyle(ModernFieldStyle(hasError: false, shouldShake: false))
+                    }
+                    .transition(.opacity.combined(with: .slide))
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 32)
+            
+            // Login Button
+            Button(action: handleAuth) {
+                HStack {
+                    Text(isSignUp ? "Create Account" : "Sign In")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isFormValid ? Color.blue : Color.gray)
+                )
+            }
+            .disabled(!isFormValid || authService.phase == .loading)
+            .padding(.horizontal, 24)
+            .padding(.top, 32)
+            
+            // Divider
+            HStack {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 1)
+                
+                Text("or")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .frame(height: 1)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 24)
+            
+            // Social Login
+            VStack(spacing: 12) {
+                SocialButton(
+                    title: "Continue with Google",
+                    icon: "globe",
+                    backgroundColor: Color(.systemGray6),
+                    foregroundColor: .primary
+                ) {
+                    Task { await authService.signInWithGoogle() }
+                }
+                
+                SocialButton(
+                    title: "Continue with Apple",
+                    icon: "applelogo",
+                    backgroundColor: .black,
+                    foregroundColor: .white
+                ) {
+                    Task { await authService.signInWithApple() }
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 8)
+        )
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Loading Overlay
+    
+    private var loadingOverlay: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                .scaleEffect(1.2)
+            
+            Text(isSignUp ? "Creating account..." : "Signing in...")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 10)
+        )
+        .allowsHitTesting(false)
+    }
+    
+    // MARK: - Computed Properties
+    
     private var isFormValid: Bool {
-        if email.isEmpty || password.isEmpty {
+        let emailValid = !email.isEmpty && email.contains("@")
+        let passwordValid = password.count >= 6
+        let confirmValid = !isSignUp || (confirmPassword == password && !confirmPassword.isEmpty)
+        
+        return emailValid && passwordValid && confirmValid
+    }
+    
+    private var isEmailFieldError: Bool {
+        if case .error(let authError) = authService.phase {
+            return isEmailError(authError)
+        }
+        return false
+    }
+    
+    private var isPasswordFieldError: Bool {
+        if case .error(let authError) = authService.phase {
+            return isPasswordError(authError)
+        }
+        return false
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func isEmailError(_ error: AuthError) -> Bool {
+        switch error {
+        case .userExists, .invalidEmail:
+            return true
+        default:
             return false
         }
-        
-        if isSignUp && (confirmPassword.isEmpty || password != confirmPassword) {
+    }
+    
+    private func isPasswordError(_ error: AuthError) -> Bool {
+        switch error {
+        case .wrongCredentials, .weakPassword:
+            return true
+        default:
             return false
         }
-        
-        return email.contains("@") && password.count >= 6
     }
     
     private func handleAuth() {
-        guard isFormValid else { return }
+        // Client-side validation first
+        if !email.contains("@") || email.isEmpty {
+            triggerEmailShake()
+            return
+        }
         
+        if password.count < 6 {
+            triggerPasswordShake()
+            return
+        }
+        
+        if isSignUp && password != confirmPassword {
+            triggerPasswordShake()
+            return
+        }
+        
+        // Proceed with authentication
         Task {
-            let success: Bool
             if isSignUp {
-                success = await authService.signUp(email: email, password: password)
+                await authService.signUp(email: email, password: password)
             } else {
-                success = await authService.signIn(email: email, password: password)
+                await authService.signIn(email: email, password: password)
             }
-            
-            if success {
-                // Success is handled by the auth service updating the user state
+        }
+    }
+    
+    private func handleAuthError(_ error: AuthError) {
+        switch error {
+        case .userExists, .invalidEmail:
+            triggerEmailShake()
+        case .wrongCredentials, .weakPassword:
+            triggerPasswordShake()
+        case .networkError, .unknown:
+            // Show general error without field-specific shake
+            break
+        }
+    }
+    
+    private func triggerEmailShake() {
+        emailShakeID = UUID() // New ID triggers new animation
+    }
+    
+    private func triggerPasswordShake() {
+        passwordShakeID = UUID() // New ID triggers new animation
+    }
+}
+
+// MARK: - Custom Styles & Components
+
+struct ModernFieldStyle: TextFieldStyle {
+    let hasError: Bool
+    let shouldShake: Bool
+    
+    func _body(configuration: TextField<Self._Label>) -> some View {
+        configuration
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(hasError ? Color.red.opacity(0.08) : Color(.systemGray6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                hasError ? Color.red : Color(.systemGray4),
+                                lineWidth: hasError ? 2 : 1
+                            )
+                    )
+            )
+            .modifier(ShakeEffect(shouldShake: shouldShake))
+    }
+}
+
+struct ShakeEffect: ViewModifier {
+    let shouldShake: Bool
+    @State private var shakeOffset: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        content
+            .offset(x: shakeOffset)
+            .onAppear {
+                if shouldShake {
+                    startShaking()
+                }
             }
+            .onChange(of: shouldShake) { _, newValue in
+                if newValue {
+                    startShaking()
+                }
+            }
+    }
+    
+    private func startShaking() {
+        let animation = Animation
+            .easeInOut(duration: 0.1)
+            .repeatCount(6, autoreverses: true)
+        
+        withAnimation(animation) {
+            shakeOffset = 8
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            shakeOffset = 0
         }
     }
 }
 
-struct CustomTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+struct SocialButton: View {
+    let title: String
+    let icon: String
+    let backgroundColor: Color
+    let foregroundColor: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(foregroundColor)
+                
+                Text(title)
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .foregroundColor(foregroundColor)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
             .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(.systemGray6))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(backgroundColor)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(.systemGray4), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(backgroundColor == .black ? .clear : Color(.systemGray4), lineWidth: 1)
                     )
             )
+        }
     }
 }
 
 #Preview {
     AuthView()
+        .environmentObject(AuthService())
 } 

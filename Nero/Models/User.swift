@@ -18,9 +18,105 @@ struct User: Codable, Equatable {
     }
 }
 
+enum AuthError: LocalizedError, Equatable {
+    case userExists
+    case wrongCredentials
+    case weakPassword
+    case invalidEmail
+    case networkError
+    case unknown(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .userExists:
+            return "Email already in use"
+        case .wrongCredentials:
+            return "Incorrect email or password"
+        case .weakPassword:
+            return "Password too weak"
+        case .invalidEmail:
+            return "Invalid email format"
+        case .networkError:
+            return "Network connection error"
+        case .unknown(let message):
+            return message
+        }
+    }
+    
+    var suggestions: [String] {
+        switch self {
+        case .userExists:
+            return [
+                "Try signing in instead",
+                "Use a different email address",
+                "Reset your password if you forgot it"
+            ]
+        case .wrongCredentials:
+            return [
+                "Double-check your email and password",
+                "Try creating an account if you don't have one",
+                "Use 'Forgot Password' if you can't remember"
+            ]
+        case .weakPassword:
+            return [
+                "Use at least 8 characters",
+                "Include letters and numbers",
+                "Add special characters for strength"
+            ]
+        case .invalidEmail:
+            return [
+                "Make sure to include @ in your email",
+                "Check for typos in your email address"
+            ]
+        case .networkError:
+            return [
+                "Check your internet connection",
+                "Try again in a moment"
+            ]
+        case .unknown:
+            return [
+                "Try again in a moment",
+                "Contact support if the problem persists"
+            ]
+        }
+    }
+}
+
+enum AuthPhase: Equatable {
+    case idle
+    case loading
+    case success(User)
+    case error(AuthError)
+    
+    static func == (lhs: AuthPhase, rhs: AuthPhase) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle), (.loading, .loading):
+            return true
+        case (.success(let user1), .success(let user2)):
+            return user1 == user2
+        case (.error(let error1), .error(let error2)):
+            return error1 == error2
+        default:
+            return false
+        }
+    }
+}
+
+enum AuthErrorType {
+    case invalidEmail
+    case passwordTooShort
+    case passwordTooWeak
+    case invalidCredentials
+    case userAlreadyExists
+    case passwordError
+    case emailError
+    case networkError
+}
+
 @MainActor
 class AuthService: ObservableObject {
     @Published var user: User?
+    @Published var phase: AuthPhase = .idle
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -59,11 +155,11 @@ class AuthService: ObservableObject {
         // Skip session check if this is a fresh install
         let hasLaunchedBefore = UserDefaults.standard.bool(forKey: firstLaunchKey)
         if !hasLaunchedBefore {
-            isLoading = false
+            phase = .idle
             return
         }
         
-        isLoading = true
+        phase = .loading
         Task {
             do {
                 let session = try await supabase.auth.session
@@ -77,26 +173,27 @@ class AuthService: ObservableObject {
                     print("⚠️ Session restored but profile creation failed for: \(authUser.email ?? "unknown")")
                 }
                 
+                let user = User(
+                    id: authUser.id,
+                    email: authUser.email ?? "",
+                    createdAt: authUser.createdAt
+                )
+                
                 await MainActor.run {
-                    self.user = User(
-                        id: authUser.id,
-                        email: authUser.email ?? "",
-                        createdAt: authUser.createdAt
-                    )
-                    self.isLoading = false
+                    self.user = user
+                    self.phase = .success(user)
                 }
             } catch {
                 await MainActor.run {
                     self.user = nil
-                    self.isLoading = false
+                    self.phase = .idle
                 }
             }
         }
     }
     
-    func signUp(email: String, password: String) async -> Bool {
-        isLoading = true
-        errorMessage = nil
+    func signUp(email: String, password: String) async {
+        phase = .loading
         
         do {
             print("🔄 Creating new user account for: \(email)")
@@ -117,35 +214,36 @@ class AuthService: ObservableObject {
                 }
             }
             
+            let user = User(
+                id: authUser.id,
+                email: authUser.email ?? "",
+                createdAt: authUser.createdAt
+            )
+            
             await MainActor.run {
-                self.user = User(
-                    id: authUser.id,
-                    email: authUser.email ?? "",
-                    createdAt: authUser.createdAt
-                )
-                self.isLoading = false
+                self.user = user
+                self.phase = .success(user)
             }
             
             print("✅ New user signup completed for: \(email)")
-            return true
         } catch {
+            let authError = parseError(error)
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
+                self.phase = .error(authError)
             }
             print("❌ Signup failed for \(email): \(error.localizedDescription)")
-            return false
         }
     }
     
-    func signIn(email: String, password: String) async -> Bool {
-        isLoading = true
-        errorMessage = nil
+    func signIn(email: String, password: String) async {
+        print("🔐 AuthService.signIn() called for: \(email)")
+        phase = .loading
         
         do {
             print("🔄 Signing in user: \(email)")
             let response = try await supabase.auth.signIn(email: email, password: password)
             let authUser = response.user
+            print("🔐 AuthService: Supabase signIn successful for: \(email)")
             
             // For sign-in, just ensure profile exists (shouldn't be needed for new users)
             let profileExists = await UserProfileService.ensureUserProfileExists(for: authUser)
@@ -155,25 +253,53 @@ class AuthService: ObservableObject {
                 print("⚠️ Profile issue detected for user: \(email)")
             }
             
+            let user = User(
+                id: authUser.id,
+                email: authUser.email ?? "",
+                createdAt: authUser.createdAt
+            )
+            
             await MainActor.run {
-                self.user = User(
-                    id: authUser.id,
-                    email: authUser.email ?? "",
-                    createdAt: authUser.createdAt
-                )
-                self.isLoading = false
+                self.user = user
+                self.phase = .success(user)
             }
             
             print("✅ Sign in completed for: \(email)")
-            return true
         } catch {
+            print("🚨 AuthService: signIn caught error: \(error)")
+            let authError = parseError(error)
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
+                self.phase = .error(authError)
             }
             print("❌ Sign in failed for \(email): \(error.localizedDescription)")
-            return false
         }
+    }
+    
+    private func parseError(_ error: Error) -> AuthError {
+        let errorStr = error.localizedDescription.lowercased()
+        
+        if errorStr.contains("invalid login credentials") ||
+           errorStr.contains("user not found") ||
+           errorStr.contains("invalid email or password") {
+            return .wrongCredentials
+        } else if errorStr.contains("user already registered") ||
+                  errorStr.contains("email address already exists") ||
+                  errorStr.contains("user already exists") {
+            return .userExists
+        } else if errorStr.contains("password") && 
+                  (errorStr.contains("weak") || errorStr.contains("strength") || errorStr.contains("short")) {
+            return .weakPassword
+        } else if errorStr.contains("email") {
+            return .invalidEmail
+        } else if errorStr.contains("network") || errorStr.contains("connection") {
+            return .networkError
+        } else {
+            return .unknown(error.localizedDescription)
+        }
+    }
+    
+    func resetPhase() {
+        phase = .idle
     }
     
     func signOut() async {
@@ -181,11 +307,12 @@ class AuthService: ObservableObject {
             try await supabase.auth.signOut()
             await MainActor.run {
                 self.user = nil
+                self.phase = .idle
             }
             print("✅ User signed out successfully")
         } catch {
             await MainActor.run {
-                self.errorMessage = error.localizedDescription
+                self.phase = .error(.networkError)
             }
             print("❌ Sign out failed: \(error.localizedDescription)")
         }
@@ -195,6 +322,45 @@ class AuthService: ObservableObject {
     func resetFirstLaunch() {
         UserDefaults.standard.removeObject(forKey: firstLaunchKey)
         print("🔄 Reset first launch flag - next app launch will be treated as fresh install")
+    }
+    
+    // Method to manually clear error message after UI has processed it
+    func clearErrorMessage() {
+        errorMessage = nil
+        print("🧹 AuthService: Error message manually cleared")
+    }
+    
+    // Method to validate credentials without full authentication
+    // This allows UI to show errors before loading state changes
+    func validateCredentials(email: String, password: String, isSignUp: Bool) async -> (isValid: Bool, errorType: AuthErrorType?) {
+        print("🔍 AuthService.validateCredentials() called for: \(email), isSignUp: \(isSignUp)")
+        
+        // Basic validation first
+        if email.isEmpty || !email.contains("@") {
+            print("❌ Validation failed: Invalid email format")
+            return (false, .invalidEmail)
+        }
+        
+        if password.count < 6 {
+            print("❌ Validation failed: Password too short")
+            return (false, .passwordTooShort)
+        }
+        
+        // For sign up, check password strength
+        if isSignUp {
+            if password.count < 8 {
+                print("❌ Validation failed: Password too weak for signup")
+                return (false, .passwordTooWeak)
+            }
+            print("✅ Validation passed for signup")
+            return (true, nil)
+        }
+        
+        // For sign in, we'll do basic validation here
+        // The real credential check will happen during actual sign in
+        // This just ensures we don't have obvious format issues
+        print("✅ Basic validation passed for signin")
+        return (true, nil)
     }
     
     func signInWithGoogle() async -> Bool {
