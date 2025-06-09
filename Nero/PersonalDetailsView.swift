@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Neumorphic
 
 // Personal Details Data Model
 struct PersonalDetails {
@@ -245,15 +246,7 @@ struct PersonalDetailsView: View {
         NavigationView {
             ZStack {
                 // Background
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.blue.opacity(0.1),
-                        Color.white
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                Color.offWhite.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Progress indicator
@@ -262,12 +255,12 @@ struct PersonalDetailsView: View {
                             Text("Step \(currentStep + 1) of \(totalSteps)")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundColor(.blue)
+                                .foregroundColor(Color.accentBlue)
                             Spacer()
                         }
                         
                         ProgressView(value: Double(currentStep + 1), total: Double(totalSteps))
-                            .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                            .progressViewStyle(LinearProgressViewStyle(tint: Color.accentBlue))
                             .scaleEffect(y: 2)
                     }
                     .padding(.horizontal, 24)
@@ -325,7 +318,7 @@ struct PersonalDetailsView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                 }
             }
         }
@@ -354,36 +347,21 @@ struct PersonalDetailsView: View {
                             .font(.headline)
                             .fontWeight(.semibold)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue, lineWidth: 2)
-                    )
                 }
+                .softButtonStyle(
+                    RoundedRectangle(cornerRadius: 12),
+                    padding: 16,
+                    mainColor: Color.offWhite,
+                    textColor: Color.accentBlue,
+                    pressedEffect: .hard
+                )
             }
             
             // Next/Finish button
-            Button(action: {
-                if currentStep < totalSteps - 1 {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        currentStep += 1
-                    }
-                } else {
-                    // Save personal details
-                    Task {
-                        let success = await personalDetailsService.savePersonalDetails(personalDetails)
-                        if success {
-                            showingSuccessAlert = true
-                            // Auto-dismiss after 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                dismiss()
-                            }
-                        }
-                    }
-                }
-            }) {
+            Button(action: nextFinishAction) {
                 HStack {
                     Text(currentStep < totalSteps - 1 ? "Next" : "Finish")
                         .font(.headline)
@@ -397,22 +375,45 @@ struct PersonalDetailsView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue)
-                )
             }
+            .softButtonStyle(
+                RoundedRectangle(cornerRadius: 12),
+                padding: 16,
+                mainColor: Color.accentBlue,
+                textColor: .white,
+                pressedEffect: .hard
+            )
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color.clear, Color.white.opacity(0.95)]),
+                gradient: Gradient(colors: [Color.clear, Color.offWhite.opacity(0.95)]),
                 startPoint: .top,
                 endPoint: .bottom
             )
             .frame(height: 120)
         )
+    }
+    
+    private func nextFinishAction() {
+        if currentStep < totalSteps - 1 {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentStep += 1
+            }
+        } else {
+            // Save personal details
+            Task {
+                let success = await personalDetailsService.savePersonalDetails(personalDetails)
+                if success {
+                    showingSuccessAlert = true
+                    // Auto-dismiss after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -439,13 +440,13 @@ struct AgeStep: View {
                 Text("\(age) years old")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                 
                 Slider(value: Binding(
                     get: { Double(age) },
                     set: { age = Int($0) }
                 ), in: 16...80, step: 1)
-                .accentColor(.blue)
+                .accentColor(Color.accentBlue)
                 
                 HStack {
                     Text("16")
@@ -491,7 +492,7 @@ struct HeightStep: View {
                 Text("\(heightFeet)' \(heightInches)\"")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                 
                 HStack(spacing: 20) {
                     VStack {
@@ -543,13 +544,13 @@ struct WeightStep: View {
                 Text("\(weight) lbs")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                 
                 Slider(value: Binding(
                     get: { Double(weight) },
                     set: { weight = Int($0) }
                 ), in: 80...400, step: 1)
-                .accentColor(.blue)
+                .accentColor(Color.accentBlue)
                 
                 HStack {
                     Text("80 lbs")
@@ -586,13 +587,13 @@ struct BodyFatStep: View {
                 Text("\(bodyFatPercentage)%")
                     .font(.largeTitle)
                     .fontWeight(.bold)
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                 
                 Slider(value: Binding(
                     get: { Double(bodyFatPercentage) },
                     set: { bodyFatPercentage = Int($0) }
                 ), in: 5...40, step: 1)
-                .accentColor(.blue)
+                .accentColor(Color.accentBlue)
                 
                 HStack {
                     Text("5%")
@@ -731,7 +732,7 @@ struct SummaryRow: View {
             Spacer()
             Text(value)
                 .font(.body)
-                .foregroundColor(.blue)
+                .foregroundColor(Color.accentBlue)
                 .fontWeight(.semibold)
         }
         .padding(.horizontal, 16)
@@ -770,7 +771,7 @@ struct PersonalDetailsQuestionStepView<T: RawRepresentable & CaseIterable & Hash
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOption == option,
-                        color: .blue
+                        color: Color.accentBlue
                     ) {
                         selectedOption = option
                     }

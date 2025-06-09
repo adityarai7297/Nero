@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Neumorphic
 
 // Comprehensive Workout Preferences Data Model
 struct WorkoutPreferences {
@@ -604,17 +605,12 @@ struct WorkoutQuestionnaireView: View {
         NavigationView {
             ZStack {
                 // Background gradient
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.white, Color.blue.opacity(0.05)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .ignoresSafeArea()
+                Color.offWhite.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Progress indicator
                     ProgressView(value: Double(currentStep), total: Double(totalSteps - 1))
-                        .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                        .progressViewStyle(LinearProgressViewStyle(tint: Color.accentBlue))
                         .scaleEffect(x: 1, y: 2, anchor: .center)
                         .padding(.horizontal, 24)
                         .padding(.top, 20)
@@ -684,7 +680,7 @@ struct WorkoutQuestionnaireView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                 }
             }
         }
@@ -701,7 +697,7 @@ struct WorkoutQuestionnaireView: View {
                     
                     VStack(spacing: 16) {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                            .progressViewStyle(CircularProgressViewStyle(tint: Color.accentBlue))
                             .scaleEffect(1.5)
                         
                         Text("Saving preferences...")
@@ -743,18 +739,17 @@ struct WorkoutQuestionnaireView: View {
                             .font(.headline)
                             .fontWeight(.semibold)
                     }
-                    .foregroundColor(.blue)
+                    .foregroundColor(Color.accentBlue)
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.blue, lineWidth: 2)
-                            )
-                    )
                 }
+                .softButtonStyle(
+                    RoundedRectangle(cornerRadius: 12),
+                    padding: 16,
+                    mainColor: Color.offWhite,
+                    textColor: Color.accentBlue,
+                    pressedEffect: .hard
+                )
             } else {
                 Spacer()
                     .frame(maxWidth: .infinity)
@@ -793,17 +788,20 @@ struct WorkoutQuestionnaireView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue)
-                )
             }
+            .softButtonStyle(
+                RoundedRectangle(cornerRadius: 12),
+                padding: 16,
+                mainColor: Color.accentBlue,
+                textColor: .white,
+                pressedEffect: .hard
+            )
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color.clear, Color.white.opacity(0.95)]),
+                gradient: Gradient(colors: [Color.clear, Color.offWhite.opacity(0.95)]),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -1123,11 +1121,11 @@ struct QuestionnaireOptionButton: View {
                 Text(letter)
                     .font(.headline)
                     .fontWeight(.bold)
-                    .foregroundColor(isSelected ? .white : color)
+                    .foregroundColor(isSelected ? .white : Color.accentBlue)
                     .frame(width: 32, height: 32)
                     .background(
                         Circle()
-                            .fill(isSelected ? color : color.opacity(0.1))
+                            .fill(isSelected ? Color.accentBlue : Color.accentBlue.opacity(0.1))
                     )
                 
                 // Content
@@ -1152,18 +1150,33 @@ struct QuestionnaireOptionButton: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title2)
-                        .foregroundColor(color)
+                        .foregroundColor(Color.accentBlue)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? color.opacity(0.05) : Color.white)
-                    .overlay(
+                Group {
+                    if isPressed {
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(color, lineWidth: isSelected ? 2 : 1)
-                    )
+                            .fill(Color.offWhite)
+                            .softInnerShadow(
+                                RoundedRectangle(cornerRadius: 16),
+                                darkShadow: Color.black.opacity(0.2),
+                                lightShadow: Color.white,
+                                spread: 0.15,
+                                radius: 3
+                            )
+                    } else {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(isSelected ? Color.accentBlue.opacity(0.05) : Color.offWhite)
+                            .softOuterShadow()
+                    }
+                }
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.accentBlue, lineWidth: isSelected ? 2 : 1)
             )
             .scaleEffect(isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -1174,4 +1187,14 @@ struct QuestionnaireOptionButton: View {
             isPressed = pressing
         }, perform: {})
     }
+}
+
+// MARK: - Color Extensions
+
+extension Color {
+    /// Global accent blue used across the app (matches number panels)
+    static let accentBlue = Color(red: 0 / 255, green: 122 / 255, blue: 255 / 255) // Same as system blue, centralised
+
+    /// Slightly tinted white for better Neumorphic contrast
+    static let offWhite = Color(red: 240 / 255, green: 240 / 255, blue: 245 / 255)
 } 

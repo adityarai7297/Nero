@@ -1308,12 +1308,4 @@ struct GameStyleMenuButton: View {
     ContentView()
 }
 
-extension Color {
-    /// Global accent blue used across the app (matches number panels)
-    static let accentBlue = Color(red: 0 / 255, green: 122 / 255, blue: 255 / 255) // Same as system blue, centralised
-
-    /// Slightly tinted white for better Neumorphic contrast
-    static let offWhite = Color(red: 240 / 255, green: 240 / 255, blue: 245 / 255)
-}
-
 
