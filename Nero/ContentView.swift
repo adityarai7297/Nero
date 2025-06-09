@@ -989,7 +989,13 @@ struct ExerciseComponent: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.white)
-                    .softInnerShadow(RoundedRectangle(cornerRadius: 8))
+                    .softInnerShadow(
+                        RoundedRectangle(cornerRadius: 8),
+                        darkShadow: Color.black.opacity(0.3),
+                        lightShadow: Color.white.opacity(0.9),
+                        spread: 0.15,
+                        radius: 4
+                    )
                 
                 Text("\(Int(value))")
                     .font(.system(size: 20, weight: .bold))
