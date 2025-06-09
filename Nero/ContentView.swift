@@ -237,13 +237,6 @@ struct ExerciseView: View {
                     .foregroundColor(.black)
                     .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
                     .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
-                    .overlay(alignment: .trailingLastTextBaseline) {
-                        // Position counter button right next to the text
-                        if currentExercise.setsCompleted > 0 {
-                            SetCounterButton()
-                                .offset(x: 38, y: -2) // Adjust positioning relative to text
-                        }
-                    }
                 
                 Spacer()
             }
@@ -251,7 +244,7 @@ struct ExerciseView: View {
             .padding(.bottom, 5)
             .padding(.horizontal, 20)
             .overlay(alignment: .leading) {
-                // Hamburger menu icon positioned on the left without affecting centering
+                // Hamburger menu icon positioned on the left
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showingSideMenu.toggle()
@@ -260,10 +253,17 @@ struct ExerciseView: View {
                     Image(systemName: "line.3.horizontal")
                         .font(.title2)
                         .foregroundColor(.blue)
-                        .frame(width: 44, height: 44) // Larger touch area
-                        .contentShape(Rectangle()) // Make entire frame touchable
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
                 .padding(.leading, 20)
+            }
+            .overlay(alignment: .trailing) {
+                // Counter button in top right corner
+                if currentExercise.setsCompleted > 0 {
+                    SetCounterButton()
+                        .padding(.trailing, 20)
+                }
             }
         }
     }
@@ -277,9 +277,11 @@ struct ExerciseView: View {
                 .font(.caption)
                 .fontWeight(.bold)
                 .foregroundColor(.green.opacity(0.8))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .softButtonStyle(Circle(), padding: 8, mainColor: Color.white, textColor: .green.opacity(0.8))
-        .frame(width: 30, height: 30)
+        .softButtonStyle(Circle(), padding: 10, mainColor: Color.white, textColor: .green.opacity(0.8))
+        .frame(width: 36, height: 36)
     }
     
     @ViewBuilder
