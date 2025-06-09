@@ -252,10 +252,17 @@ struct ExerciseView: View {
                 }) {
                     Image(systemName: "line.3.horizontal")
                         .font(.title2)
-                        .foregroundColor(.blue)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue.opacity(0.8))
                 }
+                .softButtonStyle(
+                    Circle(),
+                    padding: 12,
+                    mainColor: Color.white,
+                    textColor: Color.accentBlue.opacity(0.8),
+                    pressedEffect: .hard
+                )
+                .frame(width: 44, height: 44)
                 .padding(.leading, 20)
             }
             .overlay(alignment: .trailing) {
@@ -276,11 +283,17 @@ struct ExerciseView: View {
             Text("\(currentExercise.setsCompleted)")
                 .font(.caption)
                 .fontWeight(.bold)
-                .foregroundColor(.green.opacity(0.8))
+                .foregroundColor(Color.green.opacity(0.8))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .softButtonStyle(Circle(), padding: 10, mainColor: Color.white, textColor: .green.opacity(0.8))
+        .softButtonStyle(
+            Circle(),
+            padding: 10,
+            mainColor: Color.white,
+            textColor: Color.green.opacity(0.8),
+            pressedEffect: .hard
+        )
         .frame(width: 36, height: 36)
     }
     
@@ -346,9 +359,15 @@ struct ExerciseView: View {
             Image(systemName: "chevron.left")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.blue.opacity(0.8))
+                .foregroundColor(Color.accentBlue.opacity(0.8))
         }
-        .softButtonStyle(Circle(), padding: 12, mainColor: Color.white, textColor: .blue.opacity(0.8))
+        .softButtonStyle(
+            Circle(),
+            padding: 12,
+            mainColor: Color.white,
+            textColor: Color.accentBlue.opacity(0.8),
+            pressedEffect: .hard
+        )
         .frame(width: 44, height: 44)
     }
     
@@ -362,7 +381,13 @@ struct ExerciseView: View {
                 .fontWeight(.bold)
                 .foregroundColor(Color.green.opacity(0.8))
         }
-        .softButtonStyle(Circle(), padding: 23, mainColor: Color.white, textColor: .green.opacity(0.8))
+        .softButtonStyle(
+            Circle(),
+            padding: 23,
+            mainColor: Color.white,
+            textColor: Color.green.opacity(0.8),
+            pressedEffect: .hard
+        )
         .frame(width: 70, height: 70)
     }
     
@@ -379,9 +404,15 @@ struct ExerciseView: View {
             Image(systemName: "chevron.right")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.blue.opacity(0.8))
+                .foregroundColor(Color.accentBlue.opacity(0.8))
         }
-        .softButtonStyle(Circle(), padding: 12, mainColor: Color.white, textColor: .blue.opacity(0.8))
+        .softButtonStyle(
+            Circle(),
+            padding: 12,
+            mainColor: Color.white,
+            textColor: Color.accentBlue.opacity(0.8),
+            pressedEffect: .hard
+        )
         .frame(width: 44, height: 44)
     }
     
@@ -520,7 +551,7 @@ struct ExerciseView: View {
                     GameStyleMenuButton(
                         title: "Edit Workout Plan",
                         icon: "dumbbell.fill",
-                        color: .blue
+                        color: Color.accentBlue
                     ) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSideMenu = false
@@ -535,7 +566,7 @@ struct ExerciseView: View {
                     GameStyleMenuButton(
                         title: "Personal Details",
                         icon: "person.fill",
-                        color: .blue
+                        color: Color.accentBlue
                     ) {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             showingSideMenu = false
@@ -759,9 +790,9 @@ struct SetRowView: View {
                 }) {
                     Image(systemName: "pencil")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(Color.accentBlue)
                         .frame(width: 32, height: 32)
-                        .background(Color.blue.opacity(0.1))
+                        .background(Color.accentBlue.opacity(0.1))
                         .clipShape(Circle())
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -1055,7 +1086,7 @@ struct PresetButton: View {
             Text("\(value)")
                 .font(.subheadline)
                 .fontWeight(.bold)
-                .foregroundColor(.blue.opacity(0.8))
+                .foregroundColor(Color.accentBlue.opacity(0.8))
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
         }
@@ -1063,7 +1094,8 @@ struct PresetButton: View {
             RoundedRectangle(cornerRadius: 8),
             padding: 12,
             mainColor: Color.white,
-            textColor: .blue.opacity(0.8)
+            textColor: Color.accentBlue.opacity(0.8),
+            pressedEffect: .hard
         )
         .frame(width: 75, height: 40)
     }
@@ -1139,7 +1171,7 @@ struct WheelPicker: View {
             }))
             .overlay(alignment: .center) {
                 Rectangle()
-                    .fill(Color.blue)
+                    .fill(Color.accentBlue)
                     .frame(width: 2, height: 40)
                     .padding(.bottom, 20)
             }
@@ -1221,19 +1253,19 @@ struct GameStyleMenuButton: View {
         }) {
             HStack(spacing: 16) {
                 // Icon with solid outline
-                Image(systemName: icon)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(color)
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                Circle()
-                                    .stroke(color, lineWidth: 2)
-                            )
-                    )
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .overlay(
+                            Circle()
+                                .stroke(color, lineWidth: 2)
+                        )
+                    Image(systemName: icon)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(color)
+                }
+                .frame(width: 44, height: 44)
                 
                 // Title text
                 Text(title)
@@ -1246,12 +1278,23 @@ struct GameStyleMenuButton: View {
             .padding(.horizontal, 32)
             .padding(.vertical, 20)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
+                Group {
+                    if isPressed {
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(color, lineWidth: 2)
-                    )
+                            .fill(Color.white)
+                            .softInnerShadow(
+                                RoundedRectangle(cornerRadius: 16),
+                                darkShadow: Color.black.opacity(0.2),
+                                lightShadow: Color.white,
+                                spread: 0.15,
+                                radius: 3
+                            )
+                    } else {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.white)
+                            .softOuterShadow()
+                    }
+                }
             )
             .scaleEffect(isPressed ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.1), value: isPressed)
@@ -1263,6 +1306,14 @@ struct GameStyleMenuButton: View {
 
 #Preview {
     ContentView()
+}
+
+extension Color {
+    /// Global accent blue used across the app (matches number panels)
+    static let accentBlue = Color(red: 0 / 255, green: 122 / 255, blue: 255 / 255) // Same as system blue, centralised
+
+    /// Slightly tinted white for better Neumorphic contrast
+    static let offWhite = Color(red: 240 / 255, green: 240 / 255, blue: 245 / 255)
 }
 
 
