@@ -281,11 +281,12 @@ struct ExerciseView: View {
             showingSetsModal = true
         }) {
             Text("\(currentExercise.setsCompleted)")
-                .font(.caption)
+                .font(.callout)
                 .fontWeight(.bold)
                 .foregroundColor(Color.green.opacity(0.8))
+                .frame(width: 18, height: 18)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.5)
         }
         .softButtonStyle(
             Circle(),
@@ -1034,13 +1035,13 @@ struct ExerciseComponent: View {
                     .contentTransition(.numericText())
                     .animation(.bouncy(duration: 0.3), value: value)
             }
-            .frame(width: 60, height: 40)
+            .frame(width: 75, height: 40)
             .overlay(alignment: Alignment.leading) {
                 Text(type.label)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.black)
                     .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
-                    .offset(x: 70) // 60px (box width) + 10px spacing
+                    .offset(x: 85) // 75px (box width) + 10px spacing
             }
             .padding(.top, 5)
             
