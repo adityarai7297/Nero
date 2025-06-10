@@ -1,4 +1,5 @@
 import SwiftUI
+import Neumorphic
 
 struct AuthView: View {
     @EnvironmentObject var authService: AuthService
@@ -14,12 +15,7 @@ struct AuthView: View {
     var body: some View {
         ZStack {
             // Background
-            LinearGradient(
-                gradient: Gradient(colors: [.blue.opacity(0.1), .white]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            Color.offWhite.ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 32) {
@@ -68,11 +64,10 @@ struct AuthView: View {
     private var loginForm: some View {
         VStack(spacing: 0) {
             // Mode Selector
-            Picker("Mode", selection: $isSignUp) {
-                Text("Sign In").tag(false)
-                Text("Sign Up").tag(true)
-            }
-            .pickerStyle(SegmentedPickerStyle())
+            NeumorphicSegmentedSwitch(
+                labels: ["Sign In", "Sign Up"],
+                selection: $isSignUp
+            )
             .padding(.horizontal, 24)
             .padding(.top, 24)
             .onChange(of: isSignUp) { _, _ in
@@ -161,12 +156,15 @@ struct AuthView: View {
                 }
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isFormValid ? Color.blue : Color.gray)
-                )
+                .frame(height: 42)
             }
+            .softButtonStyle(
+                RoundedRectangle(cornerRadius: 12),
+                padding: 14,
+                mainColor: isFormValid ? Color.accentBlue : Color.gray,
+                textColor: .white,
+                pressedEffect: .hard
+            )
             .disabled(!isFormValid || authService.phase == .loading)
             .padding(.horizontal, 24)
             .padding(.top, 32)
@@ -345,13 +343,17 @@ struct ModernFieldStyle: TextFieldStyle {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(hasError ? Color.red.opacity(0.08) : Color(.systemGray6))
+                    .fill(Color.offWhite)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(
-                                hasError ? Color.red : Color(.systemGray4),
-                                lineWidth: hasError ? 2 : 1
-                            )
+                            .stroke(hasError ? Color.red : Color.clear, lineWidth: hasError ? 2 : 0)
+                    )
+                    .softInnerShadow(
+                        RoundedRectangle(cornerRadius: 12),
+                        darkShadow: Color.black.opacity(0.2),
+                        lightShadow: Color.white,
+                        spread: 0.15,
+                        radius: 3
                     )
             )
             .modifier(ShakeEffect(shouldShake: shouldShake))
@@ -414,14 +416,73 @@ struct SocialButton: View {
             .frame(maxWidth: .infinity)
             .frame(height: 54)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(backgroundColor)
-                    .overlay(
+                Group {
+                    if backgroundColor == .black {
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(backgroundColor == .black ? .clear : Color(.systemGray4), lineWidth: 1)
-                    )
+                            .fill(backgroundColor)
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.offWhite)
+                            .softOuterShadow()
+                    }
+                }
             )
         }
+    }
+}
+
+// MARK: - Neumorphic Segmented Switch
+
+struct NeumorphicSegmentedSwitch: View {
+    let labels: [String]
+    @Binding var selection: Bool // false = first, true = second
+    private let cornerRadius: CGFloat = 16
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let thumbWidth = width / CGFloat(labels.count)
+
+            ZStack(alignment: .leading) {
+                // Groove (depressed)
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.offWhite)
+                    .softInnerShadow(
+                        RoundedRectangle(cornerRadius: cornerRadius),
+                        darkShadow: Color.black.opacity(0.2),
+                        lightShadow: Color.white,
+                        spread: 0.18,
+                        radius: 3
+                    )
+
+                // Thumb (raised)
+                RoundedRectangle(cornerRadius: cornerRadius - 4)
+                    .fill(Color.offWhite)
+                    .softOuterShadow()
+                    .frame(width: thumbWidth - 4, height: geo.size.height - 4)
+                    .offset(x: selection ? thumbWidth + 2 : 2)
+                    .animation(.easeInOut(duration: 0.25), value: selection)
+
+                // Labels overlay
+                HStack(spacing: 0) {
+                    ForEach(labels.indices, id: \ .self) { idx in
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                selection = idx == 1
+                            }
+                        }) {
+                            Text(labels[idx])
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .foregroundColor(selection == (idx == 1) ? .primary : .secondary)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+            }
+        }
+        .frame(height: 44)
     }
 }
 

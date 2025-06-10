@@ -289,12 +289,12 @@ struct ExerciseView: View {
         }
         .softButtonStyle(
             Circle(),
-            padding: 10,
+            padding: 12,
             mainColor: Color.offWhite,
             textColor: Color.green.opacity(0.8),
             pressedEffect: .hard
         )
-        .frame(width: 36, height: 36)
+        .frame(width: 44, height: 44)
     }
     
     @ViewBuilder
