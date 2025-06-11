@@ -191,15 +191,26 @@ struct ExerciseView: View {
                 Text(errorMessage)
             }
         }
-        .alert("Sign Out", isPresented: $showingLogoutAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Sign Out", role: .destructive) {
-                Task {
-                    await authService.signOut()
-                }
+        // Custom glass-style sign-out confirmation overlay replaces the default alert
+        .overlay {
+            if showingLogoutAlert {
+                SignOutGlassPopup(
+                    confirmAction: {
+                        Task {
+                            await authService.signOut()
+                        }
+                        // Dismiss popup
+                        showingLogoutAlert = false
+                    },
+                    cancelAction: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingLogoutAlert = false
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale))
+                .zIndex(1000)
             }
-        } message: {
-            Text("Are you sure you want to sign out?")
         }
         .overlay {
             if workoutService.isLoading {
@@ -1302,6 +1313,63 @@ struct GameStyleMenuButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .frame(maxWidth: 300)
+    }
+}
+
+// MARK: - Glass-Style Sign Out Popup
+
+struct SignOutGlassPopup: View {
+    let confirmAction: () -> Void
+    let cancelAction: () -> Void
+
+    var body: some View {
+        ZStack {
+            // Dimmed background
+            Color.black.opacity(0.25)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    cancelAction()
+                }
+
+            // Translucent card
+            VStack(spacing: 24) {
+                Text("Are you sure you want to sign out?")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.primary)
+
+                HStack(spacing: 16) {
+                    // Cancel button
+                    Button(action: cancelAction) {
+                        Text("Cancel")
+                            .fontWeight(.bold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(.thinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    // Sign Out button
+                    Button(action: confirmAction) {
+                        Text("Sign Out")
+                            .fontWeight(.bold)
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(.thinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(28)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
+            .padding(.horizontal, 40)
+        }
+        .transition(.opacity.combined(with: .scale))
     }
 }
 

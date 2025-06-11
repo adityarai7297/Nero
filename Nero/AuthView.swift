@@ -191,7 +191,8 @@ struct AuthView: View {
             VStack(spacing: 12) {
                 SocialButton(
                     title: "Continue with Google",
-                    icon: "globe",
+                    iconName: "google",
+                    isSystemImage: false,
                     backgroundColor: Color(.systemGray6),
                     foregroundColor: .primary
                 ) {
@@ -200,7 +201,8 @@ struct AuthView: View {
                 
                 SocialButton(
                     title: "Continue with Apple",
-                    icon: "applelogo",
+                    iconName: "applelogo",
+                    isSystemImage: true,
                     backgroundColor: .black,
                     foregroundColor: .white
                 ) {
@@ -396,7 +398,8 @@ struct ShakeEffect: ViewModifier {
 
 struct SocialButton: View {
     let title: String
-    let icon: String
+    let iconName: String
+    let isSystemImage: Bool
     let backgroundColor: Color
     let foregroundColor: Color
     let action: () -> Void
@@ -404,9 +407,16 @@ struct SocialButton: View {
     var body: some View {
         Button(action: action) {
             HStack {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(foregroundColor)
+                if isSystemImage {
+                    Image(systemName: iconName)
+                        .font(.title3)
+                        .foregroundColor(foregroundColor)
+                } else {
+                    Image(iconName)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                }
                 
                 Text(title)
                     .font(.headline)
