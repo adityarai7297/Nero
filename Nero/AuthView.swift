@@ -191,7 +191,8 @@ struct AuthView: View {
             VStack(spacing: 12) {
                 SocialButton(
                     title: "Continue with Google",
-                    iconName: "google",
+                    iconName: nil,
+                    imageURL: URL(string: "https://developers.google.com/identity/images/g-logo.png"),
                     isSystemImage: false,
                     backgroundColor: Color(.systemGray6),
                     foregroundColor: .primary
@@ -202,6 +203,7 @@ struct AuthView: View {
                 SocialButton(
                     title: "Continue with Apple",
                     iconName: "applelogo",
+                    imageURL: nil,
                     isSystemImage: true,
                     backgroundColor: .black,
                     foregroundColor: .white
@@ -398,7 +400,8 @@ struct ShakeEffect: ViewModifier {
 
 struct SocialButton: View {
     let title: String
-    let iconName: String
+    let iconName: String? // Local asset or SF Symbol name
+    let imageURL: URL?    // Remote image URL
     let isSystemImage: Bool
     let backgroundColor: Color
     let foregroundColor: Color
@@ -406,18 +409,11 @@ struct SocialButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack {
-                if isSystemImage {
-                    Image(systemName: iconName)
-                        .font(.title3)
-                        .foregroundColor(foregroundColor)
-                } else {
-                    Image(iconName)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                }
-                
+            HStack(spacing: 12) {
+                // Icon / Logo Handling
+                logoView
+                    .frame(width: 24, height: 24)
+
                 Text(title)
                     .font(.headline)
                     .fontWeight(.medium)
@@ -438,6 +434,46 @@ struct SocialButton: View {
                 }
             )
         }
+    }
+    
+    // MARK: - Logo View
+    
+    @ViewBuilder
+    private var logoView: some View {
+        if let url = imageURL {
+            // Remote image using AsyncImage (iOS 15+)
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                case .failure(_):
+                    fallbackLogo
+                case .empty:
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                @unknown default:
+                    fallbackLogo
+                }
+            }
+        } else if isSystemImage, let name = iconName {
+            Image(systemName: name)
+                .font(.title3)
+                .foregroundColor(foregroundColor)
+        } else if let name = iconName {
+            Image(name)
+                .resizable()
+                .scaledToFit()
+        } else {
+            fallbackLogo
+        }
+    }
+    
+    private var fallbackLogo: some View {
+        Image(systemName: "questionmark")
+            .font(.title3)
+            .foregroundColor(foregroundColor)
     }
 }
 
