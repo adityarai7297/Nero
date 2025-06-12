@@ -191,11 +191,12 @@ struct AuthView: View {
             VStack(spacing: 12) {
                 SocialButton(
                     title: "Continue with Google",
-                    iconName: nil,
-                    imageURL: URL(string: "https://developers.google.com/identity/images/g-logo.png"),
+                    iconName: "google_logo",
+                    imageURL: nil,
                     isSystemImage: false,
                     backgroundColor: Color(.systemGray6),
-                    foregroundColor: .primary
+                    foregroundColor: .primary,
+                    logoSize: 32
                 ) {
                     Task { await authService.signInWithGoogle() }
                 }
@@ -405,14 +406,36 @@ struct SocialButton: View {
     let isSystemImage: Bool
     let backgroundColor: Color
     let foregroundColor: Color
+    let logoSize: CGFloat
     let action: () -> Void
+    
+    // Custom initializer to provide clear parameter ordering & defaults
+    init(
+        title: String,
+        iconName: String? = nil,
+        imageURL: URL? = nil,
+        isSystemImage: Bool = false,
+        backgroundColor: Color = Color(.systemGray6),
+        foregroundColor: Color = .primary,
+        logoSize: CGFloat = 24,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.iconName = iconName
+        self.imageURL = imageURL
+        self.isSystemImage = isSystemImage
+        self.backgroundColor = backgroundColor
+        self.foregroundColor = foregroundColor
+        self.logoSize = logoSize
+        self.action = action
+    }
     
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 // Icon / Logo Handling
                 logoView
-                    .frame(width: 24, height: 24)
+                    .frame(width: logoSize, height: logoSize)
 
                 Text(title)
                     .font(.headline)

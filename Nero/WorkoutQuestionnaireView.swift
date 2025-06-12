@@ -690,7 +690,7 @@ struct WorkoutQuestionnaireView: View {
             Text("Exercise preferences saved successfully!")
         }
         .overlay {
-            if preferencesService.isSaving {
+            if preferencesService.isSaving || preferencesService.isGeneratingPlan {
                 ZStack {
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
@@ -700,9 +700,20 @@ struct WorkoutQuestionnaireView: View {
                             .progressViewStyle(CircularProgressViewStyle(tint: Color.accentBlue))
                             .scaleEffect(1.5)
                         
-                        Text("Saving preferences...")
-                            .font(.headline)
-                            .foregroundColor(.primary)
+                        if preferencesService.isSaving {
+                            Text("Saving preferences...")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                        } else if preferencesService.isGeneratingPlan {
+                            VStack(spacing: 8) {
+                                Text("Generating your workout plan...")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text("This may take a moment")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                     .padding(32)
                     .background(
@@ -762,9 +773,9 @@ struct WorkoutQuestionnaireView: View {
                         currentStep += 1
                     }
                 } else {
-                    // Directly save preferences without confirmation
+                    // Use the new comprehensive method
                     Task {
-                        let success = await preferencesService.saveWorkoutPreferences(preferences)
+                        let success = await preferencesService.savePreferencesAndGeneratePlan(preferences)
                         if success {
                             showingSuccessAlert = true
                             // Auto-dismiss after 2 seconds

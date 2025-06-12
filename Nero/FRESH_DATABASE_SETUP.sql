@@ -152,6 +152,31 @@ GRANT ALL ON exercises TO authenticated;
 GRANT ALL ON public.users TO authenticated;
 GRANT ALL ON workout_sets TO authenticated;
 
+-- 13. Create workout_plans table for storing generated plans
+CREATE TABLE IF NOT EXISTS workout_plans (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    plan_json JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 14. Enable Row Level Security on workout_plans
+ALTER TABLE workout_plans ENABLE ROW LEVEL SECURITY;
+
+-- 15. Create RLS policies for workout_plans
+CREATE POLICY "Users can view their own workout plans" ON workout_plans
+    FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own workout plans" ON workout_plans
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own workout plans" ON workout_plans
+    FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own workout plans" ON workout_plans
+    FOR DELETE USING (auth.uid() = user_id);
+
 -- Setup complete! 
 -- This script creates:
 -- ✅ public.users table with all 19 workout preferences

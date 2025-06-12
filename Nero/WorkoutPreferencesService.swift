@@ -48,6 +48,7 @@ struct UserPreferencesResponse: Codable {
 
 class WorkoutPreferencesService: ObservableObject {
     @Published var isSaving = false
+    @Published var isGeneratingPlan = false
     @Published var errorMessage: String?
     
     func saveWorkoutPreferences(_ preferences: WorkoutPreferences) async -> Bool {
@@ -182,6 +183,83 @@ class WorkoutPreferencesService: ObservableObject {
                 self.errorMessage = "Failed to load workout preferences: \(error.localizedDescription)"
             }
             return nil
+        }
+    }
+    
+    // Save generated workout plan to Supabase
+    func saveWorkoutPlan(_ plan: DeepseekWorkoutPlan) async -> Bool {
+        do {
+            let session = try await supabase.auth.session
+            let userId = session.user.id
+            let planData = try JSONEncoder().encode(plan)
+            guard let planJSON = try JSONSerialization.jsonObject(with: planData) as? [String: Any] else {
+                throw NSError(domain: "WorkoutPlan", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to encode plan to JSON"])
+            }
+            let insertData: [String: Any] = [
+                "user_id": userId,
+                "plan_json": planJSON,
+                "created_at": Date().ISO8601String(),
+                "updated_at": Date().ISO8601String()
+            ]
+            _ = try await supabase
+                .from("workout_plans")
+                .insert(insertData)
+                .execute()
+            return true
+        } catch {
+            print("Failed to save workout plan: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    // Add this new method to handle the complete workflow
+    func savePreferencesAndGeneratePlan(_ preferences: WorkoutPreferences) async -> Bool {
+        // Step 1: Save preferences
+        let preferencesSuccess = await saveWorkoutPreferences(preferences)
+        if !preferencesSuccess {
+            return false
+        }
+        
+        // Step 2: Generate and save workout plan
+        await MainActor.run {
+            self.isGeneratingPlan = true
+        }
+        
+        do {
+            // Fetch personal details
+            let personalDetailsService = PersonalDetailsService()
+            guard let personalDetails = await personalDetailsService.loadPersonalDetails() else {
+                await MainActor.run {
+                    self.errorMessage = "Personal details not found. Please complete your personal details onboarding."
+                    self.isGeneratingPlan = false
+                }
+                return false
+            }
+            
+            // Call Deepseek API
+            let plan = try await DeepseekAPIClient.shared.generateWorkoutPlan(personalDetails: personalDetails, preferences: preferences)
+            
+            // Save plan to Supabase
+            let planSaved = await saveWorkoutPlan(plan)
+            
+            await MainActor.run {
+                self.isGeneratingPlan = false
+            }
+            
+            if !planSaved {
+                await MainActor.run {
+                    self.errorMessage = "Failed to save generated workout plan."
+                }
+                return false
+            }
+            
+            return true
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to generate workout plan: \(error.localizedDescription)"
+                self.isGeneratingPlan = false
+            }
+            return false
         }
     }
 }
