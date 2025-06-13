@@ -11,82 +11,162 @@ struct DeepseekWorkoutPlan: Codable {
     let plan: [DeepseekWorkoutPlanDay]
 }
 
+// MARK: - API Response Models
+struct DeepseekChatResponse: Codable {
+    let choices: [DeepseekChoice]
+}
+
+struct DeepseekChoice: Codable {
+    let message: DeepseekMessage
+}
+
+struct DeepseekMessage: Codable {
+    let content: String
+}
+
+// MARK: - API Request Models
+struct DeepseekChatRequest: Codable {
+    let model: String
+    let messages: [DeepseekRequestMessage]
+    let stream: Bool
+    let temperature: Double?
+}
+
+struct DeepseekRequestMessage: Codable {
+    let role: String
+    let content: String
+}
+
 class DeepseekAPIClient {
     static let shared = DeepseekAPIClient()
-    private let apiKey = "YOUR_DEEPSEEK_API_KEY" // Replace with your actual key
-    private let endpoint = URL(string: "https://api.deepseek.com/v1/generate-workout-plan")!
+    private let apiKey = Config.deepseekAPIKey
+    private let endpoint = URL(string: "https://api.deepseek.com/chat/completions")!
 
     private init() {}
 
     func generateWorkoutPlan(personalDetails: PersonalDetails, preferences: WorkoutPreferences) async throws -> DeepseekWorkoutPlan {
+        // Validate API key before making request
+        guard Config.validateConfiguration() else {
+            throw NSError(domain: "DeepseekAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "DeepSeek API key not configured. Please set your API key in Config.swift"])
+        }
+        
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let prompt = "Generate a 4 week workout plan for the user based on their preferences and personal details. The plan should be an array of objects with: Day of the week, Exercise Name, Sets, Reps."
+        // Create a comprehensive prompt with user data
+        let personalDetailsText = formatPersonalDetails(personalDetails)
+        let preferencesText = formatWorkoutPreferences(preferences)
+        
+        let systemPrompt = """
+        You are a professional fitness coach and workout plan generator. Generate a comprehensive 4-week workout plan based on the user's personal details and workout preferences.
+        
+        Return ONLY a valid JSON object in this exact format:
+        {
+          "plan": [
+            {
+              "dayOfWeek": "Monday",
+              "exerciseName": "Squat",
+              "sets": 3,
+              "reps": 8
+            },
+            {
+              "dayOfWeek": "Monday", 
+              "exerciseName": "Bench Press",
+              "sets": 3,
+              "reps": 8
+            }
+          ]
+        }
+        
+        Include exercises for all 4 weeks, with appropriate progression. Each day should have 4-6 exercises based on the user's preferences.
+        """
+        
+        let userPrompt = """
+        Personal Details:
+        \(personalDetailsText)
+        
+        Workout Preferences:
+        \(preferencesText)
+        
+        Please generate a 4-week workout plan based on this information.
+        """
 
-        let payload: [String: Any] = [
-            "personal_details": personalDetails.asDictionary(),
-            "workout_preferences": preferences.asDictionary(),
-            "prompt": prompt
-        ]
+        let chatRequest = DeepseekChatRequest(
+            model: "deepseek-chat",
+            messages: [
+                DeepseekRequestMessage(role: "system", content: systemPrompt),
+                DeepseekRequestMessage(role: "user", content: userPrompt)
+            ],
+            stream: false,
+            temperature: 0.7
+        )
 
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+        request.httpBody = try JSONEncoder().encode(chatRequest)
 
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to get valid response from Deepseek API"])
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid response from Deepseek API"])
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "DeepseekAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "API Error (\(httpResponse.statusCode)): \(errorMessage)"])
         }
 
-        let plan = try JSONDecoder().decode(DeepseekWorkoutPlan.self, from: data)
+        let chatResponse = try JSONDecoder().decode(DeepseekChatResponse.self, from: data)
+        guard let content = chatResponse.choices.first?.message.content else {
+            throw NSError(domain: "DeepseekAPI", code: 2, userInfo: [NSLocalizedDescriptionKey: "No content in API response"])
+        }
+        
+        // Parse the JSON content from the response
+        guard let contentData = content.data(using: .utf8) else {
+            throw NSError(domain: "DeepseekAPI", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to convert response content to data"])
+        }
+        
+        let plan = try JSONDecoder().decode(DeepseekWorkoutPlan.self, from: contentData)
         return plan
     }
-}
-
-// MARK: - Helpers for converting models to dictionary
-
-extension PersonalDetails {
-    func asDictionary() -> [String: Any] {
-        return [
-            "age": age,
-            "gender": gender.rawValue,
-            "height_feet": heightFeet,
-            "height_inches": heightInches,
-            "weight": weight,
-            "body_fat_percentage": bodyFatPercentage,
-            "activity_level": activityLevel.rawValue,
-            "primary_fitness_goal": primaryFitnessGoal.rawValue,
-            "injury_history": injuryHistory.rawValue,
-            "sleep_hours": sleepHours.rawValue,
-            "stress_level": stressLevel.rawValue,
-            "workout_history": workoutHistory.rawValue
-        ]
+    
+    // MARK: - Helper Methods
+    private func formatPersonalDetails(_ details: PersonalDetails) -> String {
+        return """
+        Age: \(details.age)
+        Gender: \(details.gender.rawValue)
+        Height: \(details.heightFeet)'\(details.heightInches)"
+        Weight: \(details.weight) lbs
+        Body Fat: \(details.bodyFatPercentage)%
+        Activity Level: \(details.activityLevel.rawValue)
+        Primary Fitness Goal: \(details.primaryFitnessGoal.rawValue)
+        Injury History: \(details.injuryHistory.rawValue)
+        Sleep Hours: \(details.sleepHours.rawValue)
+        Stress Level: \(details.stressLevel.rawValue)
+        Workout History: \(details.workoutHistory.rawValue)
+        """
     }
-}
-
-extension WorkoutPreferences {
-    func asDictionary() -> [String: Any] {
-        return [
-            "primary_goal": primaryGoal.rawValue,
-            "training_experience": trainingExperience.rawValue,
-            "session_frequency": sessionFrequency.rawValue,
-            "session_length": sessionLength.rawValue,
-            "equipment_access": equipmentAccess.rawValue,
-            "movement_styles": movementStyles.rawValue,
-            "weekly_split": weeklySplit.rawValue,
-            "volume_tolerance": volumeTolerance.rawValue,
-            "rep_ranges": repRanges.rawValue,
-            "effort_level": effortLevel.rawValue,
-            "eating_approach": eatingApproach.rawValue,
-            "injury_considerations": injuryConsiderations.rawValue,
-            "mobility_time": mobilityTime.rawValue,
-            "busy_equipment_preference": busyEquipmentPreference.rawValue,
-            "rest_periods": restPeriods.rawValue,
-            "progression_style": progressionStyle.rawValue,
-            "exercise_menu_change": exerciseMenuChange.rawValue,
-            "recovery_resources": recoveryResources.rawValue,
-            "programming_format": programmingFormat.rawValue
-        ]
+    
+    private func formatWorkoutPreferences(_ preferences: WorkoutPreferences) -> String {
+        return """
+        Primary Goal: \(preferences.primaryGoal.rawValue)
+        Training Experience: \(preferences.trainingExperience.rawValue)
+        Session Frequency: \(preferences.sessionFrequency.rawValue) per week
+        Session Length: \(preferences.sessionLength.rawValue)
+        Equipment Access: \(preferences.equipmentAccess.rawValue)
+        Movement Styles: \(preferences.movementStyles.rawValue)
+        Weekly Split: \(preferences.weeklySplit.rawValue)
+        Volume Tolerance: \(preferences.volumeTolerance.rawValue) sets per muscle per session
+        Rep Ranges: \(preferences.repRanges.rawValue)
+        Effort Level: \(preferences.effortLevel.rawValue)
+        Eating Approach: \(preferences.eatingApproach.rawValue)
+        Injury Considerations: \(preferences.injuryConsiderations.rawValue)
+        Mobility Time: \(preferences.mobilityTime.rawValue)
+        Busy Equipment Preference: \(preferences.busyEquipmentPreference.rawValue)
+        Rest Periods: \(preferences.restPeriods.rawValue)
+        Progression Style: \(preferences.progressionStyle.rawValue)
+        Exercise Menu Change: \(preferences.exerciseMenuChange.rawValue)
+        Recovery Resources: \(preferences.recoveryResources.rawValue)
+        Programming Format: \(preferences.programmingFormat.rawValue)
+        """
     }
 } 

@@ -191,16 +191,22 @@ class WorkoutPreferencesService: ObservableObject {
         do {
             let session = try await supabase.auth.session
             let userId = session.user.id
-            let planData = try JSONEncoder().encode(plan)
-            guard let planJSON = try JSONSerialization.jsonObject(with: planData) as? [String: Any] else {
-                throw NSError(domain: "WorkoutPlan", code: 2, userInfo: [NSLocalizedDescriptionKey: "Failed to encode plan to JSON"])
+            
+            // Create a proper encodable struct for Supabase insertion
+            struct WorkoutPlanInsert: Encodable {
+                let user_id: UUID
+                let plan_json: DeepseekWorkoutPlan
+                let created_at: String
+                let updated_at: String
             }
-            let insertData: [String: Any] = [
-                "user_id": userId,
-                "plan_json": planJSON,
-                "created_at": Date().ISO8601String(),
-                "updated_at": Date().ISO8601String()
-            ]
+            
+            let insertData = WorkoutPlanInsert(
+                user_id: userId,
+                plan_json: plan,
+                created_at: Date().ISO8601String(),
+                updated_at: Date().ISO8601String()
+            )
+            
             _ = try await supabase
                 .from("workout_plans")
                 .insert(insertData)
