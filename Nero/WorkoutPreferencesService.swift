@@ -163,11 +163,16 @@ class WorkoutPreferencesService: ObservableObject {
     
     // Add this new method to handle the complete workflow
     func savePreferencesAndGeneratePlan(_ preferences: WorkoutPreferences) async -> Bool {
+        print("🎯 Starting workflow: Save preferences and generate plan")
+        
         // Step 1: Save preferences
+        print("📝 Step 1: Saving workout preferences...")
         let preferencesSuccess = await saveWorkoutPreferences(preferences)
         if !preferencesSuccess {
+            print("❌ Failed to save preferences, aborting workflow")
             return false
         }
+        print("✅ Preferences saved successfully")
         
         // Step 2: Generate and save workout plan
         await MainActor.run {
@@ -176,19 +181,25 @@ class WorkoutPreferencesService: ObservableObject {
         
         do {
             // Fetch personal details
+            print("👤 Step 2: Fetching personal details...")
             let personalDetailsService = PersonalDetailsService()
             guard let personalDetails = await personalDetailsService.loadPersonalDetails() else {
+                print("❌ Personal details not found")
                 await MainActor.run {
                     self.errorMessage = "Personal details not found. Please complete your personal details onboarding."
                     self.isGeneratingPlan = false
                 }
                 return false
             }
+            print("✅ Personal details loaded successfully")
             
             // Call Deepseek API
+            print("🤖 Step 3: Calling DeepSeek API...")
             let plan = try await DeepseekAPIClient.shared.generateWorkoutPlan(personalDetails: personalDetails, preferences: preferences)
+            print("✅ Workout plan generated successfully")
             
             // Save plan to Supabase
+            print("💾 Step 4: Saving plan to database...")
             let planSaved = await saveWorkoutPlan(plan)
             
             await MainActor.run {
@@ -196,14 +207,18 @@ class WorkoutPreferencesService: ObservableObject {
             }
             
             if !planSaved {
+                print("❌ Failed to save workout plan to database")
                 await MainActor.run {
                     self.errorMessage = "Failed to save generated workout plan."
                 }
                 return false
             }
             
+            print("🎉 Workflow completed successfully!")
             return true
         } catch {
+            print("❌ Workflow failed with error: \(error)")
+            print("🔍 Error details: \(error.localizedDescription)")
             await MainActor.run {
                 self.errorMessage = "Failed to generate workout plan: \(error.localizedDescription)"
                 self.isGeneratingPlan = false
