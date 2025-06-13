@@ -15,20 +15,10 @@ struct WorkoutPreferences {
     var sessionFrequency: SessionFrequency = .notSure
     var sessionLength: SessionLength = .notSure
     var equipmentAccess: EquipmentAccess = .notSure
-    var movementStyles: MovementStyles = .noPreference
+    var movementStyles: Set<MovementStyles> = []
     var weeklySplit: WeeklySplit = .notSure
-    var volumeTolerance: VolumeTolerance = .notSure
-    var repRanges: RepRanges = .noPreference
-    var effortLevel: EffortLevel = .notSure
-    var eatingApproach: EatingApproach = .notSure
-    var injuryConsiderations: InjuryConsiderations = .noneSignificant
-    var mobilityTime: MobilityTime = .notSure
-    var busyEquipmentPreference: BusyEquipmentPreference = .noPreference
-    var restPeriods: RestPeriods = .notSure
-    var progressionStyle: ProgressionStyle = .noPreference
-    var exerciseMenuChange: ExerciseMenuChange = .notSure
-    var recoveryResources: RecoveryResources = .notSure
-    var programmingFormat: ProgrammingFormat = .noPreference
+    var moreFocusMuscleGroups: Set<MuscleGroup> = []
+    var lessFocusMuscleGroups: Set<MuscleGroup> = []
 }
 
 // MARK: - Question Enums
@@ -181,6 +171,7 @@ enum MovementStyles: String, CaseIterable {
     case bodybuildingIsolation = "Bodybuilding isolation work"
     case functionalUnilateral = "Functional / unilateral & core-centric moves"
     case olympicLifts = "Olympic-style lifts or power derivatives"
+    case calisthenics = "Calisthenics & bodyweight movements"
     case noPreference = "No preference / open to anything"
     
     var icon: String {
@@ -189,6 +180,7 @@ enum MovementStyles: String, CaseIterable {
         case .bodybuildingIsolation: return "figure.arms.open"
         case .functionalUnilateral: return "figure.flexibility"
         case .olympicLifts: return "figure.wrestling"
+        case .calisthenics: return "figure.core.training"
         case .noPreference: return "questionmark.circle"
         }
     }
@@ -199,7 +191,8 @@ enum MovementStyles: String, CaseIterable {
         case .bodybuildingIsolation: return "B"
         case .functionalUnilateral: return "C"
         case .olympicLifts: return "D"
-        case .noPreference: return "E"
+        case .calisthenics: return "E"
+        case .noPreference: return "F"
         }
     }
 }
@@ -209,6 +202,9 @@ enum WeeklySplit: String, CaseIterable {
     case upperLower = "Upper / Lower"
     case pushPullLegs = "Push-Pull-Legs"
     case broSplit = "Muscle-group \"bro split\""
+    case powerBuilding = "Power/Strength + Hypertrophy hybrid"
+    case conjugate = "Conjugate method (varied training)"
+    case dailyUndulatingPeriodization = "Daily Undulating Periodization (DUP)"
     case notSure = "Not sure – coach decide"
     
     var icon: String {
@@ -217,6 +213,9 @@ enum WeeklySplit: String, CaseIterable {
         case .upperLower: return "figure.arms.open"
         case .pushPullLegs: return "arrow.3.trianglepath"
         case .broSplit: return "list.bullet"
+        case .powerBuilding: return "figure.strengthtraining.traditional"
+        case .conjugate: return "arrow.triangle.swap"
+        case .dailyUndulatingPeriodization: return "waveform.path"
         case .notSure: return "questionmark.circle"
         }
     }
@@ -227,7 +226,10 @@ enum WeeklySplit: String, CaseIterable {
         case .upperLower: return "B"
         case .pushPullLegs: return "C"
         case .broSplit: return "D"
-        case .notSure: return "E"
+        case .powerBuilding: return "E"
+        case .conjugate: return "F"
+        case .dailyUndulatingPeriodization: return "G"
+        case .notSure: return "H"
         }
     }
 }
@@ -568,16 +570,59 @@ enum ProgrammingFormat: String, CaseIterable {
     }
 }
 
+enum MuscleGroup: String, CaseIterable {
+    case chest = "Chest"
+    case back = "Back"
+    case shoulders = "Shoulders"
+    case arms = "Arms (biceps/triceps)"
+    case legs = "Legs (quads/hamstrings)"
+    case glutes = "Glutes"
+    case calves = "Calves"
+    case abs = "Abs/Core"
+    case forearms = "Forearms"
+    case traps = "Traps/Upper back"
+    
+    var icon: String {
+        switch self {
+        case .chest: return "figure.arms.open"
+        case .back: return "figure.strengthtraining.traditional"
+        case .shoulders: return "figure.arms.open"
+        case .arms: return "figure.arms.open"
+        case .legs: return "figure.walk"
+        case .glutes: return "figure.core.training"
+        case .calves: return "figure.walk"
+        case .abs: return "figure.core.training"
+        case .forearms: return "hand.raised.fill"
+        case .traps: return "figure.strengthtraining.traditional"
+        }
+    }
+    
+    var letter: String {
+        switch self {
+        case .chest: return "A"
+        case .back: return "B"
+        case .shoulders: return "C"
+        case .arms: return "D"
+        case .legs: return "E"
+        case .glutes: return "F"
+        case .calves: return "G"
+        case .abs: return "H"
+        case .forearms: return "I"
+        case .traps: return "J"
+        }
+    }
+}
+
 // MARK: - Main View
 
 struct WorkoutQuestionnaireView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var currentStep: Int = 0
-    @State private var preferences = WorkoutPreferences()
-    @State private var showingSuccessAlert = false
     @StateObject private var preferencesService = WorkoutPreferencesService()
+    @State private var preferences = WorkoutPreferences()
+    @State private var currentStep = 0
+    @State private var showingSuccessAlert = false
     
-    private let totalSteps = 19
+    private let totalSteps = 9
     
     private let questions = [
         "Primary physical goal right now?",
@@ -587,18 +632,8 @@ struct WorkoutQuestionnaireView: View {
         "Equipment you always have access to:",
         "Movement styles you most enjoy (or want emphasized):",
         "Preferred weekly split:",
-        "Volume tolerance—working sets per muscle per session:",
-        "Rep ranges you respond best to (or prefer):",
-        "Usual effort level (finish most sets at):",
-        "Current body-composition eating approach you're willing to follow:",
-        "Past or present injury considerations:",
-        "Mobility / warm-up time you'll actually do each session:",
-        "When equipment is busy, you prefer to:",
-        "Rest periods that feel best:",
-        "Progression style you enjoy tracking:",
-        "How often should the main exercise menu change?",
-        "Recovery resources you consistently get:",
-        "Programming format that keeps you motivated:"
+        "Muscle groups you want MORE focus on:",
+        "Muscle groups you want LESS focus on:"
     ]
     
     var body: some View {
@@ -630,33 +665,13 @@ struct WorkoutQuestionnaireView: View {
                             case 4:
                                 EquipmentAccessStep(selectedEquipment: $preferences.equipmentAccess)
                             case 5:
-                                MovementStylesStep(selectedStyle: $preferences.movementStyles)
+                                MovementStylesStep(selectedStyles: $preferences.movementStyles)
                             case 6:
                                 WeeklySplitStep(selectedSplit: $preferences.weeklySplit)
                             case 7:
-                                VolumeToleranceStep(selectedVolume: $preferences.volumeTolerance)
+                                MoreFocusMuscleGroupsStep(selectedGroups: $preferences.moreFocusMuscleGroups)
                             case 8:
-                                RepRangesStep(selectedRange: $preferences.repRanges)
-                            case 9:
-                                EffortLevelStep(selectedEffort: $preferences.effortLevel)
-                            case 10:
-                                EatingApproachStep(selectedApproach: $preferences.eatingApproach)
-                            case 11:
-                                InjuryConsiderationsStep(selectedConsideration: $preferences.injuryConsiderations)
-                            case 12:
-                                MobilityTimeStep(selectedTime: $preferences.mobilityTime)
-                            case 13:
-                                BusyEquipmentStep(selectedPreference: $preferences.busyEquipmentPreference)
-                            case 14:
-                                RestPeriodsStep(selectedPeriod: $preferences.restPeriods)
-                            case 15:
-                                ProgressionStyleStep(selectedStyle: $preferences.progressionStyle)
-                            case 16:
-                                ExerciseMenuChangeStep(selectedChange: $preferences.exerciseMenuChange)
-                            case 17:
-                                RecoveryResourcesStep(selectedResources: $preferences.recoveryResources)
-                            case 18:
-                                ProgrammingFormatStep(selectedFormat: $preferences.programmingFormat)
+                                LessFocusMuscleGroupsStep(selectedGroups: $preferences.lessFocusMuscleGroups)
                             default:
                                 EmptyView()
                             }
@@ -884,13 +899,13 @@ struct EquipmentAccessStep: View {
 }
 
 struct MovementStylesStep: View {
-    @Binding var selectedStyle: MovementStyles
+    @Binding var selectedStyles: Set<MovementStyles>
     
     var body: some View {
-        QuestionStepView(
+        MultipleSelectionQuestionStepView(
             title: "Movement styles you most enjoy (or want emphasized):",
             options: MovementStyles.allCases,
-            selectedOption: $selectedStyle
+            selectedOptions: $selectedStyles
         )
     }
 }
@@ -907,146 +922,26 @@ struct WeeklySplitStep: View {
     }
 }
 
-struct VolumeToleranceStep: View {
-    @Binding var selectedVolume: VolumeTolerance
+struct MoreFocusMuscleGroupsStep: View {
+    @Binding var selectedGroups: Set<MuscleGroup>
     
     var body: some View {
-        QuestionStepView(
-            title: "Volume tolerance—working sets per muscle per session:",
-            options: VolumeTolerance.allCases,
-            selectedOption: $selectedVolume
+        MultipleSelectionQuestionStepView(
+            title: "Muscle groups you want MORE focus on:",
+            options: MuscleGroup.allCases,
+            selectedOptions: $selectedGroups
         )
     }
 }
 
-struct RepRangesStep: View {
-    @Binding var selectedRange: RepRanges
+struct LessFocusMuscleGroupsStep: View {
+    @Binding var selectedGroups: Set<MuscleGroup>
     
     var body: some View {
-        QuestionStepView(
-            title: "Rep ranges you respond best to (or prefer):",
-            options: RepRanges.allCases,
-            selectedOption: $selectedRange
-        )
-    }
-}
-
-struct EffortLevelStep: View {
-    @Binding var selectedEffort: EffortLevel
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Usual effort level (finish most sets at):",
-            options: EffortLevel.allCases,
-            selectedOption: $selectedEffort
-        )
-    }
-}
-
-struct EatingApproachStep: View {
-    @Binding var selectedApproach: EatingApproach
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Current body-composition eating approach you're willing to follow:",
-            options: EatingApproach.allCases,
-            selectedOption: $selectedApproach
-        )
-    }
-}
-
-struct InjuryConsiderationsStep: View {
-    @Binding var selectedConsideration: InjuryConsiderations
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Past or present injury considerations:",
-            options: InjuryConsiderations.allCases,
-            selectedOption: $selectedConsideration
-        )
-    }
-}
-
-struct MobilityTimeStep: View {
-    @Binding var selectedTime: MobilityTime
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Mobility / warm-up time you'll actually do each session:",
-            options: MobilityTime.allCases,
-            selectedOption: $selectedTime
-        )
-    }
-}
-
-struct BusyEquipmentStep: View {
-    @Binding var selectedPreference: BusyEquipmentPreference
-    
-    var body: some View {
-        QuestionStepView(
-            title: "When equipment is busy, you prefer to:",
-            options: BusyEquipmentPreference.allCases,
-            selectedOption: $selectedPreference
-        )
-    }
-}
-
-struct RestPeriodsStep: View {
-    @Binding var selectedPeriod: RestPeriods
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Rest periods that feel best:",
-            options: RestPeriods.allCases,
-            selectedOption: $selectedPeriod
-        )
-    }
-}
-
-struct ProgressionStyleStep: View {
-    @Binding var selectedStyle: ProgressionStyle
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Progression style you enjoy tracking:",
-            options: ProgressionStyle.allCases,
-            selectedOption: $selectedStyle
-        )
-    }
-}
-
-struct ExerciseMenuChangeStep: View {
-    @Binding var selectedChange: ExerciseMenuChange
-    
-    var body: some View {
-        QuestionStepView(
-            title: "How often should the main exercise menu change?",
-            options: ExerciseMenuChange.allCases,
-            selectedOption: $selectedChange
-        )
-    }
-}
-
-struct RecoveryResourcesStep: View {
-    @Binding var selectedResources: RecoveryResources
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Recovery resources you consistently get:",
-            options: RecoveryResources.allCases,
-            selectedOption: $selectedResources
-        )
-    }
-}
-
-struct ProgrammingFormatStep: View {
-    @Binding var selectedFormat: ProgrammingFormat
-    
-    var body: some View {
-        QuestionStepView(
-            title: "Programming format that keeps you motivated:",
-            options: ProgrammingFormat.allCases,
-            selectedOption: $selectedFormat
+        MultipleSelectionQuestionStepView(
+            title: "Muscle groups you want LESS focus on:",
+            options: MuscleGroup.allCases,
+            selectedOptions: $selectedGroups
         )
     }
 }
@@ -1085,6 +980,46 @@ struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable>: View whe
     }
 }
 
+struct MultipleSelectionQuestionStepView<T: RawRepresentable & CaseIterable & Hashable>: View where T.RawValue == String, T: QuestionOption {
+    let title: String
+    let options: [T]
+    @Binding var selectedOptions: Set<T>
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                Text("Select all that apply")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            VStack(spacing: 16) {
+                ForEach(options, id: \.self) { option in
+                    QuestionnaireOptionButton(
+                        title: option.rawValue,
+                        subtitle: "",
+                        icon: option.icon,
+                        letter: option.letter,
+                        isSelected: selectedOptions.contains(option),
+                        color: .blue
+                    ) {
+                        if selectedOptions.contains(option) {
+                            selectedOptions.remove(option)
+                        } else {
+                            selectedOptions.insert(option)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Protocol for Question Options
 
 protocol QuestionOption {
@@ -1092,6 +1027,7 @@ protocol QuestionOption {
     var letter: String { get }
 }
 
+// MARK: - QuestionOption Protocol Extensions
 extension PrimaryGoal: QuestionOption {}
 extension TrainingExperience: QuestionOption {}
 extension SessionFrequency: QuestionOption {}
@@ -1099,6 +1035,7 @@ extension SessionLength: QuestionOption {}
 extension EquipmentAccess: QuestionOption {}
 extension MovementStyles: QuestionOption {}
 extension WeeklySplit: QuestionOption {}
+extension MuscleGroup: QuestionOption {}
 extension VolumeTolerance: QuestionOption {}
 extension RepRanges: QuestionOption {}
 extension EffortLevel: QuestionOption {}

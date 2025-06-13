@@ -147,26 +147,20 @@ class DeepseekAPIClient {
     }
     
     private func formatWorkoutPreferences(_ preferences: WorkoutPreferences) -> String {
+        let movementStylesText = preferences.movementStyles.isEmpty ? "No preference" : preferences.movementStyles.map { $0.rawValue }.joined(separator: ", ")
+        let moreFocusText = preferences.moreFocusMuscleGroups.isEmpty ? "No specific focus" : preferences.moreFocusMuscleGroups.map { $0.rawValue }.joined(separator: ", ")
+        let lessFocusText = preferences.lessFocusMuscleGroups.isEmpty ? "No specific restrictions" : preferences.lessFocusMuscleGroups.map { $0.rawValue }.joined(separator: ", ")
+        
         return """
         Primary Goal: \(preferences.primaryGoal.rawValue)
         Training Experience: \(preferences.trainingExperience.rawValue)
         Session Frequency: \(preferences.sessionFrequency.rawValue) per week
         Session Length: \(preferences.sessionLength.rawValue)
         Equipment Access: \(preferences.equipmentAccess.rawValue)
-        Movement Styles: \(preferences.movementStyles.rawValue)
+        Movement Styles: \(movementStylesText)
         Weekly Split: \(preferences.weeklySplit.rawValue)
-        Volume Tolerance: \(preferences.volumeTolerance.rawValue) sets per muscle per session
-        Rep Ranges: \(preferences.repRanges.rawValue)
-        Effort Level: \(preferences.effortLevel.rawValue)
-        Eating Approach: \(preferences.eatingApproach.rawValue)
-        Injury Considerations: \(preferences.injuryConsiderations.rawValue)
-        Mobility Time: \(preferences.mobilityTime.rawValue)
-        Busy Equipment Preference: \(preferences.busyEquipmentPreference.rawValue)
-        Rest Periods: \(preferences.restPeriods.rawValue)
-        Progression Style: \(preferences.progressionStyle.rawValue)
-        Exercise Menu Change: \(preferences.exerciseMenuChange.rawValue)
-        Recovery Resources: \(preferences.recoveryResources.rawValue)
-        Programming Format: \(preferences.programmingFormat.rawValue)
+        More Focus Muscle Groups: \(moreFocusText)
+        Less Focus Muscle Groups: \(lessFocusText)
         """
     }
 } 
