@@ -70,7 +70,25 @@ class WorkoutService: ObservableObject {
     private var currentUserId: UUID?
     
     init() {
-        // Don't load exercises until user is set
+        // Set up notification observer for workout plan updates
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWorkoutPlanUpdate),
+            name: NSNotification.Name("WorkoutPlanUpdated"),
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func handleWorkoutPlanUpdate() {
+        print("🔔 WorkoutService: Received workout plan update notification")
+        // Reload exercises on the main thread after a short delay to ensure database is updated
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.loadUserExercises()
+        }
     }
     
     func setUser(_ userId: UUID?) {

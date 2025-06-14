@@ -617,9 +617,10 @@ enum MuscleGroup: String, CaseIterable {
 
 struct WorkoutQuestionnaireView: View {
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var preferencesService = WorkoutPreferencesService()
-    @State private var preferences = WorkoutPreferences()
+    @EnvironmentObject private var preferencesService: WorkoutPreferencesService
+    
     @State private var currentStep = 0
+    @State private var preferences = WorkoutPreferences()
     @State private var showingSuccessAlert = false
     
     private let totalSteps = 9
@@ -702,41 +703,7 @@ struct WorkoutQuestionnaireView: View {
         .alert("Success!", isPresented: $showingSuccessAlert) {
             // No buttons - will auto-dismiss
         } message: {
-            Text("Exercise preferences saved successfully!")
-        }
-        .overlay {
-            if preferencesService.isSaving || preferencesService.isGeneratingPlan {
-                ZStack {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: Color.accentBlue))
-                            .scaleEffect(1.5)
-                        
-                        if preferencesService.isSaving {
-                            Text("Saving preferences...")
-                                .font(.headline)
-                                .foregroundColor(.primary)
-                        } else if preferencesService.isGeneratingPlan {
-                            VStack(spacing: 8) {
-                                Text("Generating your workout plan...")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                Text("This may take a moment")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    .padding(32)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(.ultraThinMaterial)
-                    )
-                }
-            }
+            Text("Preferences saved! Your workout plan is being generated in the background.")
         }
         .alert("Error", isPresented: .constant(preferencesService.errorMessage != nil)) {
             Button("OK") {
@@ -788,16 +755,13 @@ struct WorkoutQuestionnaireView: View {
                         currentStep += 1
                     }
                 } else {
-                    // Use the new comprehensive method
-                    Task {
-                        let success = await preferencesService.savePreferencesAndGeneratePlan(preferences)
-                        if success {
-                            showingSuccessAlert = true
-                            // Auto-dismiss after 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                dismiss()
-                            }
-                        }
+                    // Use the new non-blocking method
+                    preferencesService.startBackgroundPlanGeneration(preferences)
+                    
+                    // Show immediate success and close modal
+                    showingSuccessAlert = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
                     }
                 }
             }) {

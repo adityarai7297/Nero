@@ -1,5 +1,45 @@
 import Foundation
 import Supabase
+import UIKit
+
+// MARK: - Generation Status Tracking
+enum WorkoutPlanGenerationStatus: Equatable {
+    case idle
+    case savingPreferences
+    case fetchingPersonalDetails
+    case generatingPlan
+    case savingPlan
+    case completed
+    case failed(String)
+    
+    var displayText: String {
+        switch self {
+        case .idle:
+            return "Ready"
+        case .savingPreferences:
+            return "Saving preferences..."
+        case .fetchingPersonalDetails:
+            return "Loading personal details..."
+        case .generatingPlan:
+            return "Generating plan..."
+        case .savingPlan:
+            return "Saving plan..."
+        case .completed:
+            return "Plan ready!"
+        case .failed(let error):
+            return "Failed: \(error)"
+        }
+    }
+    
+    var isActive: Bool {
+        switch self {
+        case .idle, .completed, .failed:
+            return false
+        default:
+            return true
+        }
+    }
+}
 
 struct WorkoutPreferencesUpdate: Encodable {
     let primary_goal: String
@@ -30,6 +70,10 @@ class WorkoutPreferencesService: ObservableObject {
     @Published var isSaving = false
     @Published var isGeneratingPlan = false
     @Published var errorMessage: String?
+    @Published var generationStatus: WorkoutPlanGenerationStatus = .idle
+    
+    // Background task identifier for iOS background processing
+    private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
     
     func saveWorkoutPreferences(_ preferences: WorkoutPreferences) async -> Bool {
         await MainActor.run {
@@ -161,70 +205,129 @@ class WorkoutPreferencesService: ObservableObject {
         }
     }
     
-    // Add this new method to handle the complete workflow
-    func savePreferencesAndGeneratePlan(_ preferences: WorkoutPreferences) async -> Bool {
-        print("🎯 Starting workflow: Save preferences and generate plan")
+    // MARK: - Non-blocking Generation Methods
+    
+    /// Starts background workout plan generation - non-blocking
+    func startBackgroundPlanGeneration(_ preferences: WorkoutPreferences) {
+        // Immediately update status and close any modals
+        DispatchQueue.main.async {
+            self.generationStatus = .savingPreferences
+            self.errorMessage = nil
+        }
+        
+        // Start background task to prevent iOS from killing the process
+        startBackgroundTask()
+        
+        // Perform generation asynchronously without blocking UI
+        Task.detached(priority: .background) {
+            await self.performBackgroundGeneration(preferences)
+        }
+    }
+    
+    private func performBackgroundGeneration(_ preferences: WorkoutPreferences) async {
+        print("🎯 Starting background workflow: Save preferences and generate plan")
         
         // Step 1: Save preferences
+        await updateStatus(.savingPreferences)
         print("📝 Step 1: Saving workout preferences...")
+        
         let preferencesSuccess = await saveWorkoutPreferences(preferences)
         if !preferencesSuccess {
             print("❌ Failed to save preferences, aborting workflow")
-            return false
+            await updateStatus(.failed("Failed to save preferences"))
+            endBackgroundTask()
+            return
         }
         print("✅ Preferences saved successfully")
         
-        // Step 2: Generate and save workout plan
-        await MainActor.run {
-            self.isGeneratingPlan = true
+        // Step 2: Fetch personal details
+        await updateStatus(.fetchingPersonalDetails)
+        print("👤 Step 2: Fetching personal details...")
+        
+        let personalDetailsService = PersonalDetailsService()
+        guard let personalDetails = await personalDetailsService.loadPersonalDetails() else {
+            print("❌ Personal details not found")
+            await updateStatus(.failed("Personal details not found"))
+            endBackgroundTask()
+            return
         }
+        print("✅ Personal details loaded successfully")
+        
+        // Step 3: Generate workout plan
+        await updateStatus(.generatingPlan)
+        print("🤖 Step 3: Calling DeepSeek API...")
         
         do {
-            // Fetch personal details
-            print("👤 Step 2: Fetching personal details...")
-            let personalDetailsService = PersonalDetailsService()
-            guard let personalDetails = await personalDetailsService.loadPersonalDetails() else {
-                print("❌ Personal details not found")
-                await MainActor.run {
-                    self.errorMessage = "Personal details not found. Please complete your personal details onboarding."
-                    self.isGeneratingPlan = false
-                }
-                return false
-            }
-            print("✅ Personal details loaded successfully")
-            
-            // Call Deepseek API
-            print("🤖 Step 3: Calling DeepSeek API...")
-            let plan = try await DeepseekAPIClient.shared.generateWorkoutPlan(personalDetails: personalDetails, preferences: preferences)
+            let plan = try await DeepseekAPIClient.shared.generateWorkoutPlan(
+                personalDetails: personalDetails, 
+                preferences: preferences
+            )
             print("✅ Workout plan generated successfully")
             
-            // Save plan to Supabase
+            // Step 4: Save plan to database
+            await updateStatus(.savingPlan)
             print("💾 Step 4: Saving plan to database...")
+            
             let planSaved = await saveWorkoutPlan(plan)
             
-            await MainActor.run {
-                self.isGeneratingPlan = false
-            }
-            
-            if !planSaved {
-                print("❌ Failed to save workout plan to database")
+            if planSaved {
+                print("🎉 Workflow completed successfully!")
+                await updateStatus(.completed)
+                
+                // Notify that workout plan has been updated
                 await MainActor.run {
-                    self.errorMessage = "Failed to save generated workout plan."
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("WorkoutPlanUpdated"), 
+                        object: nil
+                    )
                 }
-                return false
+                
+                // Auto-reset status after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    self.generationStatus = .idle
+                }
+            } else {
+                print("❌ Failed to save workout plan to database")
+                await updateStatus(.failed("Failed to save plan"))
             }
-            
-            print("🎉 Workflow completed successfully!")
-            return true
         } catch {
             print("❌ Workflow failed with error: \(error)")
             print("🔍 Error details: \(error.localizedDescription)")
-            await MainActor.run {
-                self.errorMessage = "Failed to generate workout plan: \(error.localizedDescription)"
-                self.isGeneratingPlan = false
-            }
-            return false
+            await updateStatus(.failed("Generation failed"))
         }
+        
+        endBackgroundTask()
+    }
+    
+    private func updateStatus(_ status: WorkoutPlanGenerationStatus) async {
+        await MainActor.run {
+            self.generationStatus = status
+        }
+    }
+    
+    // MARK: - Background Task Management
+    
+    private func startBackgroundTask() {
+        backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "WorkoutPlanGeneration") {
+            // This block is called if the system needs to terminate the background task
+            print("⚠️ Background task expired - cleaning up")
+            self.endBackgroundTask()
+        }
+    }
+    
+    private func endBackgroundTask() {
+        if backgroundTaskId != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskId)
+            backgroundTaskId = .invalid
+        }
+    }
+    
+    // MARK: - Legacy Blocking Method (kept for backwards compatibility)
+    
+    func savePreferencesAndGeneratePlan(_ preferences: WorkoutPreferences) async -> Bool {
+        // This method is now deprecated - use startBackgroundPlanGeneration instead
+        startBackgroundPlanGeneration(preferences)
+        return true // Return immediately since we're now non-blocking
     }
 }
 

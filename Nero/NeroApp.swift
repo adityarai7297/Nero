@@ -11,12 +11,14 @@ import SwiftUI
 struct NeroApp: App {
     @StateObject private var authService = AuthService()
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var preferencesService = WorkoutPreferencesService()
     
     var body: some Scene {
         WindowGroup {
             MainAppView()
                 .environmentObject(authService)
                 .environmentObject(themeManager)
+                .environmentObject(preferencesService)
                 .onOpenURL { url in
                     // Handle OAuth callback for Google/Apple Sign-In
                     Task {
@@ -34,6 +36,7 @@ struct NeroApp: App {
 struct MainAppView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var preferencesService: WorkoutPreferencesService
     
     var body: some View {
         if authService.isLoading {
@@ -69,10 +72,12 @@ struct LoadingView: View {
 struct MainContentView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var preferencesService: WorkoutPreferencesService
     
     var body: some View {
         ContentView()
             .environmentObject(authService)
             .environmentObject(themeManager)
+            .environmentObject(preferencesService)
     }
 }

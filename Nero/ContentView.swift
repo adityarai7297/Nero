@@ -116,17 +116,21 @@ class ThemeManager: ObservableObject {
 struct ContentView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var preferencesService: WorkoutPreferencesService
+    @StateObject private var workoutService = WorkoutService()
     
     var body: some View {
         ExerciseView()
             .environmentObject(authService)
             .environmentObject(themeManager)
+            .environmentObject(preferencesService)
     }
 }
 
 struct ExerciseView: View {
     @StateObject private var workoutService = WorkoutService()
     @EnvironmentObject var authService: AuthService
+    @EnvironmentObject var preferencesService: WorkoutPreferencesService
     @State private var currentExerciseIndex: Int = 0
     @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
@@ -753,6 +757,13 @@ struct ExerciseView: View {
                 Spacer()
                 
                 VStack(spacing: 24) {
+                    // Workout Plan Generation Status Indicator (only show when active)
+                    if preferencesService.generationStatus.isActive || preferencesService.generationStatus == .completed {
+                        WorkoutPlanStatusButton(
+                            status: preferencesService.generationStatus
+                        )
+                    }
+                    
                     // Edit Workout Plan button
                     GameStyleMenuButton(
                         title: "Workout Preferences",
@@ -1564,6 +1575,89 @@ struct SignOutGlassPopup: View {
             .padding(.horizontal, 40)
         }
         .transition(.opacity.combined(with: .scale))
+    }
+}
+
+// MARK: - Workout Plan Status Button Component
+
+struct WorkoutPlanStatusButton: View {
+    let status: WorkoutPlanGenerationStatus
+    
+    var statusColor: Color {
+        switch status {
+        case .idle:
+            return .gray
+        case .savingPreferences, .fetchingPersonalDetails, .generatingPlan, .savingPlan:
+            return .orange
+        case .completed:
+            return .green
+        case .failed:
+            return .red
+        }
+    }
+    
+    var statusIcon: String {
+        switch status {
+        case .idle:
+            return "checkmark.circle"
+        case .savingPreferences, .fetchingPersonalDetails, .generatingPlan, .savingPlan:
+            return "clock.fill"
+        case .completed:
+            return "checkmark.circle.fill"
+        case .failed:
+            return "xmark.circle.fill"
+        }
+    }
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Status icon with animation for active states
+            ZStack {
+                Circle()
+                    .fill(Color.offWhite)
+                    .overlay(
+                        Circle()
+                            .stroke(statusColor, lineWidth: 2)
+                    )
+                
+                if status.isActive {
+                    // Animated progress indicator
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: statusColor))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: statusIcon)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(statusColor)
+                }
+            }
+            .frame(width: 44, height: 44)
+            
+            // Status text
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Workout Plan")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                Text(status.displayText)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.offWhite)
+                .softOuterShadow()
+        )
+        .frame(maxWidth: 300)
     }
 }
 
