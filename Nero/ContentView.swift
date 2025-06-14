@@ -160,7 +160,26 @@ struct ExerciseView: View {
             Color.offWhite.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                MainExerciseContentView()
+                // Debug the state
+                let _ = print("🎯 UI State - hasWorkoutPlan: \(workoutService.hasWorkoutPlan), exercises.count: \(workoutService.exercises.count), isLoading: \(workoutService.isLoading)")
+                
+                if workoutService.hasWorkoutPlan && !workoutService.exercises.isEmpty {
+                    // Show normal workout interface
+                    let _ = print("✅ UI: Showing workout interface with \(workoutService.exercises.count) exercises")
+                    MainExerciseContentView()
+                } else if !workoutService.hasWorkoutPlan && !workoutService.isLoading {
+                    // Show create workout plan message
+                    let _ = print("⚠️ UI: Showing create workout plan view")
+                    CreateWorkoutPlanView()
+                } else if workoutService.isLoading {
+                    // Show loading state
+                    let _ = print("🔄 UI: Showing loading view")
+                    LoadingView()
+                } else {
+                    // Fallback - should not normally reach here
+                    let _ = print("❌ UI: Showing empty state view (fallback)")
+                    EmptyStateView()
+                }
             }
             
             // Side Menu Overlay
@@ -180,6 +199,12 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingWorkoutQuestionnaire) {
             WorkoutQuestionnaireView()
+                .onDisappear {
+                    // Reload workout plan when questionnaire is dismissed
+                    if let userId = authService.user?.id {
+                        workoutService.setUser(userId)
+                    }
+                }
         }
         .sheet(isPresented: $showingPersonalDetails) {
             PersonalDetailsView()
@@ -212,16 +237,26 @@ struct ExerciseView: View {
                 .zIndex(1000)
             }
         }
-        .overlay {
-            if workoutService.isLoading {
-                ProgressView("Loading exercises...")
-                    .padding()
-                    .background(Color.white.opacity(0.9))
-                    .cornerRadius(10)
-            }
-        }
         .onChange(of: workoutService.todaySets) { oldSets, newSets in
             updateRecommendationsForCurrentExercise()
+        }
+        .onChange(of: authService.user) { _, newUser in
+            // Initialize workout service when user changes
+            workoutService.setUser(newUser?.id)
+            if newUser != nil {
+                loadExerciseData()
+                updateRecommendationsForCurrentExercise()
+            }
+        }
+        .onAppear {
+            // Initialize workout service on appear
+            setButtonFeedback.prepare()
+            navigationFeedback.prepare()
+            workoutService.setUser(authService.user?.id)
+            if authService.user != nil {
+                loadExerciseData()
+                updateRecommendationsForCurrentExercise()
+            }
         }
         .onTapGesture {
             // Close side menu when tapping outside
@@ -234,6 +269,175 @@ struct ExerciseView: View {
     }
     
     // MARK: - Component Views
+    
+    @ViewBuilder
+    private func CreateWorkoutPlanView() -> some View {
+        VStack(spacing: 32) {
+            // Header with menu button
+            HStack {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu.toggle()
+                    }
+                }) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue.opacity(0.8))
+                }
+                .softButtonStyle(
+                    Circle(),
+                    padding: 12,
+                    mainColor: Color.offWhite,
+                    textColor: Color.accentBlue.opacity(0.8),
+                    pressedEffect: .hard
+                )
+                .frame(width: 44, height: 44)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 15)
+            
+            Spacer()
+            
+            // Main content
+            VStack(spacing: 24) {
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: 60, weight: .bold))
+                    .foregroundColor(.blue.opacity(0.6))
+                
+                VStack(spacing: 16) {
+                    Text("Create a Workout Plan")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                    
+                    Text("Complete the workout questionnaire to see your personalized exercises")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+                
+                Button(action: {
+                    showingWorkoutQuestionnaire = true
+                }) {
+                    Text("Create Workout Plan")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                }
+                .softButtonStyle(
+                    RoundedRectangle(cornerRadius: 12),
+                    padding: 14,
+                    mainColor: Color.accentBlue,
+                    textColor: .white,
+                    pressedEffect: .hard
+                )
+                .padding(.horizontal, 40)
+                .padding(.top, 8)
+            }
+            
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private func LoadingView() -> some View {
+        VStack(spacing: 20) {
+            // Header with menu button
+            HStack {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu.toggle()
+                    }
+                }) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue.opacity(0.8))
+                }
+                .softButtonStyle(
+                    Circle(),
+                    padding: 12,
+                    mainColor: Color.offWhite,
+                    textColor: Color.accentBlue.opacity(0.8),
+                    pressedEffect: .hard
+                )
+                .frame(width: 44, height: 44)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 15)
+            
+            Spacer()
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+                    .scaleEffect(1.2)
+                
+                Text("Loading your workout plan...")
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+    }
+    
+    @ViewBuilder
+    private func EmptyStateView() -> some View {
+        VStack(spacing: 20) {
+            // Header with menu button
+            HStack {
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu.toggle()
+                    }
+                }) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue.opacity(0.8))
+                }
+                .softButtonStyle(
+                    Circle(),
+                    padding: 12,
+                    mainColor: Color.offWhite,
+                    textColor: Color.accentBlue.opacity(0.8),
+                    pressedEffect: .hard
+                )
+                .frame(width: 44, height: 44)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 15)
+            
+            Spacer()
+            
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 40))
+                    .foregroundColor(.orange)
+                
+                Text("Something went wrong")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Text("Please try again or contact support")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+    }
     
     @ViewBuilder
     private func ExerciseTitleView() -> some View {
@@ -344,16 +548,6 @@ struct ExerciseView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 40)
-        .onAppear {
-            setButtonFeedback.prepare()
-            navigationFeedback.prepare()
-            loadExerciseData()
-            updateRecommendationsForCurrentExercise()
-            workoutService.setUser(authService.user?.id)
-        }
-        .onChange(of: authService.user) { _, newUser in
-            workoutService.setUser(newUser?.id)
-        }
         .padding(.top, 25)
         .padding(.bottom, 20)
     }

@@ -43,72 +43,168 @@ struct DBWorkoutSet: Codable {
     }
 }
 
+// Database model for workout plans
+struct DBWorkoutPlan: Codable {
+    let id: Int?
+    let userId: UUID
+    let planJson: DeepseekWorkoutPlan
+    let createdAt: Date?
+    let updatedAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case planJson = "plan_json"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
 class WorkoutService: ObservableObject {
     @Published var exercises: [Exercise] = []
     @Published var todaySets: [WorkoutSet] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var hasWorkoutPlan = false
     
     private var currentUserId: UUID?
     
     init() {
-        loadExercises()
-        checkUserAndLoadSets()
+        // Don't load exercises until user is set
     }
     
     func setUser(_ userId: UUID?) {
         currentUserId = userId
-        checkUserAndLoadSets()
-    }
-    
-    private func checkUserAndLoadSets() {
-        if currentUserId != nil {
+        if userId != nil {
+            loadUserExercises()
             loadTodaySets()
         } else {
-            // Clear sets if no user
+            // Clear data if no user
+            exercises = []
             todaySets = []
+            hasWorkoutPlan = false
             updateSetCounts()
         }
     }
     
     // MARK: - Exercise Operations
     
-    func loadExercises() {
+    func loadUserExercises() {
+        guard let userId = currentUserId else {
+            print("⚠️ WorkoutService: No user ID provided")
+            exercises = []
+            hasWorkoutPlan = false
+            return
+        }
+        
+        print("🔄 WorkoutService: Loading exercises for user: \(userId)")
         isLoading = true
         errorMessage = nil
         
         Task {
             do {
-                let response: [DBExercise] = try await supabase
-                    .from("exercises")
+                print("📡 WorkoutService: Querying workout_plans table...")
+                // Try to load user's workout plan
+                let planResponse: [DBWorkoutPlan] = try await supabase
+                    .from("workout_plans")
                     .select()
-                    .order("name")
+                    .eq("user_id", value: userId.uuidString)
+                    .order("created_at", ascending: false)
+                    .limit(1)
                     .execute()
                     .value
                 
-                let loadedExercises = response.map { dbExercise in
-                    Exercise(
-                        name: dbExercise.name,
-                        defaultWeight: CGFloat(dbExercise.defaultWeight),
-                        defaultReps: CGFloat(dbExercise.defaultReps),
-                        defaultRPE: CGFloat(dbExercise.defaultRpe),
-                        setsCompleted: 0 // Will be calculated from today's sets
-                    )
-                }
+                print("📊 WorkoutService: Found \(planResponse.count) workout plans")
                 
-                await MainActor.run {
-                    self.exercises = loadedExercises
-                    self.updateSetCounts()
-                    self.isLoading = false
+                if let userPlan = planResponse.first {
+                    print("✅ WorkoutService: Found workout plan with \(userPlan.planJson.plan.count) exercises")
+                    
+                    // Debug: Print the plan structure
+                    print("🔍 WorkoutService: Plan structure:")
+                    for (index, exercise) in userPlan.planJson.plan.prefix(3).enumerated() {
+                        print("  Exercise \(index + 1): \(exercise.exerciseName) - \(exercise.sets) sets x \(exercise.reps) reps on \(exercise.dayOfWeek)")
+                    }
+                    if userPlan.planJson.plan.count > 3 {
+                        print("  ... and \(userPlan.planJson.plan.count - 3) more exercises")
+                    }
+                    
+                    // User has a workout plan - extract exercises from it
+                    let uniqueExercises = extractUniqueExercisesFromPlan(userPlan.planJson)
+                    
+                    await MainActor.run {
+                        self.exercises = uniqueExercises
+                        self.hasWorkoutPlan = true
+                        self.updateSetCounts()
+                        self.isLoading = false
+                    }
+                    
+                    print("✅ WorkoutService: Loaded \(uniqueExercises.count) unique exercises from user's workout plan")
+                    print("🏋️ WorkoutService: Exercise names: \(uniqueExercises.map { $0.name }.joined(separator: ", "))")
+                } else {
+                    // User has no workout plan
+                    await MainActor.run {
+                        self.exercises = []
+                        self.hasWorkoutPlan = false
+                        self.isLoading = false
+                    }
+                    
+                    print("⚠️ WorkoutService: User has no workout plan - showing empty exercise list")
                 }
             } catch {
                 await MainActor.run {
-                    self.errorMessage = "Failed to load exercises: \(error.localizedDescription)"
+                    self.errorMessage = "Failed to load workout plan: \(error.localizedDescription)"
                     self.isLoading = false
-                    // Fallback to local data
-                    self.exercises = Exercise.allExercises
+                    self.hasWorkoutPlan = false
+                    self.exercises = []
                 }
+                print("❌ WorkoutService: Failed to load user workout plan: \(error)")
+                print("🔍 WorkoutService: Error details: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    private func extractUniqueExercisesFromPlan(_ plan: DeepseekWorkoutPlan) -> [Exercise] {
+        // Get unique exercise names from the plan
+        let uniqueExerciseNames = Set(plan.plan.map { $0.exerciseName })
+        
+        // Create Exercise objects with reasonable defaults
+        // We could also fetch default values from the exercises table if needed
+        let exercises = uniqueExerciseNames.map { exerciseName in
+            // Try to get defaults from the plan data
+            let planExercises = plan.plan.filter { $0.exerciseName == exerciseName }
+            let avgSets = planExercises.map { $0.sets }.reduce(0, +) / planExercises.count
+            let avgReps = planExercises.map { $0.reps }.reduce(0, +) / planExercises.count
+            
+            return Exercise(
+                name: exerciseName,
+                defaultWeight: getDefaultWeightForExercise(exerciseName),
+                defaultReps: CGFloat(avgReps),
+                defaultRPE: 70, // Default RPE
+                setsCompleted: 0
+            )
+        }.sorted { $0.name < $1.name }
+        
+        return exercises
+    }
+    
+    private func getDefaultWeightForExercise(_ exerciseName: String) -> CGFloat {
+        // Simple heuristic for default weights based on exercise name
+        let name = exerciseName.lowercased()
+        
+        if name.contains("squat") {
+            return 135
+        } else if name.contains("bench") || name.contains("press") {
+            return 95
+        } else if name.contains("deadlift") {
+            return 185
+        } else if name.contains("row") {
+            return 115
+        } else if name.contains("curl") || name.contains("extension") {
+            return 25
+        } else if name.contains("pull") || name.contains("dip") {
+            return 0 // bodyweight
+        } else {
+            return 45 // Default barbell weight
         }
     }
     
