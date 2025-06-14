@@ -322,6 +322,50 @@ class WorkoutPreferencesService: ObservableObject {
         }
     }
     
+    // MARK: - Workout Plan Loading
+    
+    /// Load the current user's workout plan
+    func loadCurrentWorkoutPlan() async -> DeepseekWorkoutPlan? {
+        // Local struct definition to avoid conflicts
+        struct DBWorkoutPlan: Codable {
+            let id: Int?
+            let userId: UUID
+            let planJson: DeepseekWorkoutPlan
+            let createdAt: Date?
+            let updatedAt: Date?
+            
+            enum CodingKeys: String, CodingKey {
+                case id
+                case userId = "user_id"
+                case planJson = "plan_json"
+                case createdAt = "created_at"
+                case updatedAt = "updated_at"
+            }
+        }
+        
+        do {
+            let session = try await supabase.auth.session
+            let userId = session.user.id
+            
+            let response: [DBWorkoutPlan] = try await supabase
+                .from("workout_plans")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .order("created_at", ascending: false)
+                .limit(1)
+                .execute()
+                .value
+            
+            return response.first?.planJson
+        } catch {
+            print("Failed to load workout plan: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Failed to load workout plan: \(error.localizedDescription)"
+            }
+            return nil
+        }
+    }
+    
     // MARK: - Legacy Blocking Method (kept for backwards compatibility)
     
     func savePreferencesAndGeneratePlan(_ preferences: WorkoutPreferences) async -> Bool {

@@ -140,6 +140,7 @@ struct ExerciseView: View {
     @State private var showingSideMenu: Bool = false // Control side menu presentation
     @State private var showingWorkoutQuestionnaire: Bool = false // Control workout questionnaire presentation
     @State private var showingPersonalDetails: Bool = false // Control personal details presentation
+    @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -212,6 +213,10 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingPersonalDetails) {
             PersonalDetailsView()
+        }
+        .sheet(isPresented: $showingWorkoutPlan) {
+            WorkoutPlanView()
+                .environmentObject(preferencesService)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -757,11 +762,27 @@ struct ExerciseView: View {
                 Spacer()
                 
                 VStack(spacing: 24) {
-                    // Workout Plan Generation Status Indicator (only show when active)
-                    if preferencesService.generationStatus.isActive || preferencesService.generationStatus == .completed {
+                    // Workout Plan Generation Status Indicator or View Plan Button
+                    if preferencesService.generationStatus.isActive {
+                        // Show status indicator while generating
                         WorkoutPlanStatusButton(
                             status: preferencesService.generationStatus
                         )
+                    } else if preferencesService.generationStatus == .completed || workoutService.hasWorkoutPlan {
+                        // Show "View Workout Plan" button when completed or plan exists
+                        GameStyleMenuButton(
+                            title: "View Workout Plan",
+                            icon: "doc.text.fill",
+                            color: Color.green
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Small delay to let menu close animation finish
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingWorkoutPlan = true
+                            }
+                        }
                     }
                     
                     // Edit Workout Plan button
@@ -1658,6 +1679,245 @@ struct WorkoutPlanStatusButton: View {
                 .softOuterShadow()
         )
         .frame(maxWidth: 300)
+    }
+}
+
+// MARK: - Workout Plan View
+
+struct WorkoutPlanView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var preferencesService: WorkoutPreferencesService
+    @State private var workoutPlan: DeepseekWorkoutPlan?
+    @State private var isLoading = true
+    @State private var groupedExercises: [String: [DeepseekWorkoutPlanDay]] = [:]
+    
+    private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.offWhite.ignoresSafeArea()
+                
+                if isLoading {
+                    LoadingStateView()
+                } else if let plan = workoutPlan {
+                    WorkoutPlanContentView(groupedExercises: groupedExercises)
+                } else {
+                    EmptyPlanStateView()
+                }
+            }
+            .navigationTitle("Workout Plan")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.accentBlue)
+                }
+            }
+        }
+        .onAppear {
+            loadWorkoutPlan()
+        }
+    }
+    
+    private func loadWorkoutPlan() {
+        Task {
+            let plan = await preferencesService.loadCurrentWorkoutPlan()
+            await MainActor.run {
+                self.workoutPlan = plan
+                if let plan = plan {
+                    self.groupedExercises = groupExercisesByDay(plan.plan)
+                }
+                self.isLoading = false
+            }
+        }
+    }
+    
+    private func groupExercisesByDay(_ exercises: [DeepseekWorkoutPlanDay]) -> [String: [DeepseekWorkoutPlanDay]] {
+        return Dictionary(grouping: exercises) { $0.dayOfWeek }
+    }
+    
+    @ViewBuilder
+    private func LoadingStateView() -> some View {
+        VStack(spacing: 20) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle())
+                .scaleEffect(1.2)
+            
+            Text("Loading workout plan...")
+                .font(.headline)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private func EmptyPlanStateView() -> some View {
+        VStack(spacing: 24) {
+            Image(systemName: "doc.text.fill")
+                .font(.system(size: 60, weight: .bold))
+                .foregroundColor(.gray.opacity(0.6))
+            
+            VStack(spacing: 16) {
+                Text("No Workout Plan Found")
+                    .font(.title)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Text("Create a workout plan through the questionnaire to see your personalized exercises")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func WorkoutPlanContentView(groupedExercises: [String: [DeepseekWorkoutPlanDay]]) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 24) {
+                ForEach(daysOfWeek, id: \.self) { day in
+                    if let dayExercises = groupedExercises[day], !dayExercises.isEmpty {
+                        DayWorkoutCard(day: day, exercises: dayExercises)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+        }
+    }
+}
+
+// MARK: - Day Workout Card Component
+
+struct DayWorkoutCard: View {
+    let day: String
+    let exercises: [DeepseekWorkoutPlanDay]
+    @State private var isExpanded = false
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Day Header
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(day)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("\(exercises.count) exercises")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue)
+                        .rotationEffect(.degrees(isExpanded ? 0 : 0))
+                        .animation(.easeInOut(duration: 0.3), value: isExpanded)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Exercises List (Expandable)
+            if isExpanded {
+                VStack(spacing: 12) {
+                    ForEach(exercises.indices, id: \.self) { index in
+                        ExerciseRowCard(exercise: exercises[index])
+                        
+                        if index < exercises.count - 1 {
+                            Divider()
+                                .padding(.horizontal, 24)
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.offWhite)
+                .softOuterShadow()
+        )
+        .animation(.easeInOut(duration: 0.3), value: isExpanded)
+    }
+}
+
+// MARK: - Exercise Row Card Component
+
+struct ExerciseRowCard: View {
+    let exercise: DeepseekWorkoutPlanDay
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Exercise Icon
+            ZStack {
+                Circle()
+                    .fill(Color.offWhite)
+                    .softInnerShadow(
+                        Circle(),
+                        darkShadow: Color.black.opacity(0.2),
+                        lightShadow: Color.white.opacity(0.9),
+                        spread: 0.1,
+                        radius: 2
+                    )
+                
+                Image(systemName: "dumbbell.fill")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.accentBlue.opacity(0.8))
+            }
+            .frame(width: 44, height: 44)
+            
+            // Exercise Details
+            VStack(alignment: .leading, spacing: 4) {
+                Text(exercise.exerciseName)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Text("\(exercise.sets)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.accentBlue)
+                        Text("sets")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text("\(exercise.reps)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.accentBlue)
+                        Text("reps")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 8)
     }
 }
 
