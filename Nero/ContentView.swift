@@ -755,7 +755,7 @@ struct ExerciseView: View {
                 VStack(spacing: 24) {
                     // Edit Workout Plan button
                     GameStyleMenuButton(
-                        title: "Edit Workout Plan",
+                        title: "Edit Workout Preferences",
                         icon: "dumbbell.fill",
                         color: Color.accentBlue
                     ) {
