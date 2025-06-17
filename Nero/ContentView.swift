@@ -220,7 +220,17 @@ struct ExerciseView: View {
             PersonalDetailsView()
         }
         .sheet(isPresented: $showingWorkoutPlan) {
-            WorkoutPlanView()
+            WorkoutPlanView(onExerciseSelected: { exerciseName in
+                // Find the exercise index and navigate to it
+                if let index = workoutService.exercises.firstIndex(where: { $0.name == exerciseName }) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        currentExerciseIndex = index
+                        loadExerciseData()
+                    }
+                }
+                // Dismiss the workout plan sheet
+                showingWorkoutPlan = false
+            })
                 .environmentObject(preferencesService)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
@@ -1787,6 +1797,7 @@ struct WorkoutPlanView: View {
     @State private var workoutPlan: DeepseekWorkoutPlan?
     @State private var isLoading = true
     @State private var groupedExercises: [String: [DeepseekWorkoutPlanDay]] = [:]
+    let onExerciseSelected: (String) -> Void
     
     private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
     
@@ -1878,7 +1889,7 @@ struct WorkoutPlanView: View {
             LazyVStack(spacing: 24) {
                 ForEach(daysOfWeek, id: \.self) { day in
                     if let dayExercises = groupedExercises[day], !dayExercises.isEmpty {
-                        DayWorkoutCard(day: day, exercises: dayExercises)
+                        DayWorkoutCard(day: day, exercises: dayExercises, onExerciseSelected: onExerciseSelected)
                     }
                 }
             }
@@ -1893,11 +1904,12 @@ struct WorkoutPlanView: View {
 struct DayWorkoutCard: View {
     let day: String
     let exercises: [DeepseekWorkoutPlanDay]
+    let onExerciseSelected: (String) -> Void
     @State private var isExpanded = false
     
     var body: some View {
         VStack(spacing: 0) {
-            // Day Header
+            // Day Header - Fully Clickable
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isExpanded.toggle()
@@ -1926,6 +1938,8 @@ struct DayWorkoutCard: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(PlainButtonStyle())
             
@@ -1933,7 +1947,9 @@ struct DayWorkoutCard: View {
             if isExpanded {
                 VStack(spacing: 12) {
                     ForEach(exercises.indices, id: \.self) { index in
-                        ExerciseRowCard(exercise: exercises[index])
+                        ExerciseRowCard(exercise: exercises[index], onTap: {
+                            onExerciseSelected(exercises[index].exerciseName)
+                        })
                         
                         if index < exercises.count - 1 {
                             Divider()
@@ -1959,9 +1975,11 @@ struct DayWorkoutCard: View {
 
 struct ExerciseRowCard: View {
     let exercise: DeepseekWorkoutPlanDay
+    let onTap: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
+        Button(action: onTap) {
+            HStack(spacing: 16) {
             // Exercise Icon
             ZStack {
                 Circle()
@@ -2013,8 +2031,10 @@ struct ExerciseRowCard: View {
             }
             
             Spacer()
+            }
+            .padding(.vertical, 8)
         }
-        .padding(.vertical, 8)
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
