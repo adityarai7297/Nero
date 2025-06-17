@@ -8,7 +8,6 @@
 import Supabase
 import SwiftUI
 import UIKit
-import IrregularGradient
 import Neumorphic
 
 // Next-Set Recommendations Algorithm
@@ -141,6 +140,12 @@ struct ExerciseView: View {
     @State private var showingWorkoutQuestionnaire: Bool = false // Control workout questionnaire presentation
     @State private var showingPersonalDetails: Bool = false // Control personal details presentation
     @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
+    
+    // Crown animation state
+    @State private var showCrown: Bool = false
+    @State private var crownScale: CGFloat = 0.5
+    @State private var crownRotation: Double = 0
+    @State private var crownOffset: CGFloat = 0
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -520,6 +525,31 @@ struct ExerciseView: View {
             pressedEffect: .hard
         )
         .frame(width: 44, height: 44)
+        .overlay(alignment: .topTrailing) {
+            // Crown overlay when target sets are reached
+            if showCrown {
+                CrownView()
+                    .scaleEffect(crownScale)
+                    .rotationEffect(.degrees(crownRotation))
+                    .offset(x: 5, y: crownOffset - 10)
+                    .allowsHitTesting(false)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func CrownView() -> some View {
+        Image(systemName: "crown.fill")
+            .font(.title3)
+            .fontWeight(.bold)
+            .foregroundColor(.yellow)
+            .shadow(color: .orange, radius: 2, x: 0, y: 0)
+            .background(
+                Circle()
+                    .fill(.green.opacity(0.2))
+                    .frame(width: 28, height: 28)
+                    .blur(radius: 4)
+            )
     }
     
     @ViewBuilder
@@ -661,6 +691,12 @@ struct ExerciseView: View {
         let exercise = currentExercise
         weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
         
+        // Reset crown state when switching exercises
+        showCrown = false
+        
+        // Check if current exercise has already reached target sets
+        checkForTargetCompletion()
+        
         // Update recommendations based on the latest set for this exercise
         updateRecommendationsForCurrentExercise()
     }
@@ -730,6 +766,9 @@ struct ExerciseView: View {
             // Update recommendations immediately after successful save
             updateRecommendationsAfterSet()
             
+            // Check if we've reached the target sets for today
+            checkForTargetCompletionWithAnimation()
+            
             // Show radial burst effect
             withAnimation(.easeOut(duration: 0.15)) {
                 showRadialBurst = true
@@ -742,6 +781,64 @@ struct ExerciseView: View {
                 }
             }
         }
+    }
+    
+    private func checkForTargetCompletion() {
+        let exerciseName = currentExercise.name
+        let completedSets = currentExercise.setsCompleted
+        
+        if let targetSets = workoutService.getTargetSetsForToday(exerciseName: exerciseName),
+           completedSets >= targetSets {
+            
+            // Show crown (but don't animate if we're just switching exercises)
+            if !showCrown {
+                showCrown = true
+                crownScale = 1.0
+                crownRotation = 0
+                crownOffset = 0
+            }
+        }
+    }
+    
+    private func checkForTargetCompletionWithAnimation() {
+        let exerciseName = currentExercise.name
+        let completedSets = currentExercise.setsCompleted
+        
+        if let targetSets = workoutService.getTargetSetsForToday(exerciseName: exerciseName),
+           completedSets >= targetSets && !showCrown {
+            
+            // Show crown with bouncy animation
+            showCrownAnimation()
+        }
+    }
+    
+    private func showCrownAnimation() {
+        // Haptic feedback for crown achievement
+        let achievementFeedback = UINotificationFeedbackGenerator()
+        achievementFeedback.notificationOccurred(.success)
+        
+        // Reset crown state
+        crownScale = 0.5
+        crownRotation = -15
+        crownOffset = -20
+        
+        withAnimation(.none) {
+            showCrown = true
+        }
+        
+        // Bounce in animation
+        withAnimation(.interpolatingSpring(stiffness: 300, damping: 10)) {
+            crownScale = 1.2
+            crownOffset = 0
+        }
+        
+        // Settle animation
+        withAnimation(.interpolatingSpring(stiffness: 200, damping: 8).delay(0.2)) {
+            crownScale = 1.0
+            crownRotation = 0
+        }
+        
+        // Crown stays visible permanently for the day - no auto-hide
     }
     
     @ViewBuilder

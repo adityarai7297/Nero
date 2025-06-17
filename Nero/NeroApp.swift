@@ -39,13 +39,16 @@ struct MainAppView: View {
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
     
     var body: some View {
-        if authService.isLoading {
-            LoadingView()
-        } else if authService.user != nil {
-            MainContentView()
-        } else {
-            AuthView()
+        Group {
+            if authService.isLoading {
+                LoadingView()
+            } else if authService.user != nil {
+                MainContentView()
+            } else {
+                AuthView()
+            }
         }
+        .preferredColorScheme(.light) // Force light mode, override system default
     }
 }
 

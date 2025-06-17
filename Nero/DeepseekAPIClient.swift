@@ -64,7 +64,7 @@ class DeepseekAPIClient {
         print("🏋️ Preferences: \(preferencesText)")
         
         let systemPrompt = """
-        You are a professional fitness coach and workout plan generator. Generate a comprehensive 4-week workout plan based on the user's personal details and workout preferences.
+        You are a professional fitness coach and workout plan generator. Generate a comprehensive weekly workout plan based on the user's personal details and workout preferences.
         
         CRITICAL: Return ONLY a valid JSON object with NO markdown formatting, NO code blocks, NO backticks, NO explanations.
         
@@ -93,14 +93,19 @@ class DeepseekAPIClient {
         }
         
         Requirements:
-        - Include exercises for all 4 weeks (Week 1: Monday-Friday, Week 2: Monday-Friday, etc.)
-        - Each day should have 4-6 exercises
-        - "sets" must be an integer (3, 4, etc.)
-        - "reps" must be an integer (8, 10, 12, etc.) - NO strings like "60 sec"
-        - "dayOfWeek" must be: Monday, Tuesday, Wednesday, Thursday, or Friday
-        - "exerciseName" should be clear exercise names
+        - Generate exercises for ONE WEEK ONLY (Monday through Friday)
+        - Each day must have EXACTLY 4-6 exercises (no more, no less)
+        - Total exercises across all 5 days should be 20-30 exercises
+        - "sets" must be an integer between 2-5
+        - "reps" must be an integer between 6-15 - NO strings like "60 sec"
+        - "dayOfWeek" must be exactly one of: Monday, Tuesday, Wednesday, Thursday, Friday
+        - "exerciseName" should be clear, specific exercise names (e.g., "Barbell Squat", "Incline Dumbbell Press")
         - DO NOT include any extra fields like "weightIncrease", "week", "days", etc.
+        - Ensure balanced muscle group distribution across the week
+        - Consider the user's preferred weekly split and training frequency
         - Return raw JSON only - no markdown, no code blocks, no backticks
+        
+        IMPORTANT: This is a WEEKLY template that will be repeated, so focus on creating one optimal week of training.
         """
         
         let userPrompt = """
@@ -110,7 +115,7 @@ class DeepseekAPIClient {
         Workout Preferences:
         \(preferencesText)
         
-        Please generate a 4-week workout plan based on this information.
+        Please generate a weekly workout plan template based on this information. Focus on creating one optimal week (Monday-Friday) that provides balanced training according to the user's goals and preferences.
         """
 
         let chatRequest = DeepseekChatRequest(

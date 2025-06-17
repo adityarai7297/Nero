@@ -68,6 +68,7 @@ class WorkoutService: ObservableObject {
     @Published var hasWorkoutPlan = false
     
     private var currentUserId: UUID?
+    private var currentWorkoutPlan: DeepseekWorkoutPlan?
     
     init() {
         // Set up notification observer for workout plan updates
@@ -182,6 +183,9 @@ class WorkoutService: ObservableObject {
     }
     
     private func extractUniqueExercisesFromPlan(_ plan: DeepseekWorkoutPlan) -> [Exercise] {
+        // Store the workout plan for later use
+        self.currentWorkoutPlan = plan
+        
         // Get unique exercise names from the plan
         let uniqueExerciseNames = Set(plan.plan.map { $0.exerciseName })
         
@@ -409,6 +413,24 @@ class WorkoutService: ObservableObject {
     }
     
     // MARK: - Helper Methods
+    
+    /// Get the target number of sets for a specific exercise on today's day
+    func getTargetSetsForToday(exerciseName: String) -> Int? {
+        guard let workoutPlan = currentWorkoutPlan else { return nil }
+        
+        // Get today's day of the week
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        let todayString = formatter.string(from: Date())
+        
+        // Find exercises for today with the given name
+        let todayExercises = workoutPlan.plan.filter { 
+            $0.dayOfWeek == todayString && $0.exerciseName == exerciseName 
+        }
+        
+        // Return the target sets for today's exercise
+        return todayExercises.first?.sets
+    }
     
     private func updateSetCounts() {
         for index in exercises.indices {
