@@ -189,6 +189,14 @@ class WorkoutService: ObservableObject {
         // Get unique exercise names from the plan
         let uniqueExerciseNames = Set(plan.plan.map { $0.exerciseName })
         
+        // Get today's day of the week
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        let todayString = formatter.string(from: Date())
+        
+        // Get exercises scheduled for today
+        let todayExerciseNames = Set(plan.plan.filter { $0.dayOfWeek == todayString }.map { $0.exerciseName })
+        
         // Create Exercise objects with reasonable defaults
         // We could also fetch default values from the exercises table if needed
         let exercises = uniqueExerciseNames.map { exerciseName in
@@ -204,7 +212,21 @@ class WorkoutService: ObservableObject {
                 defaultRPE: 70, // Default RPE
                 setsCompleted: 0
             )
-        }.sorted { $0.name < $1.name }
+        }.sorted { lhs, rhs in
+            // First, prioritize exercises scheduled for today
+            let lhsIsToday = todayExerciseNames.contains(lhs.name)
+            let rhsIsToday = todayExerciseNames.contains(rhs.name)
+            
+            if lhsIsToday && !rhsIsToday {
+                return true // lhs comes first
+            } else if !lhsIsToday && rhsIsToday {
+                return false // rhs comes first
+            } else {
+                // Both are today's exercises or both are not today's exercises
+                // Sort alphabetically within each group
+                return lhs.name < rhs.name
+            }
+        }
         
         return exercises
     }
