@@ -141,11 +141,8 @@ struct ExerciseView: View {
     @State private var showingPersonalDetails: Bool = false // Control personal details presentation
     @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
     
-    // Crown animation state
-    @State private var showCrown: Bool = false
-    @State private var crownScale: CGFloat = 0.5
-    @State private var crownRotation: Double = 0
-    @State private var crownOffset: CGFloat = 0
+    // Target completion state
+    @State private var showTargetCompletion: Bool = false
     
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -519,48 +516,40 @@ struct ExerciseView: View {
         Button(action: {
             showingSetsModal = true
         }) {
-            Text("\(currentExercise.setsCompleted)")
-                .font(.callout)
-                .fontWeight(.bold)
-                .foregroundColor(Color.green.opacity(0.8))
-                .frame(width: 18, height: 18)
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
+            HStack(spacing: 6) {
+                Text("\(currentExercise.setsCompleted)")
+                    .font(.callout)
+                    .fontWeight(.bold)
+                    .foregroundColor(Color.green.opacity(0.8))
+                    .lineLimit(1)
+                
+                if showTargetCompletion {
+                    ZStack {
+                        Circle()
+                            .fill(Color.green.opacity(0.8))
+                            .frame(width: 16, height: 16)
+                        
+                        Image(systemName: "checkmark")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    }
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
         }
         .softButtonStyle(
-            Circle(),
+            RoundedRectangle(cornerRadius: showTargetCompletion ? 18 : 22),
             padding: 12,
             mainColor: Color.offWhite,
             textColor: Color.green.opacity(0.8),
             pressedEffect: .hard
         )
-        .frame(width: 44, height: 44)
-        .overlay(alignment: .topTrailing) {
-            // Crown overlay when target sets are reached
-            if showCrown {
-                CrownView()
-                    .scaleEffect(crownScale)
-                    .rotationEffect(.degrees(crownRotation))
-                    .offset(x: 5, y: crownOffset - 10)
-                    .allowsHitTesting(false)
-            }
-        }
+        .frame(width: showTargetCompletion ? 80 : 44, height: 44)
+        .animation(.bouncy(duration: 0.4), value: showTargetCompletion)
     }
     
-    @ViewBuilder
-    private func CrownView() -> some View {
-        Image(systemName: "crown.fill")
-            .font(.title3)
-            .fontWeight(.bold)
-            .foregroundColor(.yellow)
-            .shadow(color: .orange, radius: 2, x: 0, y: 0)
-            .background(
-                Circle()
-                    .fill(.green.opacity(0.2))
-                    .frame(width: 28, height: 28)
-                    .blur(radius: 4)
-            )
-    }
+
     
     @ViewBuilder
     private func ExerciseComponentsView() -> some View {
@@ -701,9 +690,6 @@ struct ExerciseView: View {
         let exercise = currentExercise
         weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
         
-        // Reset crown state when switching exercises
-        showCrown = false
-        
         // Check if current exercise has already reached target sets
         checkForTargetCompletion()
         
@@ -800,13 +786,12 @@ struct ExerciseView: View {
         if let targetSets = workoutService.getTargetSetsForToday(exerciseName: exerciseName),
            completedSets >= targetSets {
             
-            // Show crown (but don't animate if we're just switching exercises)
-            if !showCrown {
-                showCrown = true
-                crownScale = 1.0
-                crownRotation = 0
-                crownOffset = 0
+            // Show checkmark (but don't animate if we're just switching exercises)
+            if !showTargetCompletion {
+                showTargetCompletion = true
             }
+        } else {
+            showTargetCompletion = false
         }
     }
     
@@ -815,40 +800,22 @@ struct ExerciseView: View {
         let completedSets = currentExercise.setsCompleted
         
         if let targetSets = workoutService.getTargetSetsForToday(exerciseName: exerciseName),
-           completedSets >= targetSets && !showCrown {
+           completedSets >= targetSets && !showTargetCompletion {
             
-            // Show crown with bouncy animation
-            showCrownAnimation()
+            // Show checkmark with bouncy animation
+            showCheckmarkAnimation()
         }
     }
     
-    private func showCrownAnimation() {
-        // Haptic feedback for crown achievement
+    private func showCheckmarkAnimation() {
+        // Haptic feedback for target achievement
         let achievementFeedback = UINotificationFeedbackGenerator()
         achievementFeedback.notificationOccurred(.success)
         
-        // Reset crown state
-        crownScale = 0.5
-        crownRotation = -15
-        crownOffset = -20
-        
-        withAnimation(.none) {
-            showCrown = true
+        // Show checkmark with bouncy animation
+        withAnimation(.bouncy(duration: 0.6)) {
+            showTargetCompletion = true
         }
-        
-        // Bounce in animation
-        withAnimation(.interpolatingSpring(stiffness: 300, damping: 10)) {
-            crownScale = 1.2
-            crownOffset = 0
-        }
-        
-        // Settle animation
-        withAnimation(.interpolatingSpring(stiffness: 200, damping: 8).delay(0.2)) {
-            crownScale = 1.0
-            crownRotation = 0
-        }
-        
-        // Crown stays visible permanently for the day - no auto-hide
     }
     
     @ViewBuilder
