@@ -464,4 +464,11 @@ class WorkoutService: ObservableObject {
     func getExercise(by name: String) -> Exercise? {
         return exercises.first { $0.name == name }
     }
+    
+    /// Check if an exercise is completed for today (completed sets >= target sets)
+    func isExerciseCompletedForToday(exerciseName: String) -> Bool {
+        guard let targetSets = getTargetSetsForToday(exerciseName: exerciseName) else { return false }
+        let completedSets = todaySets.filter { $0.exerciseName == exerciseName }.count
+        return completedSets >= targetSets
+    }
 } 

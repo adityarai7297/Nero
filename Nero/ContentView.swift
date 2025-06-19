@@ -217,17 +217,20 @@ struct ExerciseView: View {
             PersonalDetailsView()
         }
         .sheet(isPresented: $showingWorkoutPlan) {
-            WorkoutPlanView(onExerciseSelected: { exerciseName in
-                // Find the exercise index and navigate to it
-                if let index = workoutService.exercises.firstIndex(where: { $0.name == exerciseName }) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        currentExerciseIndex = index
-                        loadExerciseData()
+            WorkoutPlanView(
+                onExerciseSelected: { exerciseName in
+                    // Find the exercise index and navigate to it
+                    if let index = workoutService.exercises.firstIndex(where: { $0.name == exerciseName }) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            currentExerciseIndex = index
+                            loadExerciseData()
+                        }
                     }
-                }
-                // Dismiss the workout plan sheet
-                showingWorkoutPlan = false
-            })
+                    // Dismiss the workout plan sheet
+                    showingWorkoutPlan = false
+                },
+                workoutService: workoutService
+            )
                 .environmentObject(preferencesService)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
@@ -1765,6 +1768,7 @@ struct WorkoutPlanView: View {
     @State private var isLoading = true
     @State private var groupedExercises: [String: [DeepseekWorkoutPlanDay]] = [:]
     let onExerciseSelected: (String) -> Void
+    let workoutService: WorkoutService
     
     private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
     
@@ -1852,16 +1856,34 @@ struct WorkoutPlanView: View {
     
     @ViewBuilder
     private func WorkoutPlanContentView(groupedExercises: [String: [DeepseekWorkoutPlanDay]]) -> some View {
-        ScrollView {
-            LazyVStack(spacing: 24) {
-                ForEach(daysOfWeek, id: \.self) { day in
-                    if let dayExercises = groupedExercises[day], !dayExercises.isEmpty {
-                        DayWorkoutCard(day: day, exercises: dayExercises, onExerciseSelected: onExerciseSelected)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    ForEach(daysOfWeek, id: \.self) { day in
+                        if let dayExercises = groupedExercises[day], !dayExercises.isEmpty {
+                            DayWorkoutCard(
+                                day: day, 
+                                exercises: dayExercises, 
+                                onExerciseSelected: onExerciseSelected, 
+                                workoutService: workoutService,
+                                onExpansionChange: { isExpanded in
+                                    if isExpanded {
+                                        // Add a small delay to let the expansion animation start
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                            withAnimation(.easeInOut(duration: 0.5)) {
+                                                proxy.scrollTo(day, anchor: .center)
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+                            .id(day) // Add id for scrollTo to work
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
         }
     }
 }
@@ -1872,6 +1894,8 @@ struct DayWorkoutCard: View {
     let day: String
     let exercises: [DeepseekWorkoutPlanDay]
     let onExerciseSelected: (String) -> Void
+    let workoutService: WorkoutService
+    let onExpansionChange: (Bool) -> Void
     @State private var isExpanded = false
     
     var body: some View {
@@ -1880,6 +1904,7 @@ struct DayWorkoutCard: View {
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     isExpanded.toggle()
+                    onExpansionChange(isExpanded)
                 }
             }) {
                 HStack {
@@ -1914,7 +1939,7 @@ struct DayWorkoutCard: View {
             if isExpanded {
                 VStack(spacing: 12) {
                     ForEach(exercises.indices, id: \.self) { index in
-                        ExerciseRowCard(exercise: exercises[index], onTap: {
+                        ExerciseRowCard(exercise: exercises[index], workoutService: workoutService, onTap: {
                             onExerciseSelected(exercises[index].exerciseName)
                         })
                         
@@ -1948,7 +1973,12 @@ struct DayWorkoutCard: View {
 
 struct ExerciseRowCard: View {
     let exercise: DeepseekWorkoutPlanDay
+    let workoutService: WorkoutService
     let onTap: () -> Void
+    
+    private var isCompleted: Bool {
+        workoutService.isExerciseCompletedForToday(exerciseName: exercise.exerciseName)
+    }
     
     var body: some View {
         Button(action: onTap) {
@@ -2004,6 +2034,21 @@ struct ExerciseRowCard: View {
             }
             
             Spacer()
+            
+            // Completion Checkmark
+            if isCompleted {
+                ZStack {
+                    Circle()
+                        .fill(Color.green.opacity(0.8))
+                        .frame(width: 24, height: 24)
+                    
+                    Image(systemName: "checkmark")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+                .transition(.scale.combined(with: .opacity))
+            }
             }
             .padding(.vertical, 8)
         }
