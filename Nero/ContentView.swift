@@ -1959,9 +1959,15 @@ struct DayWorkoutCard: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 20)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.95, anchor: .top)),
+                    removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top))
+                ))
+                .clipped()
             }
         }
+        .background(Color.offWhite)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.offWhite)
