@@ -86,7 +86,7 @@ struct WorkoutSet: Identifiable, Equatable {
 }
 
 // Exercise model with name and default preferences
-struct Exercise {
+struct Exercise: Equatable {
     let name: String
     let defaultWeight: CGFloat
     let defaultReps: CGFloat
@@ -263,6 +263,14 @@ struct ExerciseView: View {
         }
         .onChange(of: workoutService.todaySets) { oldSets, newSets in
             updateRecommendationsForCurrentExercise()
+            // Check for target completion when sets data changes
+            checkForTargetCompletion()
+        }
+        .onChange(of: workoutService.exercises) { oldExercises, newExercises in
+            // Check for target completion when exercises data changes
+            if !newExercises.isEmpty {
+                checkForTargetCompletion()
+            }
         }
         .onChange(of: authService.user) { _, newUser in
             // Initialize workout service when user changes

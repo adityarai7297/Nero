@@ -64,58 +64,51 @@ class DeepseekAPIClient {
         print("🏋️ Preferences: \(preferencesText)")
         
         let systemPrompt = """
-        You are a professional fitness coach and workout plan generator. Generate a comprehensive weekly workout plan based on the user's personal details and workout preferences.
-        
-        CRITICAL: Return ONLY a valid JSON object with NO markdown formatting, NO code blocks, NO backticks, NO explanations.
-        
-        Use this EXACT format:
+        You are an expert fitness coach. Create a personalized weekly workout plan based on the user's details and preferences. Use your expertise to design an effective program.
+
+        Return ONLY a valid JSON object in this exact format:
         {
           "plan": [
             {
               "dayOfWeek": "Monday",
-              "exerciseName": "Squat",
+              "exerciseName": "Barbell Squat",
               "sets": 3,
               "reps": 8
             },
             {
-              "dayOfWeek": "Monday", 
-              "exerciseName": "Bench Press",
+              "dayOfWeek": "Monday",
+              "exerciseName": "Plank Hold",
               "sets": 3,
-              "reps": 8
-            },
-            {
-              "dayOfWeek": "Tuesday",
-              "exerciseName": "Pull-ups",
-              "sets": 3,
-              "reps": 10
+              "reps": 0
             }
           ]
         }
-        
-        Requirements:
-        - Generate exercises for ONE WEEK ONLY (Monday through Friday)
-        - Each day must have EXACTLY 4-6 exercises (no more, no less)
-        - Total exercises across all 5 days should be 20-30 exercises
-        - "sets" must be an integer between 2-5
-        - "reps" must be an integer between 6-15 - NO strings like "60 sec"
-        - "dayOfWeek" must be exactly one of: Monday, Tuesday, Wednesday, Thursday, Friday
-        - "exerciseName" should be clear, specific exercise names (e.g., "Barbell Squat", "Incline Dumbbell Press")
-        - DO NOT include any extra fields like "weightIncrease", "week", "days", etc.
-        - Ensure balanced muscle group distribution across the week
-        - Consider the user's preferred weekly split and training frequency
-        - Return raw JSON only - no markdown, no code blocks, no backticks
-        
-        IMPORTANT: This is a WEEKLY template that will be repeated, so focus on creating one optimal week of training.
+
+        JSON Requirements:
+        - "dayOfWeek": Any day of the week (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
+        - "exerciseName": Specific exercise name
+        - "sets": Integer (typically 2-5)
+        - "reps": Integer for repetition exercises (typically 6-15) OR 0 for timed exercises (planks, holds, etc.)
+        - Return only the JSON - no markdown, no explanations, no code blocks
+
+        Design Principles:
+        - Respect the user's session frequency preference - don't create more workouts than they can commit to
+        - Match their equipment access and movement style preferences
+        - Consider their experience level and goals
+        - Use your fitness expertise to create a balanced, effective program
+        - Include variety while maintaining focus on their primary goal
         """
         
         let userPrompt = """
+        Create a workout plan for this user:
+
         Personal Details:
         \(personalDetailsText)
-        
-        Workout Preferences:
+
+        Preferences:
         \(preferencesText)
-        
-        Please generate a weekly workout plan template based on this information. Focus on creating one optimal week (Monday-Friday) that provides balanced training according to the user's goals and preferences.
+
+        Use your expertise to design an effective weekly program that matches their preferences and constraints. Focus on their goal of \(preferences.primaryGoal.rawValue) with \(preferences.sessionFrequency.rawValue) sessions per week using \(preferences.equipmentAccess.rawValue).
         """
 
         let chatRequest = DeepseekChatRequest(
@@ -125,7 +118,7 @@ class DeepseekAPIClient {
                 DeepseekRequestMessage(role: "user", content: userPrompt)
             ],
             stream: false,
-            temperature: 0.7
+            temperature: 0.7 // Balanced creativity and consistency
         )
 
         do {
@@ -195,6 +188,23 @@ class DeepseekAPIClient {
             do {
                 let plan = try JSONDecoder().decode(DeepseekWorkoutPlan.self, from: contentData)
                 print("✅ Workout plan parsed successfully with \(plan.plan.count) exercises")
+                
+                // Simple validation - just basic sanity checks
+                if plan.plan.isEmpty {
+                    throw NSError(domain: "DeepseekAPI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Generated plan is empty"])
+                }
+                
+                // Check for obviously invalid data
+                for exercise in plan.plan {
+                    if exercise.sets < 1 || exercise.sets > 10 {
+                        print("⚠️ Warning: Unusual sets count for \(exercise.exerciseName): \(exercise.sets)")
+                    }
+                    if exercise.reps < 0 {
+                        throw NSError(domain: "DeepseekAPI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Invalid negative reps for \(exercise.exerciseName)"])
+                    }
+                }
+                
+                print("✅ Plan validation passed - \(plan.plan.count) exercises across \(Set(plan.plan.map { $0.dayOfWeek }).count) days")
                 return plan
             } catch {
                 print("❌ JSON parsing error: \(error)")
