@@ -5,6 +5,7 @@ struct DeepseekWorkoutPlanDay: Codable {
     let exerciseName: String
     let sets: Int
     let reps: Int
+    let exerciseType: String? // Optional field for exercise type ("static_hold" for timed exercises)
 }
 
 struct DeepseekWorkoutPlan: Codable {
@@ -73,13 +74,15 @@ class DeepseekAPIClient {
               "dayOfWeek": "Monday",
               "exerciseName": "Barbell Squat",
               "sets": 3,
-              "reps": 8
+              "reps": 8,
+              "exerciseType": null
             },
             {
               "dayOfWeek": "Monday",
               "exerciseName": "Plank Hold",
               "sets": 3,
-              "reps": 0
+              "reps": 0,
+              "exerciseType": "static_hold"
             }
           ]
         }
@@ -89,7 +92,12 @@ class DeepseekAPIClient {
         - "exerciseName": Specific exercise name
         - "sets": Integer (typically 2-5)
         - "reps": Integer for repetition exercises (typically 6-15) OR 0 for timed exercises (planks, holds, etc.)
+        - "exerciseType": null for regular exercises OR "static_hold" for timed exercises (planks, wall sits, holds, etc.)
         - Return only the JSON - no markdown, no explanations, no code blocks
+
+        Exercise Type Guidelines:
+        - Regular exercises (squats, push-ups, bench press, etc.): reps = 6-15, exerciseType = null
+        - Static hold exercises (plank, wall sit, dead hang, hollow hold, side plank, etc.): reps = 0, exerciseType = "static_hold"
 
         Design Principles:
         - Respect the user's session frequency preference - don't create more workouts than they can commit to

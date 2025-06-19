@@ -205,12 +205,16 @@ class WorkoutService: ObservableObject {
             let avgSets = planExercises.map { $0.sets }.reduce(0, +) / planExercises.count
             let avgReps = planExercises.map { $0.reps }.reduce(0, +) / planExercises.count
             
+            // Get exercise type from the first matching plan exercise
+            let exerciseType = planExercises.first?.exerciseType
+            
             return Exercise(
                 name: exerciseName,
                 defaultWeight: getDefaultWeightForExercise(exerciseName),
                 defaultReps: CGFloat(avgReps),
                 defaultRPE: 70, // Default RPE
-                setsCompleted: 0
+                setsCompleted: 0,
+                exerciseType: exerciseType
             )
         }.sorted { lhs, rhs in
             // First, prioritize exercises scheduled for today

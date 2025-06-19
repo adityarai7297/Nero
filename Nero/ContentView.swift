@@ -66,6 +66,7 @@ struct WorkoutSet: Identifiable, Equatable {
     var reps: CGFloat
     var rpe: CGFloat
     var timestamp: Date
+    var exerciseType: String? // Optional field for exercise type ("static_hold" for timed exercises)
     
     var formattedTime: String {
         let formatter = DateFormatter()
@@ -81,7 +82,8 @@ struct WorkoutSet: Identifiable, Equatable {
                lhs.weight == rhs.weight &&
                lhs.reps == rhs.reps &&
                lhs.rpe == rhs.rpe &&
-               lhs.timestamp == rhs.timestamp
+               lhs.timestamp == rhs.timestamp &&
+               lhs.exerciseType == rhs.exerciseType
     }
 }
 
@@ -92,18 +94,19 @@ struct Exercise: Equatable {
     let defaultReps: CGFloat
     let defaultRPE: CGFloat
     var setsCompleted: Int = 0
+    let exerciseType: String? // Optional field for exercise type ("static_hold" for timed exercises)
     
     static let allExercises: [Exercise] = [
-        Exercise(name: "Bench Press", defaultWeight: 50, defaultReps: 8, defaultRPE: 60),
-        Exercise(name: "Squat", defaultWeight: 80, defaultReps: 10, defaultRPE: 70),
-        Exercise(name: "Deadlift", defaultWeight: 100, defaultReps: 6, defaultRPE: 80),
-        Exercise(name: "Overhead Press", defaultWeight: 35, defaultReps: 8, defaultRPE: 65),
-        Exercise(name: "Pull-ups", defaultWeight: 0, defaultReps: 12, defaultRPE: 70),
-        Exercise(name: "Barbell Row", defaultWeight: 60, defaultReps: 10, defaultRPE: 75),
-        Exercise(name: "Incline Bench", defaultWeight: 40, defaultReps: 8, defaultRPE: 65),
-        Exercise(name: "Dips", defaultWeight: 0, defaultReps: 15, defaultRPE: 70),
-        Exercise(name: "Romanian Deadlift", defaultWeight: 70, defaultReps: 12, defaultRPE: 70),
-        Exercise(name: "Leg Press", defaultWeight: 120, defaultReps: 15, defaultRPE: 75)
+        Exercise(name: "Bench Press", defaultWeight: 50, defaultReps: 8, defaultRPE: 60, exerciseType: nil),
+        Exercise(name: "Squat", defaultWeight: 80, defaultReps: 10, defaultRPE: 70, exerciseType: nil),
+        Exercise(name: "Deadlift", defaultWeight: 100, defaultReps: 6, defaultRPE: 80, exerciseType: nil),
+        Exercise(name: "Overhead Press", defaultWeight: 35, defaultReps: 8, defaultRPE: 65, exerciseType: nil),
+        Exercise(name: "Pull-ups", defaultWeight: 0, defaultReps: 12, defaultRPE: 70, exerciseType: nil),
+        Exercise(name: "Barbell Row", defaultWeight: 60, defaultReps: 10, defaultRPE: 75, exerciseType: nil),
+        Exercise(name: "Incline Bench", defaultWeight: 40, defaultReps: 8, defaultRPE: 65, exerciseType: nil),
+        Exercise(name: "Dips", defaultWeight: 0, defaultReps: 15, defaultRPE: 70, exerciseType: nil),
+        Exercise(name: "Romanian Deadlift", defaultWeight: 70, defaultReps: 12, defaultRPE: 70, exerciseType: nil),
+        Exercise(name: "Leg Press", defaultWeight: 120, defaultReps: 15, defaultRPE: 75, exerciseType: nil)
     ]
 }
 
@@ -157,7 +160,7 @@ struct ExerciseView: View {
     
     private var currentExercise: Exercise {
         guard !workoutService.exercises.isEmpty else {
-            return Exercise(name: "Loading...", defaultWeight: 0, defaultReps: 0, defaultRPE: 0)
+            return Exercise(name: "Loading...", defaultWeight: 0, defaultReps: 0, defaultRPE: 0, exerciseType: nil)
         }
         return workoutService.exercises[currentExerciseIndex]
     }
@@ -560,27 +563,28 @@ struct ExerciseView: View {
         .animation(.bouncy(duration: 0.4), value: showTargetCompletion)
     }
     
-
-    
     @ViewBuilder
     private func ExerciseComponentsView() -> some View {
         VStack(spacing: 32) {
             ExerciseComponent(
                 value: $weights[0], 
                 type: .weight, 
-                recommendations: currentRecommendations
+                recommendations: currentRecommendations,
+                exerciseType: currentExercise.exerciseType
             )
                 .environmentObject(themeManager)
             ExerciseComponent(
                 value: $weights[1], 
                 type: .repetitions, 
-                recommendations: currentRecommendations
+                recommendations: currentRecommendations,
+                exerciseType: currentExercise.exerciseType
             )
                 .environmentObject(themeManager)
             ExerciseComponent(
                 value: $weights[2], 
                 type: .rpe, 
-                recommendations: currentRecommendations
+                recommendations: currentRecommendations,
+                exerciseType: currentExercise.exerciseType
             )
                 .environmentObject(themeManager)
         }
@@ -737,7 +741,8 @@ struct ExerciseView: View {
             weight: weights[0],
             reps: weights[1], 
             rpe: weights[2],
-            timestamp: Date()
+            timestamp: Date(),
+            exerciseType: currentExercise.exerciseType
         )
         
         currentRecommendations = NextSetRecommendations.calculate(from: tempSet)
@@ -751,7 +756,8 @@ struct ExerciseView: View {
             weight: weights[0],
             reps: weights[1],
             rpe: weights[2],
-            timestamp: Date()
+            timestamp: Date(),
+            exerciseType: currentExercise.exerciseType
         )
         
         print("SET pressed for \(currentExercise.name) with weights: \(weights)")
@@ -1086,7 +1092,7 @@ struct SetRowView: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .foregroundColor(isDeleting ? .gray : .primary)
-                        Text("reps")
+                        Text(set.exerciseType == "static_hold" ? "seconds" : "reps")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -1200,7 +1206,7 @@ struct EditSetView: View {
                         TextField("Reps", text: $repsText)
                             .keyboardType(.numberPad)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
-                        Text("reps")
+                        Text(set.exerciseType == "static_hold" ? "seconds" : "reps")
                             .foregroundColor(.gray)
                     }
                     
@@ -1274,10 +1280,11 @@ enum ExerciseComponentType {
     case repetitions
     case rpe
     
-    var label: String {
+    func label(exerciseType: String? = nil) -> String {
         switch self {
         case .weight: return "lbs"
-        case .repetitions: return "reps"
+        case .repetitions: 
+            return exerciseType == "static_hold" ? "seconds" : "reps"
         case .rpe: return "% RPE"
         }
     }
@@ -1324,6 +1331,7 @@ struct ExerciseComponent: View {
     let type: ExerciseComponentType
     @EnvironmentObject var themeManager: ThemeManager
     let recommendations: NextSetRecommendations
+    let exerciseType: String?
     
     // Get recommendation values based on component type
     private var recommendationValues: [Int] {
@@ -1359,7 +1367,7 @@ struct ExerciseComponent: View {
             }
             .frame(width: 75, height: 40)
             .overlay(alignment: Alignment.leading) {
-                Text(type.label)
+                Text(type.label(exerciseType: exerciseType))
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.black)
                     .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
@@ -2034,7 +2042,7 @@ struct ExerciseRowCard: View {
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundColor(Color.accentBlue)
-                        Text("reps")
+                        Text(exercise.exerciseType == "static_hold" ? "seconds" : "reps")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
