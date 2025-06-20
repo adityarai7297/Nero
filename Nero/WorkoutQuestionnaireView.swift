@@ -86,7 +86,8 @@ enum SessionFrequency: String, CaseIterable {
     case two = "2"
     case three = "3"
     case four = "4"
-    case fivePlus = "5 +"
+    case five = "5"
+    case sixPlus = "6 +"
     case notSure = "Not sure / flexible"
     
     var icon: String {
@@ -94,7 +95,8 @@ enum SessionFrequency: String, CaseIterable {
         case .two: return "2.circle"
         case .three: return "3.circle"
         case .four: return "4.circle"
-        case .fivePlus: return "5.circle"
+        case .five: return "5.circle"
+        case .sixPlus: return "6.circle"
         case .notSure: return "questionmark.circle"
         }
     }
@@ -104,8 +106,9 @@ enum SessionFrequency: String, CaseIterable {
         case .two: return "A"
         case .three: return "B"
         case .four: return "C"
-        case .fivePlus: return "D"
-        case .notSure: return "E"
+        case .five: return "D"
+        case .sixPlus: return "E"
+        case .notSure: return "F"
         }
     }
 }
@@ -201,10 +204,14 @@ enum WeeklySplit: String, CaseIterable {
     case fullBody = "Full-body every workout"
     case upperLower = "Upper / Lower"
     case pushPullLegs = "Push-Pull-Legs"
+    case pushPullLegsUpperLower = "Push-Pull-Legs-Upper-Lower"
+    case upperLowerPushPull = "Upper-Lower-Push-Pull"
     case broSplit = "Muscle-group \"bro split\""
     case powerBuilding = "Power/Strength + Hypertrophy hybrid"
     case conjugate = "Conjugate method (varied training)"
     case dailyUndulatingPeriodization = "Daily Undulating Periodization (DUP)"
+    case arnoldSplit = "Arnold Split (Chest/Back, Shoulders/Arms, Legs)"
+    case bodyPartSpecialization = "Body Part Specialization"
     case notSure = "Not sure – coach decide"
     
     var icon: String {
@@ -212,10 +219,14 @@ enum WeeklySplit: String, CaseIterable {
         case .fullBody: return "figure.mixed.cardio"
         case .upperLower: return "figure.arms.open"
         case .pushPullLegs: return "arrow.3.trianglepath"
+        case .pushPullLegsUpperLower: return "square.grid.2x2"
+        case .upperLowerPushPull: return "rectangle.split.2x1"
         case .broSplit: return "list.bullet"
         case .powerBuilding: return "figure.strengthtraining.traditional"
         case .conjugate: return "arrow.triangle.swap"
         case .dailyUndulatingPeriodization: return "waveform.path"
+        case .arnoldSplit: return "figure.wrestling"
+        case .bodyPartSpecialization: return "target"
         case .notSure: return "questionmark.circle"
         }
     }
@@ -225,12 +236,64 @@ enum WeeklySplit: String, CaseIterable {
         case .fullBody: return "A"
         case .upperLower: return "B"
         case .pushPullLegs: return "C"
-        case .broSplit: return "D"
-        case .powerBuilding: return "E"
-        case .conjugate: return "F"
-        case .dailyUndulatingPeriodization: return "G"
-        case .notSure: return "H"
+        case .pushPullLegsUpperLower: return "D"
+        case .upperLowerPushPull: return "E"
+        case .broSplit: return "F"
+        case .powerBuilding: return "G"
+        case .conjugate: return "H"
+        case .dailyUndulatingPeriodization: return "I"
+        case .arnoldSplit: return "J"
+        case .bodyPartSpecialization: return "K"
+        case .notSure: return "L"
         }
+    }
+    
+    var minDays: Int {
+        switch self {
+        case .fullBody: return 2
+        case .upperLower: return 2
+        case .pushPullLegs: return 3
+        case .pushPullLegsUpperLower: return 5
+        case .upperLowerPushPull: return 4
+        case .broSplit: return 5
+        case .powerBuilding: return 3
+        case .conjugate: return 3
+        case .dailyUndulatingPeriodization: return 3
+        case .arnoldSplit: return 6
+        case .bodyPartSpecialization: return 4
+        case .notSure: return 1
+        }
+    }
+    
+    var maxDays: Int {
+        switch self {
+        case .fullBody: return 4
+        case .upperLower: return 6
+        case .pushPullLegs: return 6
+        case .pushPullLegsUpperLower: return 5
+        case .upperLowerPushPull: return 4
+        case .broSplit: return 7
+        case .powerBuilding: return 6
+        case .conjugate: return 6
+        case .dailyUndulatingPeriodization: return 6
+        case .arnoldSplit: return 6
+        case .bodyPartSpecialization: return 7
+        case .notSure: return 7
+        }
+    }
+    
+    func isCompatible(with frequency: SessionFrequency) -> Bool {
+        let days: Int
+        switch frequency {
+        case .two: days = 2
+        case .three: days = 3
+        case .four: days = 4
+        case .five: days = 5
+        case .sixPlus: days = 6
+        case .notSure: return true // Always show all options if frequency is not sure
+        }
+        
+        return days >= minDays && days <= maxDays
     }
 }
 
@@ -668,7 +731,7 @@ struct WorkoutQuestionnaireView: View {
                             case 5:
                                 MovementStylesStep(selectedStyles: $preferences.movementStyles)
                             case 6:
-                                WeeklySplitStep(selectedSplit: $preferences.weeklySplit)
+                                WeeklySplitStep(selectedSplit: $preferences.weeklySplit, sessionFrequency: preferences.sessionFrequency)
                             case 7:
                                 MoreFocusMuscleGroupsStep(selectedGroups: $preferences.moreFocusMuscleGroups)
                             case 8:
@@ -800,7 +863,39 @@ struct WorkoutQuestionnaireView: View {
     }
 }
 
-// MARK: - Question Step Views
+// MARK: - Generic Step Views
+
+struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable & QuestionOption>: View where T.RawValue == String {
+    let title: String
+    let options: [T]
+    @Binding var selectedOption: T
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            Text(title)
+                .font(.title2)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+            
+            VStack(spacing: 16) {
+                ForEach(options, id: \.self) { option in
+                    QuestionnaireOptionButton(
+                        title: option.rawValue,
+                        subtitle: "",
+                        icon: option.icon,
+                        letter: option.letter,
+                        isSelected: selectedOption == option,
+                        color: .blue
+                    ) {
+                        selectedOption = option
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Individual Step Views
 
 struct PrimaryGoalStep: View {
     @Binding var selectedGoal: PrimaryGoal
@@ -876,13 +971,44 @@ struct MovementStylesStep: View {
 
 struct WeeklySplitStep: View {
     @Binding var selectedSplit: WeeklySplit
+    let sessionFrequency: SessionFrequency
     
     var body: some View {
-        QuestionStepView(
-            title: "Preferred weekly split:",
-            options: WeeklySplit.allCases,
-            selectedOption: $selectedSplit
-        )
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Text("Preferred weekly split:")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                if sessionFrequency != .notSure {
+                    Text("Based on your \(sessionFrequency.rawValue) day frequency")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            VStack(spacing: 16) {
+                ForEach(WeeklySplit.allCases, id: \.self) { split in
+                    let isCompatible = split.isCompatible(with: sessionFrequency)
+                    
+                    QuestionnaireOptionButton(
+                        title: split.rawValue,
+                        subtitle: isCompatible ? "" : "Requires \(split.minDays)-\(split.maxDays) days",
+                        icon: split.icon,
+                        letter: split.letter,
+                        isSelected: selectedSplit == split,
+                        color: isCompatible ? .blue : .gray
+                    ) {
+                        if isCompatible {
+                            selectedSplit = split
+                        }
+                    }
+                    .opacity(isCompatible ? 1.0 : 0.5)
+                    .disabled(!isCompatible)
+                }
+            }
+        }
     }
 }
 
@@ -911,38 +1037,6 @@ struct LessFocusMuscleGroupsStep: View {
 }
 
 // MARK: - Generic Question Step View
-
-struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable>: View where T.RawValue == String, T: QuestionOption {
-    let title: String
-    let options: [T]
-    @Binding var selectedOption: T
-    
-    var body: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 12) {
-                Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
-            }
-            
-            VStack(spacing: 16) {
-                ForEach(options, id: \.self) { option in
-                    QuestionnaireOptionButton(
-                        title: option.rawValue,
-                        subtitle: "",
-                        icon: option.icon,
-                        letter: option.letter,
-                        isSelected: selectedOption == option,
-                        color: .blue
-                    ) {
-                        selectedOption = option
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct MultipleSelectionQuestionStepView<T: RawRepresentable & CaseIterable & Hashable>: View where T.RawValue == String, T: QuestionOption {
     let title: String
@@ -1029,19 +1123,40 @@ struct QuestionnaireOptionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                // Letter indicator
-                Text(letter)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(isSelected ? .white : Color.accentBlue)
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(isSelected ? Color.accentBlue : Color.accentBlue.opacity(0.1))
-                    )
+                // Icon circle
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? color : Color.offWhite)
+                        .frame(width: 50, height: 50)
+                        .softOuterShadow(
+                            darkShadow: isSelected ? color.opacity(0.3) : Color.black.opacity(0.2),
+                            lightShadow: Color.white.opacity(0.8),
+                            offset: 2,
+                            radius: isPressed ? 1 : 4
+                        )
+                    
+                    Image(systemName: icon)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(isSelected ? .white : color)
+                }
                 
                 // Content
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(letter)
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(isSelected ? color : .secondary)
+                            .frame(width: 20, height: 20)
+                            .background(
+                                Circle()
+                                    .fill(isSelected ? color.opacity(0.2) : Color.gray.opacity(0.1))
+                            )
+                        
+                        Spacer()
+                    }
+                    
                     Text(title)
                         .font(.headline)
                         .fontWeight(.semibold)
@@ -1050,7 +1165,7 @@ struct QuestionnaireOptionButton: View {
                     
                     if !subtitle.isEmpty {
                         Text(subtitle)
-                            .font(.subheadline)
+                            .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.leading)
                     }
@@ -1062,41 +1177,28 @@ struct QuestionnaireOptionButton: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.title2)
-                        .foregroundColor(Color.accentBlue)
+                        .foregroundColor(color)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
             .background(
-                Group {
-                    if isPressed {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
-                            .softInnerShadow(
-                                RoundedRectangle(cornerRadius: 16),
-                                darkShadow: Color.black.opacity(0.2),
-                                lightShadow: Color.white,
-                                spread: 0.15,
-                                radius: 3
-                            )
-                    } else {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(isSelected ? Color.accentBlue.opacity(0.05) : Color.offWhite)
-                            .softOuterShadow()
-                    }
-                }
-            )
-            .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.accentBlue, lineWidth: isSelected ? 2 : 1)
+                    .fill(Color.offWhite)
+                    .softOuterShadow(
+                        darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
+                        lightShadow: Color.white.opacity(0.9),
+                        offset: isPressed ? 1 : 3,
+                        radius: isPressed ? 2 : 6
+                    )
             )
-            .scaleEffect(isPressed ? 0.98 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: isPressed)
-            .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
-        .buttonStyle(PlainButtonStyle())
+        .scaleEffect(isPressed ? 0.98 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
-            isPressed = pressing
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
         }, perform: {})
     }
 }
