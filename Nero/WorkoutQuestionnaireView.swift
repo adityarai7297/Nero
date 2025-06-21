@@ -247,54 +247,6 @@ enum WeeklySplit: String, CaseIterable {
         case .notSure: return "L"
         }
     }
-    
-    var minDays: Int {
-        switch self {
-        case .fullBody: return 2
-        case .upperLower: return 2
-        case .pushPullLegs: return 3
-        case .pushPullLegsUpperLower: return 5
-        case .upperLowerPushPull: return 4
-        case .broSplit: return 5
-        case .powerBuilding: return 3
-        case .conjugate: return 3
-        case .dailyUndulatingPeriodization: return 3
-        case .arnoldSplit: return 6
-        case .bodyPartSpecialization: return 4
-        case .notSure: return 1
-        }
-    }
-    
-    var maxDays: Int {
-        switch self {
-        case .fullBody: return 4
-        case .upperLower: return 6
-        case .pushPullLegs: return 6
-        case .pushPullLegsUpperLower: return 5
-        case .upperLowerPushPull: return 4
-        case .broSplit: return 7
-        case .powerBuilding: return 6
-        case .conjugate: return 6
-        case .dailyUndulatingPeriodization: return 6
-        case .arnoldSplit: return 6
-        case .bodyPartSpecialization: return 7
-        case .notSure: return 7
-        }
-    }
-    
-    func isCompatible(with frequency: SessionFrequency) -> Bool {
-        let days: Int
-        switch frequency {
-        case .two: days = 2
-        case .three: days = 3
-        case .four: days = 4
-        case .five: days = 5
-        case .sixPlus: days = 6
-        case .notSure: return true // Always show all options if frequency is not sure
-        }
-        
-        return days >= minDays && days <= maxDays
-    }
 }
 
 enum VolumeTolerance: String, CaseIterable {
@@ -684,7 +636,6 @@ struct WorkoutQuestionnaireView: View {
     
     @State private var currentStep = 0
     @State private var preferences = WorkoutPreferences()
-    @State private var showingSuccessAlert = false
     
     private let totalSteps = 9
     
@@ -763,11 +714,6 @@ struct WorkoutQuestionnaireView: View {
                 }
             }
         }
-        .alert("Success!", isPresented: $showingSuccessAlert) {
-            // No buttons - will auto-dismiss
-        } message: {
-            Text("Preferences saved! Your workout plan is being generated in the background.")
-        }
         .alert("Error", isPresented: .constant(preferencesService.errorMessage != nil)) {
             Button("OK") {
                 preferencesService.errorMessage = nil
@@ -818,14 +764,11 @@ struct WorkoutQuestionnaireView: View {
                         currentStep += 1
                     }
                 } else {
-                    // Use the new non-blocking method
+                    // Start non-blocking background generation
                     preferencesService.startBackgroundPlanGeneration(preferences)
                     
-                    // Show immediate success and close modal
-                    showingSuccessAlert = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                        dismiss()
-                    }
+                    // Dismiss immediately - no popup needed
+                    dismiss()
                 }
             }) {
                 HStack {
@@ -974,41 +917,11 @@ struct WeeklySplitStep: View {
     let sessionFrequency: SessionFrequency
     
     var body: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 12) {
-                Text("Preferred weekly split:")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .multilineTextAlignment(.center)
-                
-                if sessionFrequency != .notSure {
-                    Text("Based on your \(sessionFrequency.rawValue) day frequency")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            VStack(spacing: 16) {
-                ForEach(WeeklySplit.allCases, id: \.self) { split in
-                    let isCompatible = split.isCompatible(with: sessionFrequency)
-                    
-                    QuestionnaireOptionButton(
-                        title: split.rawValue,
-                        subtitle: isCompatible ? "" : "Requires \(split.minDays)-\(split.maxDays) days",
-                        icon: split.icon,
-                        letter: split.letter,
-                        isSelected: selectedSplit == split,
-                        color: isCompatible ? .blue : .gray
-                    ) {
-                        if isCompatible {
-                            selectedSplit = split
-                        }
-                    }
-                    .opacity(isCompatible ? 1.0 : 0.5)
-                    .disabled(!isCompatible)
-                }
-            }
-        }
+        QuestionStepView(
+            title: "Preferred weekly split:",
+            options: WeeklySplit.allCases,
+            selectedOption: $selectedSplit
+        )
     }
 }
 
@@ -1123,40 +1036,8 @@ struct QuestionnaireOptionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 16) {
-                // Icon circle
-                ZStack {
-                    Circle()
-                        .fill(isSelected ? color : Color.offWhite)
-                        .frame(width: 50, height: 50)
-                        .softOuterShadow(
-                            darkShadow: isSelected ? color.opacity(0.3) : Color.black.opacity(0.2),
-                            lightShadow: Color.white.opacity(0.8),
-                            offset: 2,
-                            radius: isPressed ? 1 : 4
-                        )
-                    
-                    Image(systemName: icon)
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                        .foregroundColor(isSelected ? .white : color)
-                }
-                
                 // Content
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(letter)
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(isSelected ? color : .secondary)
-                            .frame(width: 20, height: 20)
-                            .background(
-                                Circle()
-                                    .fill(isSelected ? color.opacity(0.2) : Color.gray.opacity(0.1))
-                            )
-                        
-                        Spacer()
-                    }
-                    
                     Text(title)
                         .font(.headline)
                         .fontWeight(.semibold)
@@ -1184,7 +1065,7 @@ struct QuestionnaireOptionButton: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.offWhite)
+                    .fill(isSelected ? color.opacity(0.05) : Color.offWhite)
                     .softOuterShadow(
                         darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
                         lightShadow: Color.white.opacity(0.9),
@@ -1192,9 +1073,14 @@ struct QuestionnaireOptionButton: View {
                         radius: isPressed ? 2 : 6
                     )
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
+            )
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
         .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
         .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
             withAnimation(.easeInOut(duration: 0.1)) {
                 isPressed = pressing
