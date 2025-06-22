@@ -482,7 +482,7 @@ struct ExerciseView: View {
                 Spacer()
                 
                 Text(currentExercise.name)
-                    .font(.title2)
+                    .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(.black)
                     .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
