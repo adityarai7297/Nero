@@ -931,7 +931,7 @@ struct MoreFocusMuscleGroupsStep: View {
     @Binding var selectedGroups: Set<MuscleGroup>
     
     var body: some View {
-        MultipleSelectionQuestionStepView(
+        MuscleGroupTileSelectionView(
             title: "Muscle groups you want MORE focus on:",
             options: MuscleGroup.allCases,
             selectedOptions: $selectedGroups
@@ -943,11 +943,102 @@ struct LessFocusMuscleGroupsStep: View {
     @Binding var selectedGroups: Set<MuscleGroup>
     
     var body: some View {
-        MultipleSelectionQuestionStepView(
+        MuscleGroupTileSelectionView(
             title: "Muscle groups you want LESS focus on:",
             options: MuscleGroup.allCases,
             selectedOptions: $selectedGroups
         )
+    }
+}
+
+// MARK: - Muscle Group Tile Selection View
+
+struct MuscleGroupTileSelectionView: View {
+    let title: String
+    let options: [MuscleGroup]
+    @Binding var selectedOptions: Set<MuscleGroup>
+    
+    // Grid layout with 2 columns
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                Text("Select all that apply")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(options, id: \.self) { option in
+                    MuscleGroupTileButton(
+                        title: option.rawValue,
+                        isSelected: selectedOptions.contains(option),
+                        color: .blue
+                    ) {
+                        if selectedOptions.contains(option) {
+                            selectedOptions.remove(option)
+                        } else {
+                            selectedOptions.insert(option)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Muscle Group Tile Button
+
+struct MuscleGroupTileButton: View {
+    let title: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity)
+                .frame(height: 60)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? color.opacity(0.1) : Color.offWhite)
+                        .softOuterShadow(
+                            darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
+                            lightShadow: Color.white.opacity(0.9),
+                            offset: isPressed ? 1 : 2,
+                            radius: isPressed ? 2 : 4
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
+                )
+        }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
     }
 }
 
