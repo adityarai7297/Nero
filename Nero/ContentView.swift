@@ -208,13 +208,20 @@ struct ExerciseView: View {
             .environmentObject(themeManager)
         }
         .sheet(isPresented: $showingWorkoutQuestionnaire) {
-            WorkoutQuestionnaireView()
-                .onDisappear {
-                    // Reload workout plan when questionnaire is dismissed
-                    if let userId = authService.user?.id {
-                        workoutService.setUser(userId)
+            WorkoutQuestionnaireView() {
+                // Show side menu after completion
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu = true
                     }
                 }
+            }
+            .onDisappear {
+                // Reload workout plan when questionnaire is dismissed
+                if let userId = authService.user?.id {
+                    workoutService.setUser(userId)
+                }
+            }
         }
         .sheet(isPresented: $showingPersonalDetails) {
             PersonalDetailsView()

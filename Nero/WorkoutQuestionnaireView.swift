@@ -207,9 +207,6 @@ enum WeeklySplit: String, CaseIterable {
     case pushPullLegsUpperLower = "Push-Pull-Legs-Upper-Lower"
     case upperLowerPushPull = "Upper-Lower-Push-Pull"
     case broSplit = "Muscle-group \"bro split\""
-    case powerBuilding = "Power/Strength + Hypertrophy hybrid"
-    case conjugate = "Conjugate method (varied training)"
-    case dailyUndulatingPeriodization = "Daily Undulating Periodization (DUP)"
     case arnoldSplit = "Arnold Split (Chest/Back, Shoulders/Arms, Legs)"
     case bodyPartSpecialization = "Body Part Specialization"
     case notSure = "Not sure – coach decide"
@@ -222,9 +219,6 @@ enum WeeklySplit: String, CaseIterable {
         case .pushPullLegsUpperLower: return "square.grid.2x2"
         case .upperLowerPushPull: return "rectangle.split.2x1"
         case .broSplit: return "list.bullet"
-        case .powerBuilding: return "figure.strengthtraining.traditional"
-        case .conjugate: return "arrow.triangle.swap"
-        case .dailyUndulatingPeriodization: return "waveform.path"
         case .arnoldSplit: return "figure.wrestling"
         case .bodyPartSpecialization: return "target"
         case .notSure: return "questionmark.circle"
@@ -239,12 +233,9 @@ enum WeeklySplit: String, CaseIterable {
         case .pushPullLegsUpperLower: return "D"
         case .upperLowerPushPull: return "E"
         case .broSplit: return "F"
-        case .powerBuilding: return "G"
-        case .conjugate: return "H"
-        case .dailyUndulatingPeriodization: return "I"
-        case .arnoldSplit: return "J"
-        case .bodyPartSpecialization: return "K"
-        case .notSure: return "L"
+        case .arnoldSplit: return "G"
+        case .bodyPartSpecialization: return "H"
+        case .notSure: return "I"
         }
     }
 }
@@ -634,10 +625,18 @@ struct WorkoutQuestionnaireView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferencesService: WorkoutPreferencesService
     
+    // Callback to show side menu after completion
+    let onCompletion: (() -> Void)?
+    
     @State private var currentStep = 0
     @State private var preferences = WorkoutPreferences()
     
     private let totalSteps = 9
+    
+    // Initialize with optional completion callback
+    init(onCompletion: (() -> Void)? = nil) {
+        self.onCompletion = onCompletion
+    }
     
     private let questions = [
         "Primary physical goal right now?",
@@ -769,6 +768,9 @@ struct WorkoutQuestionnaireView: View {
                     
                     // Dismiss immediately - no popup needed
                     dismiss()
+                    
+                    // Show side menu after completion if callback provided
+                    onCompletion?()
                 }
             }) {
                 HStack {
