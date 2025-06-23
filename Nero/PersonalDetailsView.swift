@@ -626,7 +626,7 @@ struct FitnessGoalStep: View {
     @Binding var selectedGoal: FitnessGoal
     
     var body: some View {
-        PersonalDetailsQuestionStepView(
+        PersonalDetailsTileSelectionView(
             title: "What's your primary fitness goal?",
             subtitle: "This will help us tailor your workout recommendations",
             options: FitnessGoal.allCases,
@@ -778,6 +778,103 @@ struct PersonalDetailsQuestionStepView<T: RawRepresentable & CaseIterable & Hash
                 }
             }
         }
+    }
+}
+
+// MARK: - Tile Selection View for Personal Details
+
+struct PersonalDetailsTileSelectionView<T: RawRepresentable & CaseIterable & Hashable>: View where T.RawValue == String, T: PersonalDetailsQuestionOption {
+    let title: String
+    let subtitle: String
+    let options: [T]
+    @Binding var selectedOption: T
+    
+    // Grid layout with 2 columns for better space utilization
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.body)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(options, id: \.self) { option in
+                    PersonalDetailsTileButton(
+                        title: option.rawValue,
+                        icon: option.icon,
+                        letter: option.letter,
+                        isSelected: selectedOption == option,
+                        color: Color.accentBlue
+                    ) {
+                        selectedOption = option
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Personal Details Tile Button
+
+struct PersonalDetailsTileButton: View {
+    let title: String
+    let icon: String
+    let letter: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            // Title only
+            Text(title)
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .frame(height: 80)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? color.opacity(0.1) : Color.offWhite)
+                        .softOuterShadow(
+                            darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
+                            lightShadow: Color.white.opacity(0.9),
+                            offset: isPressed ? 1 : 2,
+                            radius: isPressed ? 2 : 4
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
+                )
+        }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
     }
 }
 

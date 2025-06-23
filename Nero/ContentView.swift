@@ -162,7 +162,17 @@ struct ExerciseView: View {
         guard !workoutService.exercises.isEmpty else {
             return Exercise(name: "Loading...", defaultWeight: 0, defaultReps: 0, defaultRPE: 0, exerciseType: nil)
         }
-        return workoutService.exercises[currentExerciseIndex]
+        
+        // Ensure currentExerciseIndex is within bounds
+        let safeIndex = min(max(currentExerciseIndex, 0), workoutService.exercises.count - 1)
+        if safeIndex != currentExerciseIndex {
+            // Update currentExerciseIndex to the safe value
+            DispatchQueue.main.async {
+                currentExerciseIndex = safeIndex
+            }
+        }
+        
+        return workoutService.exercises[safeIndex]
     }
     
     var body: some View {
@@ -277,9 +287,18 @@ struct ExerciseView: View {
             checkForTargetCompletion()
         }
         .onChange(of: workoutService.exercises) { oldExercises, newExercises in
+            // Reset currentExerciseIndex if it's out of bounds
+            if !newExercises.isEmpty && currentExerciseIndex >= newExercises.count {
+                currentExerciseIndex = 0
+                print("🔄 ContentView: Reset currentExerciseIndex to 0 due to exercises array change")
+            }
+            
             // Check for target completion when exercises data changes
             if !newExercises.isEmpty {
                 checkForTargetCompletion()
+                // Reload exercise data for the current (potentially new) exercise
+                loadExerciseData()
+                updateRecommendationsForCurrentExercise()
             }
         }
         .onChange(of: authService.user) { _, newUser in

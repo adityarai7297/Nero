@@ -846,8 +846,9 @@ struct PrimaryGoalStep: View {
     @Binding var selectedGoal: PrimaryGoal
     
     var body: some View {
-        QuestionStepView(
+        TileSelectionView(
             title: "Primary physical goal right now?",
+            subtitle: nil,
             options: PrimaryGoal.allCases,
             selectedOption: $selectedGoal
         )
@@ -870,8 +871,9 @@ struct SessionFrequencyStep: View {
     @Binding var selectedFrequency: SessionFrequency
     
     var body: some View {
-        QuestionStepView(
+        TileSelectionView(
             title: "How many separate resistance sessions can you commit to each week?",
+            subtitle: nil,
             options: SessionFrequency.allCases,
             selectedOption: $selectedFrequency
         )
@@ -906,8 +908,9 @@ struct MovementStylesStep: View {
     @Binding var selectedStyles: Set<MovementStyles>
     
     var body: some View {
-        MultipleSelectionQuestionStepView(
+        MultiTileSelectionView(
             title: "Movement styles you most enjoy (or want emphasized):",
+            subtitle: nil,
             options: MovementStyles.allCases,
             selectedOptions: $selectedStyles
         )
@@ -919,8 +922,9 @@ struct WeeklySplitStep: View {
     let sessionFrequency: SessionFrequency
     
     var body: some View {
-        QuestionStepView(
+        TileSelectionView(
             title: "Preferred weekly split:",
+            subtitle: nil,
             options: WeeklySplit.allCases,
             selectedOption: $selectedSplit
         )
@@ -1190,4 +1194,154 @@ extension Color {
 
     /// Slightly tinted white for better Neumorphic contrast
     static let offWhite = Color(red: 240 / 255, green: 240 / 255, blue: 245 / 255)
+}
+
+// MARK: - Tile Selection Views
+
+struct TileSelectionView<T: RawRepresentable & CaseIterable & Hashable & QuestionOption>: View where T.RawValue == String {
+    let title: String
+    let subtitle: String?
+    let options: [T]
+    @Binding var selectedOption: T
+    
+    // Grid layout with 2 columns for better space utilization
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                if let subtitle = subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.body)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(options, id: \.self) { option in
+                    TileOptionButton(
+                        title: option.rawValue,
+                        icon: option.icon,
+                        letter: option.letter,
+                        isSelected: selectedOption == option,
+                        color: Color.accentBlue
+                    ) {
+                        selectedOption = option
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct MultiTileSelectionView<T: RawRepresentable & CaseIterable & Hashable & QuestionOption>: View where T.RawValue == String {
+    let title: String
+    let subtitle: String?
+    let options: [T]
+    @Binding var selectedOptions: Set<T>
+    
+    // Grid layout with 2 columns
+    private let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible())
+    ]
+    
+    var body: some View {
+        VStack(spacing: 24) {
+            VStack(spacing: 12) {
+                Text(title)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .multilineTextAlignment(.center)
+                
+                if let subtitle = subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.body)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("Select all that apply")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            LazyVGrid(columns: columns, spacing: 16) {
+                ForEach(options, id: \.self) { option in
+                    TileOptionButton(
+                        title: option.rawValue,
+                        icon: option.icon,
+                        letter: option.letter,
+                        isSelected: selectedOptions.contains(option),
+                        color: Color.accentBlue
+                    ) {
+                        if selectedOptions.contains(option) {
+                            selectedOptions.remove(option)
+                        } else {
+                            selectedOptions.insert(option)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Tile Option Button
+
+struct TileOptionButton: View {
+    let title: String
+    let icon: String
+    let letter: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: action) {
+            // Title only
+            Text(title)
+                .font(.system(.subheadline, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity)
+                .frame(height: 80)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? color.opacity(0.1) : Color.offWhite)
+                        .softOuterShadow(
+                            darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
+                            lightShadow: Color.white.opacity(0.9),
+                            offset: isPressed ? 1 : 2,
+                            radius: isPressed ? 2 : 4
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
+                )
+        }
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .onLongPressGesture(minimumDuration: 0, maximumDistance: .infinity, pressing: { pressing in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = pressing
+            }
+        }, perform: {})
+    }
 } 

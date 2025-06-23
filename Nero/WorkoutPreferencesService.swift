@@ -173,34 +173,70 @@ class WorkoutPreferencesService: ObservableObject {
         }
     }
     
-    // Save generated workout plan to Supabase
+    // Save generated workout plan to Supabase (overwrites existing plan if one exists)
     func saveWorkoutPlan(_ plan: DeepseekWorkoutPlan) async -> Bool {
         do {
             let session = try await supabase.auth.session
             let userId = session.user.id
             
-            // Create a proper encodable struct for Supabase insertion
-            struct WorkoutPlanInsert: Encodable {
-                let user_id: UUID
-                let plan_json: DeepseekWorkoutPlan
-                let created_at: String
-                let updated_at: String
+            // First, check if user already has a workout plan
+            let existingPlans: [DBWorkoutPlan] = try await supabase
+                .from("workout_plans")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+                .value
+            
+            if let existingPlan = existingPlans.first {
+                // Update existing plan
+                print("🔄 Updating existing workout plan for user: \(userId)")
+                
+                struct WorkoutPlanUpdate: Encodable {
+                    let plan_json: DeepseekWorkoutPlan
+                    let updated_at: String
+                }
+                
+                let updateData = WorkoutPlanUpdate(
+                    plan_json: plan,
+                    updated_at: Date().ISO8601String()
+                )
+                
+                _ = try await supabase
+                    .from("workout_plans")
+                    .update(updateData)
+                    .eq("id", value: existingPlan.id!)
+                    .execute()
+                
+                print("✅ Workout plan updated successfully")
+            } else {
+                // Insert new plan
+                print("➕ Creating new workout plan for user: \(userId)")
+                
+                struct WorkoutPlanInsert: Encodable {
+                    let user_id: UUID
+                    let plan_json: DeepseekWorkoutPlan
+                    let created_at: String
+                    let updated_at: String
+                }
+                
+                let insertData = WorkoutPlanInsert(
+                    user_id: userId,
+                    plan_json: plan,
+                    created_at: Date().ISO8601String(),
+                    updated_at: Date().ISO8601String()
+                )
+                
+                _ = try await supabase
+                    .from("workout_plans")
+                    .insert(insertData)
+                    .execute()
+                
+                print("✅ New workout plan created successfully")
             }
             
-            let insertData = WorkoutPlanInsert(
-                user_id: userId,
-                plan_json: plan,
-                created_at: Date().ISO8601String(),
-                updated_at: Date().ISO8601String()
-            )
-            
-            _ = try await supabase
-                .from("workout_plans")
-                .insert(insertData)
-                .execute()
             return true
         } catch {
-            print("Failed to save workout plan: \(error.localizedDescription)")
+            print("❌ Failed to save workout plan: \(error.localizedDescription)")
             return false
         }
     }
@@ -326,23 +362,6 @@ class WorkoutPreferencesService: ObservableObject {
     
     /// Load the current user's workout plan
     func loadCurrentWorkoutPlan() async -> DeepseekWorkoutPlan? {
-        // Local struct definition to avoid conflicts
-        struct DBWorkoutPlan: Codable {
-            let id: Int?
-            let userId: UUID
-            let planJson: DeepseekWorkoutPlan
-            let createdAt: Date?
-            let updatedAt: Date?
-            
-            enum CodingKeys: String, CodingKey {
-                case id
-                case userId = "user_id"
-                case planJson = "plan_json"
-                case createdAt = "created_at"
-                case updatedAt = "updated_at"
-            }
-        }
-        
         do {
             let session = try await supabase.auth.session
             let userId = session.user.id

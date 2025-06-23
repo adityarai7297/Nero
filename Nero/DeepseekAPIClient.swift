@@ -92,19 +92,22 @@ class DeepseekAPIClient {
         - "exerciseName": Specific exercise name
         - "sets": Integer (typically 2-5)
         - "reps": Integer for repetition exercises (typically 6-15) OR 0 for timed exercises (planks, holds, etc.)
-        - "exerciseType": null for regular exercises OR "static_hold" for timed exercises (planks, wall sits, holds, etc.)
+        - "exerciseType": null for regular exercises OR "static_hold" for timed exercises if they exist in plan (planks, wall sits, holds, etc.)
         - Return only the JSON - no markdown, no explanations, no code blocks
 
         Exercise Type Guidelines:
         - Regular exercises (squats, push-ups, bench press, etc.): reps = 6-15, exerciseType = null
-        - Static hold exercises (plank, wall sit, dead hang, hollow hold, side plank, etc.): reps = 0, exerciseType = "static_hold"
+        - If static hold exercises exist in plan (plank, wall sit, dead hang, hollow hold, side plank, etc.): reps = 0, exerciseType = "static_hold"
 
         Design Principles:
-        - Respect the user's session frequency preference - don't create more workouts than they can commit to
+        - Respect the user's session frequency preference (number of sessions per week)
         - Match their equipment access and movement style preferences
         - Consider their experience level and goals
+        - Consider the users workout split preferences (full body, push/pull/legs, upper/lower, etc.)
         - Use your fitness expertise to create a balanced, effective program
         - Include variety while maintaining focus on their primary goal
+        - Pay attention to focus muscle groups and less focus muscle groups and make sure to include exercises that emphasize this
+        - Take care to include appropriate sets, reps and general exercise volume
         """
         
         let userPrompt = """
