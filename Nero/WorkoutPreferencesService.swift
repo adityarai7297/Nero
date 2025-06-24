@@ -9,6 +9,7 @@ enum WorkoutPlanGenerationStatus: Equatable {
     case fetchingPersonalDetails
     case generatingPlan
     case savingPlan
+    case editingPlan
     case completed
     case failed(String)
     
@@ -22,6 +23,8 @@ enum WorkoutPlanGenerationStatus: Equatable {
             return "Loading personal details..."
         case .generatingPlan:
             return "Generating plan..."
+        case .editingPlan:
+            return "Editing workout plan..."
         case .savingPlan:
             return "Saving plan..."
         case .completed:
@@ -383,6 +386,78 @@ class WorkoutPreferencesService: ObservableObject {
             }
             return nil
         }
+    }
+    
+    // MARK: - Workout Plan Editing
+    
+    /// Starts background workout plan editing - non-blocking
+    func startWorkoutPlanEdit(editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
+        // Immediately update status
+        await MainActor.run {
+            self.generationStatus = .editingPlan
+            self.errorMessage = nil
+        }
+        
+        // Start background task to prevent iOS from killing the process
+        startBackgroundTask()
+        
+        // Perform editing asynchronously without blocking UI
+        Task.detached(priority: .background) {
+            await self.performBackgroundEdit(
+                editRequest: editRequest,
+                currentPlan: currentPlan,
+                personalDetails: personalDetails,
+                preferences: preferences
+            )
+        }
+    }
+    
+    private func performBackgroundEdit(editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
+        print("🎯 Starting background edit workflow")
+        
+        await updateStatus(.editingPlan)
+        print("✏️ Editing workout plan...")
+        
+        do {
+            let editedPlan = try await DeepseekAPIClient.shared.editWorkoutPlan(
+                editRequest: editRequest,
+                currentPlan: currentPlan,
+                personalDetails: personalDetails,
+                preferences: preferences
+            )
+            print("✅ Workout plan edited successfully")
+            
+            // Save the edited plan to database
+            await updateStatus(.savingPlan)
+            print("💾 Saving edited plan to database...")
+            
+            let planSaved = await saveWorkoutPlan(editedPlan)
+            
+            if planSaved {
+                print("🎉 Edit workflow completed successfully!")
+                await updateStatus(.completed)
+                
+                // Notify that workout plan has been updated
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("WorkoutPlanUpdated"), 
+                        object: nil
+                    )
+                }
+                
+                // Note: For editing workflow, we keep the completion status persistent
+                // so the "View Updated Plan" button stays visible
+            } else {
+                print("❌ Failed to save edited workout plan to database")
+                await updateStatus(.failed("Failed to save plan"))
+            }
+        } catch {
+            print("❌ Edit workflow failed with error: \(error)")
+            print("🔍 Error details: \(error.localizedDescription)")
+            await updateStatus(.failed("Edit failed"))
+        }
+        
+        endBackgroundTask()
     }
     
     // MARK: - Legacy Blocking Method (kept for backwards compatibility)

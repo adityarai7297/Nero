@@ -143,6 +143,7 @@ struct ExerciseView: View {
     @State private var showingWorkoutQuestionnaire: Bool = false // Control workout questionnaire presentation
     @State private var showingPersonalDetails: Bool = false // Control personal details presentation
     @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
+    @State private var showingWorkoutEditChat: Bool = false // Control workout edit chat presentation
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -251,6 +252,10 @@ struct ExerciseView: View {
                 },
                 workoutService: workoutService
             )
+                .environmentObject(preferencesService)
+        }
+        .sheet(isPresented: $showingWorkoutEditChat) {
+            WorkoutEditChatView()
                 .environmentObject(preferencesService)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
@@ -902,7 +907,24 @@ struct ExerciseView: View {
                         }
                     }
                     
-                    // Edit Workout Plan button
+                    // Edit Workout Plan button (only show if user has a workout plan)
+                    if workoutService.hasWorkoutPlan {
+                        GameStyleMenuButton(
+                            title: "Edit Workout Plan",
+                            icon: "bubble.left.and.bubble.right.fill",
+                            color: Color.orange
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Small delay to let menu close animation finish
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingWorkoutEditChat = true
+                            }
+                        }
+                    }
+                    
+                    // Workout Preferences button
                     GameStyleMenuButton(
                         title: "Workout Preferences",
                         icon: "dumbbell.fill",
@@ -1727,7 +1749,7 @@ struct WorkoutPlanStatusButton: View {
         switch status {
         case .idle:
             return .gray
-        case .savingPreferences, .fetchingPersonalDetails, .generatingPlan, .savingPlan:
+        case .savingPreferences, .fetchingPersonalDetails, .generatingPlan, .editingPlan, .savingPlan:
             return .orange
         case .completed:
             return .green
@@ -1740,7 +1762,7 @@ struct WorkoutPlanStatusButton: View {
         switch status {
         case .idle:
             return "checkmark.circle"
-        case .savingPreferences, .fetchingPersonalDetails, .generatingPlan, .savingPlan:
+        case .savingPreferences, .fetchingPersonalDetails, .generatingPlan, .editingPlan, .savingPlan:
             return "clock.fill"
         case .completed:
             return "checkmark.circle.fill"
