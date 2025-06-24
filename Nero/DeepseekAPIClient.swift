@@ -100,14 +100,16 @@ class DeepseekAPIClient {
         - If static hold exercises exist in plan (plank, wall sit, dead hang, hollow hold, side plank, etc.): reps = 0, exerciseType = "static_hold"
 
         Design Principles:
-        - Respect the user's session frequency preference (number of sessions per week)
+        - Honor the exact session frequency specified by the user—never add or omit training days.
         - Match their equipment access and movement style preferences
         - Consider their experience level and goals
-        - Consider the users workout split preferences (full body, push/pull/legs, upper/lower, etc.)
+        - Organize each workout around the user’s preferred split (full body, push/pull/legs, upper/lower, etc.)
+        - Prioritize focus muscle groups with additional sets, angles, and exercises; give lower-priority areas only the minimum effective volume to maintain balance.
+        - Lead sessions with large compound lifts for efficiency and strength, then layer accessory compounds and isolation work—finishing with core or metabolic/finisher drills if time permits.
         - Use your fitness expertise to create a balanced, effective program
         - Include variety while maintaining focus on their primary goal
         - Pay attention to focus muscle groups and less focus muscle groups and make sure to include exercises that emphasize this
-        - Take care to include appropriate sets, reps and general exercise volume
+        - Prescribe evidence-based hypertrophy parameters (Example: ≈ 6–12 reps for compounds, 8–15 for isolations, 2–5 sets) while ensuring total weekly volume (example: ≈ 10–20 hard sets per target muscle).
         """
         
         let userPrompt = """
