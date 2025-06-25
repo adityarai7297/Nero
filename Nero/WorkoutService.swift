@@ -186,50 +186,36 @@ class WorkoutService: ObservableObject {
         // Store the workout plan for later use
         self.currentWorkoutPlan = plan
         
-        // Get unique exercise names from the plan
-        let uniqueExerciseNames = Set(plan.plan.map { $0.exerciseName })
-        
         // Get today's day of the week
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
         let todayString = formatter.string(from: Date())
         
-        // Get exercises scheduled for today
-        let todayExerciseNames = Set(plan.plan.filter { $0.dayOfWeek == todayString }.map { $0.exerciseName })
+        // Get exercises scheduled for today only
+        let todayExercises = plan.plan.filter { $0.dayOfWeek == todayString }
         
-        // Create Exercise objects with reasonable defaults
-        // We could also fetch default values from the exercises table if needed
-        let exercises = uniqueExerciseNames.map { exerciseName in
-            // Try to get defaults from the plan data
-            let planExercises = plan.plan.filter { $0.exerciseName == exerciseName }
-            let avgSets = planExercises.map { $0.sets }.reduce(0, +) / planExercises.count
-            let avgReps = planExercises.map { $0.reps }.reduce(0, +) / planExercises.count
+        // Get unique exercise names for today
+        let todayExerciseNames = Set(todayExercises.map { $0.exerciseName })
+        
+        // Create Exercise objects only for today's exercises
+        let exercises = todayExerciseNames.map { exerciseName in
+            // Get plan data specifically for today's instance of this exercise
+            let todayPlanExercises = todayExercises.filter { $0.exerciseName == exerciseName }
             
-            // Get exercise type from the first matching plan exercise
-            let exerciseType = planExercises.first?.exerciseType
+            // Use today's specific exercise data for defaults
+            let todayExercise = todayPlanExercises.first!
             
             return Exercise(
                 name: exerciseName,
                 defaultWeight: getDefaultWeightForExercise(exerciseName),
-                defaultReps: CGFloat(avgReps),
+                defaultReps: CGFloat(todayExercise.reps),
                 defaultRPE: 70, // Default RPE
                 setsCompleted: 0,
-                exerciseType: exerciseType
+                exerciseType: todayExercise.exerciseType
             )
         }.sorted { lhs, rhs in
-            // First, prioritize exercises scheduled for today
-            let lhsIsToday = todayExerciseNames.contains(lhs.name)
-            let rhsIsToday = todayExerciseNames.contains(rhs.name)
-            
-            if lhsIsToday && !rhsIsToday {
-                return true // lhs comes first
-            } else if !lhsIsToday && rhsIsToday {
-                return false // rhs comes first
-            } else {
-                // Both are today's exercises or both are not today's exercises
-                // Sort alphabetically within each group
-                return lhs.name < rhs.name
-            }
+            // Sort alphabetically
+            return lhs.name < rhs.name
         }
         
         return exercises
