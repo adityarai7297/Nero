@@ -3,7 +3,7 @@ import UserNotifications
 import SwiftUI
 import Supabase
 
-class NotificationService: ObservableObject {
+class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationService()
     
     @Published var notifications: [AppNotification] = []
@@ -11,9 +11,25 @@ class NotificationService: ObservableObject {
     @Published var hasPermission: Bool = false
     
     private var currentUserId: UUID?
+    private var completionNotificationSentToday: Bool = false
+    private var lastCompletionDate: Date?
     
-    private init() {
+    private override init() {
+        super.init()
+        UNUserNotificationCenter.current().delegate = self
         checkNotificationPermission()
+        
+        // Listen for workout plan updates
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWorkoutPlanUpdate),
+            name: NSNotification.Name("WorkoutPlanUpdated"),
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Permission Handling
@@ -26,6 +42,7 @@ class NotificationService: ObservableObject {
             await MainActor.run {
                 self.hasPermission = granted
             }
+            print("🔔 NotificationService: Permission granted: \(granted)")
             return granted
         } catch {
             print("❌ NotificationService: Failed to request permission: \(error)")
@@ -37,6 +54,7 @@ class NotificationService: ObservableObject {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
                 self.hasPermission = settings.authorizationStatus == .authorized
+                print("🔔 NotificationService: Current permission status: \(settings.authorizationStatus.rawValue)")
             }
         }
     }
@@ -47,9 +65,12 @@ class NotificationService: ObservableObject {
         currentUserId = userId
         if userId != nil {
             loadNotifications()
+            resetDailyCompletionTracking()
         } else {
             notifications = []
             unreadCount = 0
+            completionNotificationSentToday = false
+            lastCompletionDate = nil
         }
     }
     
@@ -216,9 +237,25 @@ class NotificationService: ObservableObject {
         timeInterval: TimeInterval = 1,
         userInfo: [String: Any] = [:]
     ) async {
-        guard hasPermission else {
-            print("⚠️ NotificationService: No permission for local notifications")
-            return
+        // Check permission status first
+        let center = UNUserNotificationCenter.current()
+        let settings = await center.notificationSettings()
+        
+        print("🔔 NotificationService: Scheduling notification with permission status: \(settings.authorizationStatus.rawValue)")
+        
+        if settings.authorizationStatus != .authorized {
+            print("⚠️ NotificationService: No permission for local notifications. Status: \(settings.authorizationStatus.rawValue)")
+            // Try to request permission if not yet determined
+            if settings.authorizationStatus == .notDetermined {
+                let granted = await requestNotificationPermission()
+                if !granted {
+                    print("❌ NotificationService: Permission denied, cannot schedule notification")
+                    return
+                }
+                // If permission was granted, continue with the function
+            } else {
+                return
+            }
         }
         
         let content = UNMutableNotificationContent()
@@ -240,8 +277,8 @@ class NotificationService: ObservableObject {
         )
         
         do {
-            try await UNUserNotificationCenter.current().add(request)
-            print("✅ NotificationService: Scheduled local notification")
+            try await center.add(request)
+            print("✅ NotificationService: Successfully scheduled local notification with ID: \(request.identifier)")
         } catch {
             print("❌ NotificationService: Failed to schedule notification: \(error)")
         }
@@ -250,14 +287,38 @@ class NotificationService: ObservableObject {
     // MARK: - Workout Completion Notifications
     
     func checkWorkoutCompletion(workoutService: WorkoutService) {
-        guard !workoutService.exercises.isEmpty else { return }
+        guard !workoutService.exercises.isEmpty else { 
+            print("🔔 NotificationService: No exercises found, skipping completion check")
+            return 
+        }
+        
+        // Check if we need to reset daily tracking (new day)
+        resetDailyCompletionTrackingIfNeeded()
+        
+        // Check if we already sent a completion notification today
+        if completionNotificationSentToday {
+            print("🔔 NotificationService: Completion notification already sent today, skipping")
+            return
+        }
+        
+        print("🔔 NotificationService: Checking workout completion for \(workoutService.exercises.count) exercises")
         
         // Check if all exercises are completed for today
         let allExercisesCompleted = workoutService.exercises.allSatisfy { exercise in
-            workoutService.isExerciseCompletedForToday(exerciseName: exercise.name)
+            let isCompleted = workoutService.isExerciseCompletedForToday(exerciseName: exercise.name)
+            print("🔔 NotificationService: Exercise '\(exercise.name)' completed: \(isCompleted)")
+            return isCompleted
         }
         
+        print("🔔 NotificationService: All exercises completed: \(allExercisesCompleted)")
+        
         if allExercisesCompleted {
+            print("🎉 NotificationService: Workout completed! Creating notifications...")
+            
+            // Mark that we've sent the completion notification for today
+            completionNotificationSentToday = true
+            lastCompletionDate = Date()
+            
             // Create in-app notification
             createNotification(
                 title: "🎉 Workout Complete!",
@@ -271,10 +332,67 @@ class NotificationService: ObservableObject {
                 await scheduleLocalNotification(
                     title: "🎉 Workout Complete!",
                     body: "Amazing! You've completed all your exercises for today.",
-                    timeInterval: 1,
+                    timeInterval: 2, // Give a bit more time for the app to process
                     userInfo: ["type": "workout_completed"]
                 )
             }
         }
     }
+    
+    // MARK: - Helper Methods for Daily Tracking
+    
+    private func resetDailyCompletionTracking() {
+        completionNotificationSentToday = false
+        lastCompletionDate = nil
+        print("🔔 NotificationService: Reset daily completion tracking")
+    }
+    
+    private func resetDailyCompletionTrackingIfNeeded() {
+        let today = Calendar.current.startOfDay(for: Date())
+        
+        if let lastDate = lastCompletionDate {
+            let lastCompletionDay = Calendar.current.startOfDay(for: lastDate)
+            
+            // If it's a new day, reset the tracking
+            if today > lastCompletionDay {
+                print("🔔 NotificationService: New day detected, resetting completion tracking")
+                resetDailyCompletionTracking()
+            }
+        }
+    }
+    
+    // Call this when the workout plan changes
+    func resetCompletionTrackingForPlanChange() {
+        print("🔔 NotificationService: Workout plan changed, resetting completion tracking")
+        resetDailyCompletionTracking()
+    }
+    
+    @objc private func handleWorkoutPlanUpdate() {
+        print("🔔 NotificationService: Received workout plan update notification")
+        resetCompletionTrackingForPlanChange()
+    }
+    
+    // MARK: - UNUserNotificationCenterDelegate
+    
+    // This method is called when a notification is delivered while the app is in the foreground
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        print("🔔 NotificationService: Notification will present in foreground: \(notification.request.content.title)")
+        
+        // Show the notification even when the app is in the foreground
+        completionHandler([.banner, .sound, .badge])
+    }
+    
+    // This method is called when the user taps on a notification
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        print("🔔 NotificationService: Notification tapped: \(response.notification.request.content.title)")
+        
+        let userInfo = response.notification.request.content.userInfo
+        print("🔔 NotificationService: Notification userInfo: \(userInfo)")
+        
+        // Handle the notification tap here if needed
+        // For example, navigate to a specific screen
+        
+        completionHandler()
+    }
+
 } 

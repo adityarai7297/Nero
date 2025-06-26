@@ -946,7 +946,7 @@ struct ExerciseView: View {
                     
                     // Workout Preferences button
                     GameStyleMenuButton(
-                        title: "Workout Preferences",
+                        title: "Create Workout Plan",
                         icon: "dumbbell.fill",
                         color: Color.accentBlue
                     ) {
