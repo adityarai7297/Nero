@@ -12,6 +12,7 @@ struct NeroApp: App {
     @StateObject private var authService = AuthService()
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var preferencesService = WorkoutPreferencesService()
+    @StateObject private var notificationService = NotificationService.shared
     
     var body: some Scene {
         WindowGroup {
@@ -19,6 +20,7 @@ struct NeroApp: App {
                 .environmentObject(authService)
                 .environmentObject(themeManager)
                 .environmentObject(preferencesService)
+                .environmentObject(notificationService)
                 .onOpenURL { url in
                     // Handle OAuth callback for Google/Apple Sign-In
                     Task {
@@ -76,11 +78,13 @@ struct MainContentView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
+    @EnvironmentObject var notificationService: NotificationService
     
     var body: some View {
         ContentView()
             .environmentObject(authService)
             .environmentObject(themeManager)
             .environmentObject(preferencesService)
+            .environmentObject(notificationService)
     }
 }

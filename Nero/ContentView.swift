@@ -119,6 +119,7 @@ struct ContentView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
+    @EnvironmentObject var notificationService: NotificationService
     @StateObject private var workoutService = WorkoutService()
     
     var body: some View {
@@ -126,11 +127,13 @@ struct ContentView: View {
             .environmentObject(authService)
             .environmentObject(themeManager)
             .environmentObject(preferencesService)
+            .environmentObject(notificationService)
     }
 }
 
 struct ExerciseView: View {
     @StateObject private var workoutService = WorkoutService()
+    @EnvironmentObject var notificationService: NotificationService
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
     @State private var currentExerciseIndex: Int = 0
@@ -144,6 +147,7 @@ struct ExerciseView: View {
     @State private var showingPersonalDetails: Bool = false // Control personal details presentation
     @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
     @State private var showingWorkoutEditChat: Bool = false // Control workout edit chat presentation
+    @State private var showingNotifications: Bool = false // Control notifications view presentation
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -258,6 +262,9 @@ struct ExerciseView: View {
             WorkoutEditChatView()
                 .environmentObject(preferencesService)
         }
+        .sheet(isPresented: $showingNotifications) {
+            NotificationsView()
+        }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
         } message: {
@@ -309,9 +316,14 @@ struct ExerciseView: View {
         .onChange(of: authService.user) { _, newUser in
             // Initialize workout service when user changes
             workoutService.setUser(newUser?.id)
+            notificationService.setUser(newUser?.id)
             if newUser != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
+                // Request notification permissions
+                Task {
+                    await notificationService.requestNotificationPermission()
+                }
             }
         }
         .onAppear {
@@ -319,9 +331,14 @@ struct ExerciseView: View {
             setButtonFeedback.prepare()
             navigationFeedback.prepare()
             workoutService.setUser(authService.user?.id)
+            notificationService.setUser(authService.user?.id)
             if authService.user != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
+                // Request notification permissions
+                Task {
+                    await notificationService.requestNotificationPermission()
+                }
             }
         }
         .onTapGesture {
@@ -813,6 +830,9 @@ struct ExerciseView: View {
             // Check if we've reached the target sets for today
             checkForTargetCompletionWithAnimation()
             
+            // Check if all exercises for today are completed (for notifications)
+            notificationService.checkWorkoutCompletion(workoutService: workoutService)
+            
             // Show radial burst effect
             withAnimation(.easeOut(duration: 0.15)) {
                 showRadialBurst = true
@@ -951,6 +971,22 @@ struct ExerciseView: View {
                         // Small delay to let menu close animation finish
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             showingPersonalDetails = true
+                        }
+                    }
+                    
+                    // Notifications button
+                    GameStyleMenuButton(
+                        title: "Notifications",
+                        icon: "bell.fill",
+                        color: Color.purple,
+                        unreadCount: notificationService.unreadCount
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
+                        // Small delay to let menu close animation finish
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingNotifications = true
                         }
                     }
                     
@@ -1613,9 +1649,28 @@ struct GameStyleMenuButton: View {
     let title: String
     let icon: String
     let color: Color
+    let unreadCount: Int?
     let action: () -> Void
     
     @State private var isPressed = false
+    
+    // Convenience initializer without unread count
+    init(title: String, icon: String, color: Color, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.unreadCount = nil
+        self.action = action
+    }
+    
+    // Full initializer with unread count
+    init(title: String, icon: String, color: Color, unreadCount: Int?, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.unreadCount = unreadCount
+        self.action = action
+    }
     
     var body: some View {
         Button(action: {
@@ -1631,7 +1686,7 @@ struct GameStyleMenuButton: View {
             }
         }) {
             HStack(spacing: 16) {
-                // Icon with solid outline
+                // Icon with solid outline and optional badge
                 ZStack {
                     Circle()
                         .fill(Color.offWhite)
@@ -1643,6 +1698,26 @@ struct GameStyleMenuButton: View {
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(color)
+                    
+                    // Unread count badge
+                    if let unreadCount = unreadCount, unreadCount > 0 {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                ZStack {
+                                    Circle()
+                                        .fill(.red)
+                                        .frame(width: 20, height: 20)
+                                    Text("\(min(unreadCount, 99))")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                .offset(x: 8, y: -8)
+                            }
+                            Spacer()
+                        }
+                    }
                 }
                 .frame(width: 44, height: 44)
                 
