@@ -751,7 +751,21 @@ struct ExerciseView: View {
     // Load exercise data when switching to a new exercise
     private func loadExerciseData() {
         let exercise = currentExercise
-        weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
+        
+        // Check if there's a latest set for this exercise and use those values
+        let exerciseName = exercise.name
+        let latestSet = workoutService.todaySets
+            .filter { $0.exerciseName == exerciseName }
+            .sorted { $0.timestamp > $1.timestamp }
+            .first
+        
+        if let latestSet = latestSet {
+            // Use the latest set values to maintain continuity
+            weights = [latestSet.weight, latestSet.reps, latestSet.rpe]
+        } else {
+            // No sets yet for this exercise, use default values
+            weights = [exercise.defaultWeight, exercise.defaultReps, exercise.defaultRPE]
+        }
         
         // Check if current exercise has already reached target sets
         checkForTargetCompletion()
