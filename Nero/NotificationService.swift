@@ -13,6 +13,11 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     private var currentUserId: UUID?
     private var completionNotificationSentToday: Bool = false
     private var lastCompletionDate: Date?
+    private var weeklyAnalysisNotificationSent: Bool = false
+    private var lastWeeklyAnalysisDate: Date?
+    
+    // Progressive overload service
+    @Published var progressiveOverloadService = ProgressiveOverloadService()
     
     private override init() {
         super.init()
@@ -336,7 +341,122 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
                     userInfo: ["type": "workout_completed"]
                 )
             }
+            
+            // Check if this is the last workout day of the week
+            checkForWeeklyCompletionAndProgressiveOverload(workoutService: workoutService)
         }
+    }
+    
+    // MARK: - Progressive Overload Analysis
+    
+    private func checkForWeeklyCompletionAndProgressiveOverload(workoutService: WorkoutService) {
+        // Check if we need to reset weekly tracking (new week)
+        resetWeeklyAnalysisTrackingIfNeeded()
+        
+        // Check if we already sent weekly analysis notification this week
+        if weeklyAnalysisNotificationSent {
+            print("🔔 NotificationService: Weekly analysis notification already sent this week, skipping")
+            return
+        }
+        
+        // Check if today is the last workout day of the week and it's completed
+        if workoutService.isLastWorkoutDayOfWeekCompleted() {
+            print("🎯 NotificationService: Last workout day of week completed! Triggering progressive overload analysis...")
+            
+            // Mark that we've sent the weekly analysis notification
+            weeklyAnalysisNotificationSent = true
+            lastWeeklyAnalysisDate = Date()
+            
+            // Create notification for progressive overload analysis
+            createNotification(
+                title: "📊 Weekly Analysis Starting",
+                message: "Analyzing your available workout progress to suggest improvements...",
+                type: .workoutCompleted,
+                imageIcon: "thumbs_up"
+            )
+            
+            // Start progressive overload analysis
+            Task {
+                await performProgressiveOverloadAnalysis(workoutService: workoutService)
+            }
+        }
+    }
+    
+    private func performProgressiveOverloadAnalysis(workoutService: WorkoutService) async {
+        print("🔄 NotificationService: Starting progressive overload analysis...")
+        
+        // Get required data
+        guard let exerciseHistory = await workoutService.fetchUpToLast12WeeksHistory(),
+              let currentWorkoutPlan = workoutService.getCurrentWorkoutPlan() else {
+            print("❌ NotificationService: Failed to get exercise history or workout plan")
+            await createProgressiveOverloadFailureNotification()
+            return
+        }
+        
+        // Get personal details and preferences
+        let personalDetailsService = PersonalDetailsService()
+        let preferencesService = WorkoutPreferencesService()
+        
+        guard let personalDetails = await personalDetailsService.loadPersonalDetails(),
+              let preferences = await preferencesService.loadWorkoutPreferences() else {
+            print("❌ NotificationService: Failed to get personal details or preferences")
+            await createProgressiveOverloadFailureNotification()
+            return
+        }
+        
+        // Perform the analysis
+        let result = await progressiveOverloadService.analyzeProgressiveOverload(
+            exerciseHistory: exerciseHistory,
+            currentWorkoutPlan: currentWorkoutPlan,
+            personalDetails: personalDetails,
+            preferences: preferences
+        )
+        
+        if let analysisResult = result {
+            print("✅ NotificationService: Progressive overload analysis completed!")
+            await createProgressiveOverloadSuccessNotification(result: analysisResult)
+        } else {
+            print("❌ NotificationService: Progressive overload analysis failed")
+            await createProgressiveOverloadFailureNotification()
+        }
+    }
+    
+    @MainActor
+    private func createProgressiveOverloadSuccessNotification(result: ProgressiveOverloadResponse) {
+        let suggestionCount = result.suggestions.count
+        let title = "🚀 Progressive Overload Suggestions Ready!"
+        let message = "Found \(suggestionCount) improvement suggestions for your workout plan. \(result.summary)"
+        
+        createNotification(
+            title: title,
+            message: message,
+            type: .workoutCompleted,
+            imageIcon: "thumbs_up"
+        )
+        
+        // Also create a local notification
+        Task {
+            await scheduleLocalNotification(
+                title: title,
+                body: "Your personalized progressive overload analysis is complete with \(suggestionCount) suggestions.",
+                timeInterval: 3,
+                userInfo: ["type": "progressive_overload_complete"]
+            )
+        }
+        
+        print("📱 NotificationService: Progressive overload success notification created")
+    }
+    
+    @MainActor
+    private func createProgressiveOverloadFailureNotification() {
+        createNotification(
+            title: "📊 Analysis Unavailable",
+            message: "Unable to analyze your workout progress at this time. Please check your internet connection and try again later.",
+            type: .workoutCompleted,
+            imageIcon: "thumbs_up"
+        )
+        
+        print("📱 NotificationService: Progressive overload failure notification created")
     }
     
     // MARK: - Helper Methods for Daily Tracking
@@ -370,6 +490,28 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     @objc private func handleWorkoutPlanUpdate() {
         print("🔔 NotificationService: Received workout plan update notification")
         resetCompletionTrackingForPlanChange()
+    }
+    
+    // MARK: - Helper Methods for Weekly Tracking
+    
+    private func resetWeeklyAnalysisTracking() {
+        weeklyAnalysisNotificationSent = false
+        lastWeeklyAnalysisDate = nil
+        print("🔔 NotificationService: Reset weekly analysis tracking")
+    }
+    
+    private func resetWeeklyAnalysisTrackingIfNeeded() {
+        let currentWeekStart = Calendar.current.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        
+        if let lastDate = lastWeeklyAnalysisDate {
+            let lastAnalysisWeekStart = Calendar.current.dateInterval(of: .weekOfYear, for: lastDate)?.start ?? Date()
+            
+            // If it's a new week, reset the tracking
+            if currentWeekStart > lastAnalysisWeekStart {
+                print("🔔 NotificationService: New week detected, resetting weekly analysis tracking")
+                resetWeeklyAnalysisTracking()
+            }
+        }
     }
     
     // MARK: - UNUserNotificationCenterDelegate

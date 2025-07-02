@@ -461,4 +461,99 @@ class WorkoutService: ObservableObject {
         let completedSets = todaySets.filter { $0.exerciseName == exerciseName }.count
         return completedSets >= targetSets
     }
+    
+    // MARK: - Weekly Completion and Progressive Overload
+    
+    /// Check if today is the last workout day of the week and if it's completed
+    func isLastWorkoutDayOfWeekCompleted() -> Bool {
+        guard let workoutPlan = currentWorkoutPlan else { return false }
+        
+        // Get all unique days of the week in the workout plan
+        let workoutDays = Set(workoutPlan.plan.map { $0.dayOfWeek })
+        let sortedWorkoutDays = workoutDays.sorted { dayOfWeek1, dayOfWeek2 in
+            let calendar = Calendar.current
+            let day1Index = calendar.weekdaySymbols.firstIndex(of: dayOfWeek1) ?? 0
+            let day2Index = calendar.weekdaySymbols.firstIndex(of: dayOfWeek2) ?? 0
+            return day1Index < day2Index
+        }
+        
+        // Get today's day of the week
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        let todayString = formatter.string(from: Date())
+        
+        // Check if today is the last workout day of the week
+        guard let lastWorkoutDay = sortedWorkoutDays.last,
+              todayString == lastWorkoutDay else {
+            return false
+        }
+        
+        // Check if all exercises for today are completed
+        return exercises.allSatisfy { exercise in
+            isExerciseCompletedForToday(exerciseName: exercise.name)
+        }
+    }
+    
+    /// Fetch up to the last 12 weeks of exercise history for progressive overload analysis
+    /// Returns all available data from the last 12 weeks, which may be less for new users
+    func fetchUpToLast12WeeksHistory() async -> [WorkoutSet]? {
+        guard let userId = currentUserId else { 
+            print("❌ WorkoutService: Cannot fetch history - no user ID")
+            return nil 
+        }
+        
+        do {
+            // Calculate date 12 weeks ago (but will return whatever data is available)
+            let twelveWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -12, to: Date()) ?? Date()
+            
+            print("🔍 WorkoutService: Fetching up to 12 weeks of exercise history (from \(twelveWeeksAgo) to now)")
+            
+            let response: [DBWorkoutSet] = try await supabase
+                .from("workout_sets")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .gte("completed_at", value: twelveWeeksAgo.ISO8601Format())
+                .order("completed_at", ascending: true)
+                .execute()
+                .value
+            
+            let historyWorkoutSets = response.compactMap { dbSet -> WorkoutSet? in
+                guard let completedAt = dbSet.completedAt else { return nil }
+                return WorkoutSet(
+                    databaseId: dbSet.id,
+                    exerciseName: dbSet.exerciseName,
+                    weight: CGFloat(dbSet.weight),
+                    reps: CGFloat(dbSet.reps),
+                    rpe: CGFloat(dbSet.rpe),
+                    timestamp: completedAt,
+                    exerciseType: nil // Will be determined based on exercise name if needed
+                )
+            }
+            
+            // Calculate actual time span of the data
+            if let earliestDate = historyWorkoutSets.first?.timestamp,
+               let latestDate = historyWorkoutSets.last?.timestamp {
+                let timeSpan = Calendar.current.dateComponents([.weekOfYear], from: earliestDate, to: latestDate).weekOfYear ?? 0
+                print("✅ WorkoutService: Fetched \(historyWorkoutSets.count) workout sets spanning \(timeSpan) weeks")
+            } else if historyWorkoutSets.isEmpty {
+                print("✅ WorkoutService: No workout history found (new user or no previous workouts)")
+            } else {
+                print("✅ WorkoutService: Fetched \(historyWorkoutSets.count) workout sets")
+            }
+            
+            return historyWorkoutSets
+            
+        } catch {
+            print("❌ WorkoutService: Failed to fetch workout history: \(error.localizedDescription)")
+            await MainActor.run {
+                self.errorMessage = "Failed to fetch workout history: \(error.localizedDescription)"
+            }
+            return nil
+        }
+    }
+    
+    /// Get the current workout plan for progressive overload analysis
+    func getCurrentWorkoutPlan() -> DeepseekWorkoutPlan? {
+        return currentWorkoutPlan
+    }
 } 

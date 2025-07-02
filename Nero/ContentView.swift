@@ -152,6 +152,9 @@ struct ExerciseView: View {
     // Target completion state
     @State private var showTargetCompletion: Bool = false
     
+    // Progressive overload state
+    @State private var showingProgressiveOverload: Bool = false
+
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
         weightOptions: [123, 135, 145, 155], // 4 options
@@ -264,6 +267,12 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingNotifications) {
             NotificationsView()
+        }
+        .sheet(isPresented: $showingProgressiveOverload) {
+            if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
+                ProgressiveOverloadView(analysisResult: analysisResult)
+                    .environmentObject(notificationService)
+            }
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -1001,6 +1010,23 @@ struct ExerciseView: View {
                         // Small delay to let menu close animation finish
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             showingNotifications = true
+                        }
+                    }
+                    
+                    // Progressive Overload button (only show if analysis is available)
+                    if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
+                        GameStyleMenuButton(
+                            title: "Progressive Overload",
+                            icon: "chart.line.uptrend.xyaxis",
+                            color: Color.green
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Small delay to let menu close animation finish
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingProgressiveOverload = true
+                            }
                         }
                     }
                     
