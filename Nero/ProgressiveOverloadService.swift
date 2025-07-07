@@ -170,6 +170,11 @@ class ProgressiveOverloadService: ObservableObject {
                 return
             }
             
+            print("🔄 ProgressiveOverloadService: Starting save operation...")
+            print("📊 User ID: \(userId)")
+            print("📊 Suggestions count: \(result.suggestions.count)")
+            print("📊 Summary: \(result.summary.prefix(100))...")
+            
             // Create a proper codable structure for database insertion
             let analysisRecord = ProgressiveOverloadAnalysisInsert(
                 userId: userId.uuidString,
@@ -178,15 +183,26 @@ class ProgressiveOverloadService: ObservableObject {
                 summary: result.summary
             )
             
+            print("🔄 ProgressiveOverloadService: Created analysis record, inserting into database...")
+            
             let response = try await supabase
                 .from("progressive_overload_analyses")
                 .insert(analysisRecord)
                 .execute()
             
-            print("✅ ProgressiveOverloadService: Analysis result saved to Supabase")
+            print("✅ ProgressiveOverloadService: Analysis result saved to Supabase successfully!")
+            print("📊 Database response: \(response)")
             
         } catch {
-            print("❌ ProgressiveOverloadService: Failed to save analysis result: \(error.localizedDescription)")
+            print("❌ ProgressiveOverloadService: Failed to save analysis result!")
+            print("❌ Full error: \(error)")
+            print("❌ Error description: \(error.localizedDescription)")
+            
+            // More detailed error information
+            if let urlError = error as? URLError {
+                print("❌ URLError code: \(urlError.code)")
+                print("❌ URLError description: \(urlError.localizedDescription)")
+            }
         }
     }
     
