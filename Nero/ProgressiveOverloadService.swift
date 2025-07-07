@@ -23,19 +23,36 @@ struct ProgressiveOverloadResponse: Codable {
 
 struct ProgressiveOverloadAnalysisRecord: Codable {
     let id: String
-    let user_id: String
-    let analysis_date: String
+    let userId: String
+    let analysisDate: String
     let suggestions: [ProgressiveOverloadSuggestion]
     let summary: String
-    let created_at: String
-    let updated_at: String
+    let createdAt: String
+    let updatedAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case analysisDate = "analysis_date"
+        case suggestions
+        case summary
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
 }
 
 struct ProgressiveOverloadAnalysisInsert: Codable {
-    let user_id: String
-    let analysis_date: String
+    let userId: String
+    let analysisDate: String
     let suggestions: [ProgressiveOverloadSuggestion]
     let summary: String
+    
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case analysisDate = "analysis_date"
+        case suggestions
+        case summary
+    }
 }
 
 // MARK: - Progressive Overload Service
@@ -155,8 +172,8 @@ class ProgressiveOverloadService: ObservableObject {
             
             // Create a proper codable structure for database insertion
             let analysisRecord = ProgressiveOverloadAnalysisInsert(
-                user_id: userId.uuidString,
-                analysis_date: ISO8601DateFormatter().string(from: Date()),
+                userId: userId.uuidString,
+                analysisDate: ISO8601DateFormatter().string(from: Date()),
                 suggestions: result.suggestions,
                 summary: result.summary
             )
