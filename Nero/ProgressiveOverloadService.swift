@@ -31,6 +31,13 @@ struct ProgressiveOverloadAnalysisRecord: Codable {
     let updated_at: String
 }
 
+struct ProgressiveOverloadAnalysisInsert: Codable {
+    let user_id: String
+    let analysis_date: String
+    let suggestions: [ProgressiveOverloadSuggestion]
+    let summary: String
+}
+
 // MARK: - Progressive Overload Service
 
 class ProgressiveOverloadService: ObservableObject {
@@ -38,10 +45,24 @@ class ProgressiveOverloadService: ObservableObject {
     @Published var errorMessage: String?
     @Published var lastAnalysisResult: ProgressiveOverloadResponse?
     
+    private var currentUserId: UUID?
+    
     init() {
-        // Load existing analysis result when service is created
-        Task {
-            await loadLastAnalysisResult()
+        // Don't load data in init - wait for user to be set
+    }
+    
+    func setUser(_ userId: UUID?) {
+        currentUserId = userId
+        if userId != nil {
+            // Load existing analysis result when user is set
+            Task {
+                await loadLastAnalysisResult()
+            }
+        } else {
+            // Clear data if no user
+            Task { @MainActor in
+                self.lastAnalysisResult = nil
+            }
         }
     }
     
@@ -114,6 +135,10 @@ class ProgressiveOverloadService: ObservableObject {
     
     /// Manually refresh analysis data from Supabase (useful for testing or data sync)
     func refreshAnalysisData() async {
+        guard currentUserId != nil else {
+            print("❌ ProgressiveOverloadService: Cannot refresh data without user ID")
+            return
+        }
         await loadLastAnalysisResult()
     }
     
@@ -122,23 +147,23 @@ class ProgressiveOverloadService: ObservableObject {
     /// Save analysis result to Supabase
     private func saveAnalysisResult(_ result: ProgressiveOverloadResponse) async {
         do {
-            // Get current user ID from Supabase auth
-            guard let user = try await supabase.auth.user.value else {
-                print("❌ ProgressiveOverloadService: No authenticated user for saving analysis")
+            // Get current user ID
+            guard let userId = currentUserId else {
+                print("❌ ProgressiveOverloadService: No user ID available for saving analysis")
                 return
             }
             
-            // Prepare data for Supabase insertion
-            let analysisData: [String: Any] = [
-                "user_id": user.id.uuidString,
-                "analysis_date": ISO8601DateFormatter().string(from: Date()),
-                "suggestions": try JSONSerialization.jsonObject(with: JSONEncoder().encode(result.suggestions)),
-                "summary": result.summary
-            ]
+            // Create a proper codable structure for database insertion
+            let analysisRecord = ProgressiveOverloadAnalysisInsert(
+                user_id: userId.uuidString,
+                analysis_date: ISO8601DateFormatter().string(from: Date()),
+                suggestions: result.suggestions,
+                summary: result.summary
+            )
             
             let response = try await supabase
                 .from("progressive_overload_analyses")
-                .insert(analysisData)
+                .insert(analysisRecord)
                 .execute()
             
             print("✅ ProgressiveOverloadService: Analysis result saved to Supabase")
@@ -149,19 +174,18 @@ class ProgressiveOverloadService: ObservableObject {
     }
     
     /// Load the most recent analysis result from Supabase
-    @MainActor
     private func loadLastAnalysisResult() async {
         do {
-            // Get current user ID from Supabase auth
-            guard let user = try await supabase.auth.user.value else {
-                print("❌ ProgressiveOverloadService: No authenticated user for loading analysis")
+            // Get current user ID
+            guard let userId = currentUserId else {
+                print("❌ ProgressiveOverloadService: No user ID available for loading analysis")
                 return
             }
             
             let response: [ProgressiveOverloadAnalysisRecord] = try await supabase
                 .from("progressive_overload_analyses")
                 .select("*")
-                .eq("user_id", value: user.id.uuidString)
+                .eq("user_id", value: userId.uuidString)
                 .order("analysis_date", ascending: false)
                 .limit(1)
                 .execute()
@@ -174,7 +198,9 @@ class ProgressiveOverloadService: ObservableObject {
                     summary: record.summary
                 )
                 
-                self.lastAnalysisResult = progressiveOverloadResponse
+                await MainActor.run {
+                    self.lastAnalysisResult = progressiveOverloadResponse
+                }
                 print("✅ ProgressiveOverloadService: Loaded existing analysis result from Supabase")
             } else {
                 print("📋 ProgressiveOverloadService: No existing analysis found")

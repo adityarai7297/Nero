@@ -68,6 +68,10 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     
     func setUser(_ userId: UUID?) {
         currentUserId = userId
+        
+        // Set user for progressive overload service
+        progressiveOverloadService.setUser(userId)
+        
         if userId != nil {
             loadNotifications()
             resetDailyCompletionTracking()
