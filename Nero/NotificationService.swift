@@ -492,6 +492,8 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         resetCompletionTrackingForPlanChange()
     }
     
+
+    
     // MARK: - Helper Methods for Weekly Tracking
     
     private func resetWeeklyAnalysisTracking() {

@@ -1013,6 +1013,7 @@ struct ExerciseView: View {
                         }
                     }
                     
+
                     // Progressive Overload button (only show if analysis is available)
                     if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
                         GameStyleMenuButton(
@@ -1051,6 +1052,8 @@ struct ExerciseView: View {
             .frame(maxWidth: .infinity)
         }
     }
+    
+
     
     @ViewBuilder
     private func MainExerciseContentView() -> some View {
