@@ -3,6 +3,16 @@ import UserNotifications
 import SwiftUI
 import Supabase
 
+// MARK: - Pending Notification Model
+
+struct PendingNotification {
+    let title: String
+    let message: String
+    let type: AppNotification.NotificationType
+    let imageIcon: String?
+    let triggerAfterNotificationId: UUID
+}
+
 class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let shared = NotificationService()
     
@@ -18,6 +28,9 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     
     // Progressive overload service
     @Published var progressiveOverloadService = ProgressiveOverloadService()
+    
+    // Track pending progressive overload notification
+    private var pendingProgressiveOverloadNotification: PendingNotification?
     
     private override init() {
         super.init()
@@ -80,6 +93,7 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             unreadCount = 0
             completionNotificationSentToday = false
             lastCompletionDate = nil
+            pendingProgressiveOverloadNotification = nil
         }
     }
     
@@ -187,6 +201,9 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
         notifications[index].isRead = true
         updateUnreadCount()
         
+        // Check if this dismissal should trigger a pending notification
+        checkForPendingNotification(dismissedNotificationId: notification.id)
+        
         // Update in database
         Task {
             await updateNotificationReadStatus(notification.id, isRead: true)
@@ -194,10 +211,18 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     }
     
     func markAllAsRead() {
+        // Check if any of the notifications being marked as read should trigger a pending notification
+        let notificationIds = notifications.filter { !$0.isRead }.map { $0.id }
+        
         for index in notifications.indices {
             notifications[index].isRead = true
         }
         updateUnreadCount()
+        
+        // Check for pending notifications for any of the marked notifications
+        for notificationId in notificationIds {
+            checkForPendingNotification(dismissedNotificationId: notificationId)
+        }
         
         // Update all in database
         Task {
@@ -236,6 +261,45 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
     
     private func updateUnreadCount() {
         unreadCount = notifications.filter { !$0.isRead }.count
+    }
+    
+    // MARK: - Pending Notification Management
+    
+    private func checkForPendingNotification(dismissedNotificationId: UUID) {
+        if let pending = pendingProgressiveOverloadNotification,
+           pending.triggerAfterNotificationId == dismissedNotificationId {
+            
+            // Show the pending notification
+            createNotification(
+                title: pending.title,
+                message: pending.message,
+                type: pending.type,
+                imageIcon: pending.imageIcon
+            )
+            
+            // Clear the pending notification
+            pendingProgressiveOverloadNotification = nil
+            
+            print("📊 NotificationService: Showed pending progressive overload notification after workout completion dismissal")
+        }
+    }
+    
+    private func createPendingNotification(
+        title: String,
+        message: String,
+        type: AppNotification.NotificationType,
+        imageIcon: String? = nil,
+        triggerAfterNotificationId: UUID
+    ) {
+        pendingProgressiveOverloadNotification = PendingNotification(
+            title: title,
+            message: message,
+            type: type,
+            imageIcon: imageIcon,
+            triggerAfterNotificationId: triggerAfterNotificationId
+        )
+        
+        print("📊 NotificationService: Created pending progressive overload notification")
     }
     
     // MARK: - Local Push Notifications
@@ -329,12 +393,25 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             lastCompletionDate = Date()
             
             // Create in-app notification
-            createNotification(
+            let workoutCompletedNotification = AppNotification(
                 title: "🎉 Workout Complete!",
                 message: "Amazing! You've completed all your exercises for today. Keep up the great work!",
                 type: .workoutCompleted,
+                timestamp: Date(),
+                isRead: false,
                 imageIcon: "thumbs_up"
             )
+            
+            // Add to notifications array
+            notifications.insert(workoutCompletedNotification, at: 0)
+            updateUnreadCount()
+            
+            // Save to database
+            if let userId = currentUserId {
+                Task {
+                    await saveNotificationToDatabase(workoutCompletedNotification, userId: userId)
+                }
+            }
             
             // Schedule local notification
             Task {
@@ -347,13 +424,19 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             }
             
             // Check if this is the last workout day of the week
-            checkForWeeklyCompletionAndProgressiveOverload(workoutService: workoutService)
+            checkForWeeklyCompletionAndProgressiveOverload(
+                workoutService: workoutService,
+                workoutCompletedNotificationId: workoutCompletedNotification.id
+            )
         }
     }
     
     // MARK: - Progressive Overload Analysis
     
-    private func checkForWeeklyCompletionAndProgressiveOverload(workoutService: WorkoutService) {
+    private func checkForWeeklyCompletionAndProgressiveOverload(
+        workoutService: WorkoutService,
+        workoutCompletedNotificationId: UUID
+    ) {
         // Check if we need to reset weekly tracking (new week)
         resetWeeklyAnalysisTrackingIfNeeded()
         
@@ -371,16 +454,16 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             weeklyAnalysisNotificationSent = true
             lastWeeklyAnalysisDate = Date()
             
-            // Delay the progressive overload notification to avoid overlap with workout completion
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                // Create notification for progressive overload analysis
-                self.createNotification(
-                    title: "📊 Weekly Analysis Starting",
-                    message: "Analyzing your available workout progress to suggest improvements...",
-                    type: .workoutCompleted,
-                    imageIcon: "thumbs_up"
-                )
-            }
+            // Create pending notification to show after workout completion is dismissed
+            createPendingNotification(
+                title: "📊 Weekly Analysis Starting",
+                message: "Analyzing your available workout progress to suggest improvements...",
+                type: .workoutCompleted,
+                imageIcon: "thumbs_up",
+                triggerAfterNotificationId: workoutCompletedNotificationId
+            )
+            
+            print("📊 NotificationService: Created pending progressive overload notification (will show after workout completion is dismissed)")
             
             // Start progressive overload analysis (no delay for actual processing)
             Task {
