@@ -1014,8 +1014,12 @@ struct ExerciseView: View {
                     }
                     
 
-                    // Progressive Overload button (only show if analysis is available)
-                    if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
+                    // Progressive Overload Analysis Status or Button
+                    if notificationService.progressiveOverloadService.isAnalyzing {
+                        // Show loading indicator while analyzing
+                        ProgressiveOverloadStatusButton(isAnalyzing: true)
+                    } else if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
+                        // Show progressive overload button when analysis is complete
                         GameStyleMenuButton(
                             title: "Progressive Overload",
                             icon: "chart.line.uptrend.xyaxis",
@@ -1855,6 +1859,63 @@ struct SignOutGlassPopup: View {
             .padding(.horizontal, 40)
         }
         .transition(.opacity.combined(with: .scale))
+    }
+}
+
+// MARK: - Progressive Overload Status Button Component
+
+struct ProgressiveOverloadStatusButton: View {
+    let isAnalyzing: Bool
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            // Status icon with animation
+            ZStack {
+                Circle()
+                    .fill(Color.offWhite)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.orange, lineWidth: 2)
+                    )
+                
+                if isAnalyzing {
+                    // Animated progress indicator
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color.orange))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                }
+            }
+            .frame(width: 44, height: 44)
+            
+            // Status text
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Progressive Overload")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                Text(isAnalyzing ? "Analyzing..." : "Analysis Complete")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 32)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.offWhite)
+                .softOuterShadow()
+        )
+        .frame(maxWidth: 300)
     }
 }
 

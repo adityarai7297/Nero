@@ -367,15 +367,18 @@ class NotificationService: NSObject, ObservableObject, UNUserNotificationCenterD
             weeklyAnalysisNotificationSent = true
             lastWeeklyAnalysisDate = Date()
             
-            // Create notification for progressive overload analysis
-            createNotification(
-                title: "📊 Weekly Analysis Starting",
-                message: "Analyzing your available workout progress to suggest improvements...",
-                type: .workoutCompleted,
-                imageIcon: "thumbs_up"
-            )
+            // Delay the progressive overload notification to avoid overlap with workout completion
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                // Create notification for progressive overload analysis
+                self.createNotification(
+                    title: "📊 Weekly Analysis Starting",
+                    message: "Analyzing your available workout progress to suggest improvements...",
+                    type: .workoutCompleted,
+                    imageIcon: "thumbs_up"
+                )
+            }
             
-            // Start progressive overload analysis
+            // Start progressive overload analysis (no delay for actual processing)
             Task {
                 await performProgressiveOverloadAnalysis(workoutService: workoutService)
             }
