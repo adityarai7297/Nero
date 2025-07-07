@@ -248,7 +248,7 @@ struct SuggestionCard: View {
                 Spacer()
                 
                 if hasChanges {
-                    Text("\(suggestion.suggestions.count) changes")
+                    Text("\(suggestion.suggestions.count) \(suggestion.suggestions.count == 1 ? "change" : "changes")")
                         .font(.caption2)
                         .fontWeight(.medium)
                         .foregroundColor(.secondary)
