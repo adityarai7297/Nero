@@ -21,6 +21,15 @@ struct DBExercise: Codable {
     }
 }
 
+// Simplified struct for fetching unique exercise names
+struct DBExerciseName: Codable {
+    let exerciseName: String
+    
+    enum CodingKeys: String, CodingKey {
+        case exerciseName = "exercise_name"
+    }
+}
+
 struct DBWorkoutSet: Codable {
     let id: Int?
     let exerciseName: String
@@ -555,5 +564,110 @@ class WorkoutService: ObservableObject {
     /// Get the current workout plan for progressive overload analysis
     func getCurrentWorkoutPlan() -> DeepseekWorkoutPlan? {
         return currentWorkoutPlan
+    }
+    
+    // MARK: - Exercise History Methods (New Feature)
+    
+    /// Fetch all unique exercises that the user has performed
+    func fetchAllUserExercises() async -> [String] {
+        guard let userId = currentUserId else {
+            print("❌ WorkoutService: Cannot fetch exercises - no user ID")
+            return []
+        }
+        
+        do {
+            let response: [DBExerciseName] = try await supabase
+                .from("workout_sets")
+                .select("exercise_name")
+                .eq("user_id", value: userId.uuidString)
+                .order("exercise_name")
+                .execute()
+                .value
+            
+            // Get unique exercise names
+            let uniqueExercises = Array(Set(response.map { $0.exerciseName })).sorted()
+            print("✅ WorkoutService: Found \(uniqueExercises.count) unique exercises")
+            return uniqueExercises
+            
+        } catch {
+            print("❌ WorkoutService: Failed to fetch exercises: \(error)")
+            return []
+        }
+    }
+    
+    /// Fetch exercise history for a specific exercise with optional date filtering
+    func fetchExerciseHistory(exerciseName: String, timeframe: ExerciseHistoryTimeframe = .all) async -> [WorkoutSet] {
+        guard let userId = currentUserId else {
+            print("❌ WorkoutService: Cannot fetch exercise history - no user ID")
+            return []
+        }
+        
+        do {
+            let response: [DBWorkoutSet]
+            
+            // Build query with conditional date filtering
+            if timeframe != .all {
+                let startDate = timeframe.startDate
+                response = try await supabase
+                    .from("workout_sets")
+                    .select()
+                    .eq("user_id", value: userId.uuidString)
+                    .eq("exercise_name", value: exerciseName)
+                    .gte("completed_at", value: startDate.ISO8601Format())
+                    .order("completed_at", ascending: true)
+                    .execute()
+                    .value
+            } else {
+                response = try await supabase
+                    .from("workout_sets")
+                    .select()
+                    .eq("user_id", value: userId.uuidString)
+                    .eq("exercise_name", value: exerciseName)
+                    .order("completed_at", ascending: true)
+                    .execute()
+                    .value
+            }
+            
+            let workoutSets = response.compactMap { dbSet -> WorkoutSet? in
+                guard let completedAt = dbSet.completedAt else { return nil }
+                return WorkoutSet(
+                    databaseId: dbSet.id,
+                    exerciseName: dbSet.exerciseName,
+                    weight: CGFloat(dbSet.weight),
+                    reps: CGFloat(dbSet.reps),
+                    rpe: CGFloat(dbSet.rpe),
+                    timestamp: completedAt,
+                    exerciseType: nil // Will be determined based on exercise name if needed
+                )
+            }
+            
+            print("✅ WorkoutService: Found \(workoutSets.count) sets for \(exerciseName) in \(timeframe.displayName)")
+            return workoutSets
+            
+        } catch {
+            print("❌ WorkoutService: Failed to fetch exercise history: \(error)")
+            return []
+        }
+    }
+    
+    /// Get exercise statistics for a specific exercise and timeframe
+    func getExerciseStats(exerciseName: String, timeframe: ExerciseHistoryTimeframe = .all) async -> ExerciseStats? {
+        let history = await fetchExerciseHistory(exerciseName: exerciseName, timeframe: timeframe)
+        
+        guard !history.isEmpty else { return nil }
+        
+        let weights = history.map { Double($0.weight) }
+        let volumes = history.map { Double($0.weight * $0.reps) }
+        
+        return ExerciseStats(
+            exerciseName: exerciseName,
+            totalSets: history.count,
+            maxWeight: weights.max() ?? 0,
+            maxVolume: volumes.max() ?? 0,
+            averageWeight: weights.reduce(0, +) / Double(weights.count),
+            averageVolume: volumes.reduce(0, +) / Double(volumes.count),
+            firstWorkout: history.first?.timestamp,
+            lastWorkout: history.last?.timestamp
+        )
     }
 } 

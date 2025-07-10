@@ -110,6 +110,71 @@ struct Exercise: Equatable {
     ]
 }
 
+// MARK: - Exercise History Models
+
+enum ExerciseHistoryTimeframe: String, CaseIterable {
+    case oneMonth = "1M"
+    case threeMonths = "3M"
+    case sixMonths = "6M"
+    case oneYear = "1Y"
+    case all = "All"
+    
+    var displayName: String {
+        switch self {
+        case .oneMonth: return "1 Month"
+        case .threeMonths: return "3 Months"
+        case .sixMonths: return "6 Months"
+        case .oneYear: return "1 Year"
+        case .all: return "All Time"
+        }
+    }
+    
+    var startDate: Date {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        switch self {
+        case .oneMonth:
+            return calendar.date(byAdding: .month, value: -1, to: now) ?? now
+        case .threeMonths:
+            return calendar.date(byAdding: .month, value: -3, to: now) ?? now
+        case .sixMonths:
+            return calendar.date(byAdding: .month, value: -6, to: now) ?? now
+        case .oneYear:
+            return calendar.date(byAdding: .year, value: -1, to: now) ?? now
+        case .all:
+            return Date.distantPast
+        }
+    }
+}
+
+enum ExerciseChartType: String, CaseIterable {
+    case volume = "Volume"
+    case weight = "Weight"
+    
+    var displayName: String {
+        return self.rawValue
+    }
+    
+    var unit: String {
+        switch self {
+        case .volume: return "Volume (lbs × reps)"
+        case .weight: return "Weight (lbs)"
+        }
+    }
+}
+
+struct ExerciseStats {
+    let exerciseName: String
+    let totalSets: Int
+    let maxWeight: Double
+    let maxVolume: Double
+    let averageWeight: Double
+    let averageVolume: Double
+    let firstWorkout: Date?
+    let lastWorkout: Date?
+}
+
 // Simple ThemeManager for the WheelPicker
 class ThemeManager: ObservableObject {
     @Published var wheelPickerColor: Color = .black.opacity(0.7)
@@ -148,6 +213,7 @@ struct ExerciseView: View {
     @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
     @State private var showingWorkoutEditChat: Bool = false // Control workout edit chat presentation
     @State private var showingNotifications: Bool = false // Control notifications view presentation
+    @State private var showingExerciseHistory: Bool = false // Control exercise history view presentation
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -267,6 +333,9 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingNotifications) {
             NotificationsView()
+        }
+        .sheet(isPresented: $showingExerciseHistory) {
+            ExerciseHistoryListView(workoutService: workoutService)
         }
         .sheet(isPresented: $showingProgressiveOverload) {
             if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
@@ -1013,7 +1082,21 @@ struct ExerciseView: View {
                         }
                     }
                     
-
+                    // Exercise History button
+                    GameStyleMenuButton(
+                        title: "Exercise History",
+                        icon: "chart.xyaxis.line",
+                        color: Color.blue
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
+                        // Small delay to let menu close animation finish
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingExerciseHistory = true
+                        }
+                    }
+                    
                     // Progressive Overload Analysis Status or Button
                     if notificationService.progressiveOverloadService.isAnalyzing {
                         // Show loading indicator while analyzing
