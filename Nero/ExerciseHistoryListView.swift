@@ -135,10 +135,10 @@ struct ExerciseHistoryCard: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 16) {
-                // Exercise name and icon
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Exercise name and chevron
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(exerciseName)
                             .font(.title3)
                             .fontWeight(.bold)
@@ -157,23 +157,24 @@ struct ExerciseHistoryCard: View {
                     Image(systemName: "chevron.right")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .frame(width: 20, height: 20)
                 }
                 
                 // Stats row
                 if let stats = stats {
-                    HStack(spacing: 24) {
+                    HStack(alignment: .top, spacing: 0) {
                         StatItem(
                             title: "Max Weight",
                             value: "\(Int(stats.maxWeight)) lbs",
                             icon: "scalemass.fill"
                         )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         
                         StatItem(
-                            title: "Max Volume",
+                            title: "Max Volume", 
                             value: "\(Int(stats.maxVolume))",
                             icon: "chart.bar.fill"
                         )
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         
                         if let lastWorkout = stats.lastWorkout {
                             StatItem(
@@ -181,13 +182,12 @@ struct ExerciseHistoryCard: View {
                                 value: relativeDateString(from: lastWorkout),
                                 icon: "calendar.circle.fill"
                             )
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        
-                        Spacer()
                     }
                 }
             }
-            .padding(20)
+            .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
                     .fill(Color.offWhite)
@@ -210,11 +210,12 @@ struct StatItem: View {
     let icon: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption2)
                     .foregroundColor(Color.accentBlue)
+                    .frame(width: 10, height: 10)
                 
                 Text(title)
                     .font(.caption2)
@@ -222,9 +223,10 @@ struct StatItem: View {
             }
             
             Text(value)
-                .font(.caption)
+                .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.primary)
+                .lineLimit(1)
         }
     }
 } 
