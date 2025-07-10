@@ -214,6 +214,7 @@ struct ExerciseView: View {
     @State private var showingWorkoutEditChat: Bool = false // Control workout edit chat presentation
     @State private var showingNotifications: Bool = false // Control notifications view presentation
     @State private var showingExerciseHistory: Bool = false // Control exercise history view presentation
+    @State private var showingAIChat: Bool = false // Control AI chat view presentation
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -336,6 +337,9 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingExerciseHistory) {
             ExerciseHistoryListView(workoutService: workoutService)
+        }
+        .sheet(isPresented: $showingAIChat) {
+            AIChatView(workoutService: workoutService)
         }
         .sheet(isPresented: $showingProgressiveOverload) {
             if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
@@ -1094,6 +1098,21 @@ struct ExerciseView: View {
                         // Small delay to let menu close animation finish
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             showingExerciseHistory = true
+                        }
+                    }
+                    
+                    // AI Chat button
+                    GameStyleMenuButton(
+                        title: "AI Chat",
+                        icon: "bubble.left.and.bubble.right.fill",
+                        color: Color.mint
+                    ) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
+                        // Small delay to let menu close animation finish
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            showingAIChat = true
                         }
                     }
                     

@@ -1,0 +1,402 @@
+import SwiftUI
+import Neumorphic
+
+// MARK: - Chat Models
+
+struct AIChatMessage: Identifiable, Equatable {
+    let id = UUID()
+    let content: String
+    let isFromUser: Bool
+    let timestamp: Date
+    
+    static func == (lhs: AIChatMessage, rhs: AIChatMessage) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+// MARK: - Chat View
+
+struct AIChatView: View {
+    let workoutService: WorkoutService
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var messages: [AIChatMessage] = []
+    @State private var messageText: String = ""
+    @State private var isLoading: Bool = false
+    @State private var errorMessage: String?
+    @FocusState private var isTextFieldFocused: Bool
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.offWhite.ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Chat messages area
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                // Welcome message
+                                if messages.isEmpty && !isLoading {
+                                    AIChatWelcomeMessageView()
+                                }
+                                
+                                // Chat messages
+                                ForEach(messages) { message in
+                                    AIChatMessageView(message: message)
+                                        .id(message.id)
+                                }
+                                
+                                // Loading indicator
+                                if isLoading {
+                                    TypingIndicatorView()
+                                        .id("typing")
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 16)
+                        }
+                        .onChange(of: messages) { _, _ in
+                            // Auto-scroll to bottom when new messages arrive
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                if let lastMessage = messages.last {
+                                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                                } else if isLoading {
+                                    proxy.scrollTo("typing", anchor: .bottom)
+                                }
+                            }
+                        }
+                        .onChange(of: isLoading) { _, _ in
+                            // Auto-scroll when loading state changes
+                            if isLoading {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    proxy.scrollTo("typing", anchor: .bottom)
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Input area
+                    VStack(spacing: 12) {
+                        if let errorMessage = errorMessage {
+                            ErrorMessageView(message: errorMessage) {
+                                self.errorMessage = nil
+                            }
+                        }
+                        
+                        AIChatMessageInputView(
+                            messageText: $messageText,
+                            isLoading: isLoading,
+                            onSend: sendMessage
+                        )
+                        .focused($isTextFieldFocused)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                    .background(Color.offWhite)
+                }
+            }
+            .navigationTitle("AI Fitness Coach")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.accentBlue)
+                }
+            }
+        }
+        .onAppear {
+            setupWelcomeMessage()
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func setupWelcomeMessage() {
+        // Add a slight delay for better UX
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isTextFieldFocused = true
+        }
+    }
+    
+    private func sendMessage() {
+        let trimmedMessage = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedMessage.isEmpty && !isLoading else { return }
+        
+        // Add user message
+        let userMessage = AIChatMessage(
+            content: trimmedMessage,
+            isFromUser: true,
+            timestamp: Date()
+        )
+        messages.append(userMessage)
+        
+        // Clear input
+        messageText = ""
+        isLoading = true
+        errorMessage = nil
+        
+        // Get AI response
+        Task {
+            await getAIResponse(for: trimmedMessage)
+        }
+    }
+    
+    private func getAIResponse(for userMessage: String) async {
+        do {
+            // This will be implemented when we extend the DeepseekAPIClient
+            let response = try await DeepseekAPIClient.shared.getFitnessCoachResponse(
+                userMessage: userMessage,
+                workoutService: workoutService
+            )
+            
+            await MainActor.run {
+                let aiMessage = AIChatMessage(
+                    content: response,
+                    isFromUser: false,
+                    timestamp: Date()
+                )
+                messages.append(aiMessage)
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                isLoading = false
+                errorMessage = "Failed to get AI response: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct AIChatWelcomeMessageView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "brain.head.profile")
+                .font(.system(size: 40))
+                .foregroundColor(Color.mint)
+            
+            Text("Your AI Fitness Coach")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+            
+            Text("Ask me anything about your workouts, progress, form, or training strategies. I'm here to help you reach your fitness goals!")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+        }
+        .padding(.vertical, 40)
+    }
+}
+
+struct AIChatMessageView: View {
+    let message: AIChatMessage
+    
+    var body: some View {
+        HStack {
+            if message.isFromUser {
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(message.content)
+                        .font(.body)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.accentBlue)
+                        .clipShape(
+                            .rect(
+                                topLeadingRadius: 16,
+                                bottomLeadingRadius: 16,
+                                bottomTrailingRadius: 4,
+                                topTrailingRadius: 16
+                            )
+                        )
+                    
+                    Text(formatMessageTime(message.timestamp))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity * 0.8, alignment: .trailing)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.caption)
+                            .foregroundColor(Color.mint)
+                        
+                        Text("AI Coach")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(Color.mint)
+                        
+                        Spacer()
+                    }
+                    
+                    Text(parseMarkdown(message.content))
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(Color.white)
+                        .clipShape(
+                            .rect(
+                                topLeadingRadius: 4,
+                                bottomLeadingRadius: 16,
+                                bottomTrailingRadius: 16,
+                                topTrailingRadius: 16
+                            )
+                        )
+                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                    
+                    Text(formatMessageTime(message.timestamp))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity * 0.8, alignment: .leading)
+                
+                Spacer()
+            }
+        }
+    }
+    
+    private func formatMessageTime(_ timestamp: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: timestamp)
+    }
+    
+    private func parseMarkdown(_ content: String) -> AttributedString {
+        do {
+            return try AttributedString(
+                markdown: content,
+                options: AttributedString.MarkdownParsingOptions(
+                    interpretedSyntax: .inlineOnlyPreservingWhitespace
+                )
+            )
+        } catch {
+            // If markdown parsing fails, return plain text
+            return AttributedString(content)
+        }
+    }
+}
+
+struct TypingIndicatorView: View {
+    @State private var animationOffset: CGFloat = 0
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Image(systemName: "brain.head.profile")
+                        .font(.caption)
+                        .foregroundColor(Color.mint)
+                    
+                    Text("AI Coach")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(Color.mint)
+                    
+                    Spacer()
+                }
+                
+                HStack(spacing: 4) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(Color.gray.opacity(0.6))
+                            .frame(width: 8, height: 8)
+                            .scaleEffect(animationOffset == CGFloat(index) ? 1.3 : 1.0)
+                            .animation(
+                                .easeInOut(duration: 0.6)
+                                .repeatForever()
+                                .delay(Double(index) * 0.2),
+                                value: animationOffset
+                            )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.white)
+                .clipShape(
+                    .rect(
+                        topLeadingRadius: 4,
+                        bottomLeadingRadius: 16,
+                        bottomTrailingRadius: 16,
+                        topTrailingRadius: 16
+                    )
+                )
+                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+            }
+            .frame(maxWidth: .infinity * 0.8, alignment: .leading)
+            
+            Spacer()
+        }
+        .onAppear {
+            animationOffset = 0
+        }
+    }
+}
+
+struct AIChatMessageInputView: View {
+    @Binding var messageText: String
+    let isLoading: Bool
+    let onSend: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            TextField("Ask about your workouts...", text: $messageText, axis: .vertical)
+                .font(.body)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.white)
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                .lineLimit(1...5)
+                .onSubmit {
+                    onSend()
+                }
+            
+            Button(action: onSend) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading ? .gray : Color.accentBlue)
+            }
+            .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+        }
+    }
+}
+
+struct ErrorMessageView: View {
+    let message: String
+    let onDismiss: () -> Void
+    
+    var body: some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.orange)
+            
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.orange)
+                .lineLimit(2)
+            
+            Spacer()
+            
+            Button("Dismiss") {
+                onDismiss()
+            }
+            .font(.caption)
+            .foregroundColor(.orange)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+} 

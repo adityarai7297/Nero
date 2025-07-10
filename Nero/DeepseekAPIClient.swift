@@ -756,6 +756,333 @@ class DeepseekAPIClient {
         }
     }
     
+    // MARK: - Fitness Coach Chat
+    
+    func getFitnessCoachResponse(
+        userMessage: String,
+        workoutService: WorkoutService
+    ) async throws -> String {
+        // Validate API key before making request
+        guard Config.validateConfiguration() else {
+            throw NSError(domain: "DeepseekAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "DeepSeek API key not configured. Please set your API key in Config.swift"])
+        }
+        
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        // Gather comprehensive user data
+        let userData = await gatherUserDataForCoaching(workoutService: workoutService)
+        
+        print("🔄 DeepSeek API: Getting fitness coach response")
+        print("💬 User Message: \(userMessage)")
+        
+        let systemPrompt = """
+        You are an expert fitness coach and personal trainer with years of experience helping people achieve their fitness goals. You have access to the user's complete workout history, personal details, and current training plan.
+
+        Your role:
+        - Act as a knowledgeable, encouraging, and supportive fitness coach
+        - Provide evidence-based advice on training, technique, progression, and recovery
+        - Be conversational, friendly, and motivating
+        - Answer questions about workouts, form, progress, nutrition basics, and training strategies
+        - Use the user's specific data to give personalized recommendations
+        - Keep responses brief and to the point (1-2 short paragraphs maximum)
+        - Use encouraging language and celebrate progress
+
+        Context:
+        - You have access to their complete workout history and personal information
+        - You can answer questions about any exercise in their program or general fitness topics
+        - Reference their actual workout data, progress trends, and training history when relevant
+
+        Guidelines:
+        - Be encouraging and positive
+        - Use their actual data to make specific recommendations
+        - If they ask about specific exercises, reference their performance data for those exercises
+        - If they ask about form, provide clear, actionable tips
+        - If they ask about progress, analyze their data trends across all exercises
+        - If they ask about programming, consider their experience level and goals
+        - Always prioritize safety and proper progression
+        - You can suggest modifications to their current workout plan
+        - Keep medical advice general and suggest consulting professionals for specific issues
+        - Answer general fitness questions even if not directly related to their specific data
+        - NEVER ask the user to send videos, images, or any media files
+        - Keep responses concise and actionable - avoid lengthy explanations
+        - Use markdown formatting for better readability: **bold** for emphasis, *italics* for exercise names, and bullet points for lists
+        - Format exercise names in italics (e.g., *Bench Press*, *Squat*)
+        - Use **bold** for key points and important advice
+        - Use bullet points (•) for lists of tips or recommendations
+        """
+        
+        let userPrompt = """
+        User's Question: \(userMessage)
+        
+        User's Complete Fitness Profile:
+        \(userData)
+        
+        Please provide a helpful, personalized response as their fitness coach. Use their specific data when relevant to give targeted advice.
+        """
+        
+        let chatRequest = DeepseekChatRequest(
+            model: "deepseek-chat",
+            messages: [
+                DeepseekRequestMessage(role: "system", content: systemPrompt),
+                DeepseekRequestMessage(role: "user", content: userPrompt)
+            ],
+            stream: false,
+            temperature: 0.7 // Balanced for personable but consistent coaching
+        )
+        
+        do {
+            request.httpBody = try JSONEncoder().encode(chatRequest)
+            print("✅ Fitness coach request body encoded successfully")
+        } catch {
+            print("❌ Failed to encode fitness coach request: \(error)")
+            throw error
+        }
+        
+        print("🌐 Making fitness coach API request to DeepSeek...")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Invalid HTTP response type")
+            throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: "Invalid response from Deepseek API"])
+        }
+        
+        print("📡 Fitness Coach API Response - Status Code: \(httpResponse.statusCode)")
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("❌ Fitness Coach API Error (\(httpResponse.statusCode)): \(errorMessage)")
+            throw NSError(domain: "DeepseekAPI", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: "API Error (\(httpResponse.statusCode)): \(errorMessage)"])
+        }
+        
+        do {
+            let chatResponse = try JSONDecoder().decode(DeepseekChatResponse.self, from: data)
+            print("✅ Fitness coach chat response decoded successfully")
+            
+            guard let content = chatResponse.choices.first?.message.content else {
+                print("❌ No content in fitness coach API response")
+                throw NSError(domain: "DeepseekAPI", code: 2, userInfo: [NSLocalizedDescriptionKey: "No content in API response"])
+            }
+            
+            print("📝 Fitness coach content from API: \(content.prefix(200))...")
+            return content.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+        } catch {
+            print("❌ Failed to decode fitness coach chat response: \(error)")
+            throw error
+        }
+    }
+    
+    /// Gather comprehensive user data for fitness coaching context
+    private func gatherUserDataForCoaching(workoutService: WorkoutService) async -> String {
+        var context = ""
+        
+        // Get user's personal details
+        let personalDetailsService = PersonalDetailsService()
+        if let personalDetails = await personalDetailsService.loadPersonalDetails() {
+            context += "PERSONAL PROFILE:\n"
+            context += formatPersonalDetails(personalDetails)
+            context += "\n\n"
+        }
+        
+        // Get user's workout preferences
+        let preferencesService = WorkoutPreferencesService()
+        if let preferences = await preferencesService.loadWorkoutPreferences() {
+            context += "WORKOUT PREFERENCES:\n"
+            context += formatWorkoutPreferences(preferences)
+            context += "\n\n"
+        }
+        
+        // Get current workout plan
+        if let currentPlan = await preferencesService.loadCurrentWorkoutPlan() {
+            context += "CURRENT WORKOUT PLAN:\n"
+            context += formatWorkoutPlanForCoaching(currentPlan)
+            context += "\n\n"
+        }
+        
+        // Get all user exercises and their data
+        let allExercises = await workoutService.fetchAllUserExercises()
+        if !allExercises.isEmpty {
+            context += "ALL EXERCISE HISTORY AND STATISTICS:\n"
+            
+            for exerciseName in allExercises {
+                context += "\n--- \(exerciseName.uppercased()) ---\n"
+                
+                // Get exercise history
+                let exerciseHistory = await workoutService.fetchExerciseHistory(exerciseName: exerciseName, timeframe: .all)
+                if !exerciseHistory.isEmpty {
+                    context += "Recent History:\n"
+                    context += formatExerciseHistoryForCoaching(exerciseHistory)
+                    context += "\n"
+                }
+                
+                // Get exercise stats
+                if let stats = await workoutService.getExerciseStats(exerciseName: exerciseName) {
+                    context += "Statistics:\n"
+                    context += formatExerciseStats(stats)
+                    context += "\n"
+                }
+            }
+            context += "\n"
+        }
+        
+        // Get recent overall workout history for broader context
+        if let recentHistory = await workoutService.fetchUpToLast12WeeksHistory() {
+            if !recentHistory.isEmpty {
+                context += "RECENT PERFORMANCE TRENDS (All Exercises - Last 12 weeks):\n"
+                context += formatAllExercisesTrends(recentHistory)
+                context += "\n\n"
+            }
+        }
+        
+        return context.isEmpty ? "No workout data available yet. This user is just getting started!" : context
+    }
+    
+    /// Format workout plan specifically for coaching context
+    private func formatWorkoutPlanForCoaching(_ plan: DeepseekWorkoutPlan) -> String {
+        let groupedByDay = Dictionary(grouping: plan.plan) { $0.dayOfWeek }
+        var formatted = ""
+        
+        let daysOrder = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        
+        for day in daysOrder {
+            if let exercises = groupedByDay[day] {
+                formatted += "\(day):\n"
+                for exercise in exercises {
+                    if exercise.exerciseType == "static_hold" {
+                        formatted += "  - \(exercise.exerciseName): \(exercise.sets) sets x \(exercise.reps) seconds\n"
+                    } else {
+                        formatted += "  - \(exercise.exerciseName): \(exercise.sets) sets x \(exercise.reps) reps\n"
+                    }
+                }
+                formatted += "\n"
+            }
+        }
+        
+        return formatted
+    }
+    
+    /// Format exercise history specifically for coaching context
+    private func formatExerciseHistoryForCoaching(_ history: [WorkoutSet]) -> String {
+        let sortedHistory = history.sorted { $0.timestamp < $1.timestamp }
+        var formatted = ""
+        
+        // Show last 10 workouts for this exercise
+        let recentHistory = Array(sortedHistory.suffix(10))
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .short
+        
+        for set in recentHistory {
+            let dateString = dateFormatter.string(from: set.timestamp)
+            if set.exerciseType == "static_hold" {
+                formatted += "- \(dateString): \(Int(set.weight))lbs x \(Int(set.reps)) seconds @ \(Int(set.rpe))% effort\n"
+            } else {
+                formatted += "- \(dateString): \(Int(set.weight))lbs x \(Int(set.reps)) reps @ \(Int(set.rpe))% effort\n"
+            }
+        }
+        
+        return formatted
+    }
+    
+    /// Format exercise statistics for coaching context
+    private func formatExerciseStats(_ stats: ExerciseStats) -> String {
+        var formatted = ""
+        formatted += "Total Sets Completed: \(stats.totalSets)\n"
+        formatted += "Max Weight Achieved: \(Int(stats.maxWeight)) lbs\n"
+        formatted += "Average Weight: \(Int(stats.averageWeight)) lbs\n"
+        formatted += "Max Volume: \(Int(stats.maxVolume)) lbs×reps\n"
+        formatted += "Average Volume: \(Int(stats.averageVolume)) lbs×reps\n"
+        
+        if let firstWorkout = stats.firstWorkout {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatted += "First Workout: \(formatter.string(from: firstWorkout))\n"
+        }
+        
+        if let lastWorkout = stats.lastWorkout {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatted += "Most Recent Workout: \(formatter.string(from: lastWorkout))\n"
+        }
+        
+        return formatted
+    }
+    
+    /// Format recent performance trends for coaching insights
+    private func formatRecentTrends(_ recentHistory: [WorkoutSet]) -> String {
+        guard !recentHistory.isEmpty else { return "No recent data available" }
+        
+        let sortedHistory = recentHistory.sorted { $0.timestamp < $1.timestamp }
+        var formatted = ""
+        
+        // Calculate trends
+        let weights = sortedHistory.map { Double($0.weight) }
+        let volumes = sortedHistory.map { Double($0.weight * $0.reps) }
+        let rpes = sortedHistory.map { Double($0.rpe) }
+        
+        if let firstWeight = weights.first, let lastWeight = weights.last {
+            let weightChange = lastWeight - firstWeight
+            let weightChangePercent = (weightChange / firstWeight) * 100
+            formatted += "Weight Progress: \(weightChange > 0 ? "+" : "")\(Int(weightChange)) lbs (\(String(format: "%.1f", weightChangePercent))%)\n"
+        }
+        
+        if let firstVolume = volumes.first, let lastVolume = volumes.last {
+            let volumeChange = lastVolume - firstVolume
+            let volumeChangePercent = (volumeChange / firstVolume) * 100
+            formatted += "Volume Progress: \(volumeChange > 0 ? "+" : "")\(Int(volumeChange)) lbs×reps (\(String(format: "%.1f", volumeChangePercent))%)\n"
+        }
+        
+        let averageRPE = rpes.reduce(0, +) / Double(rpes.count)
+        formatted += "Average Effort Level: \(Int(averageRPE))% RPE\n"
+        formatted += "Total Sets in Period: \(sortedHistory.count)\n"
+        
+        return formatted
+    }
+    
+    /// Format recent performance trends for all exercises
+    private func formatAllExercisesTrends(_ recentHistory: [WorkoutSet]) -> String {
+        guard !recentHistory.isEmpty else { return "No recent data available" }
+        
+        // Group by exercise
+        let groupedHistory = Dictionary(grouping: recentHistory) { $0.exerciseName }
+        var formatted = ""
+        
+        for (exerciseName, sets) in groupedHistory.sorted(by: { $0.key < $1.key }) {
+            formatted += "\n\(exerciseName):\n"
+            
+            let sortedSets = sets.sorted { $0.timestamp < $1.timestamp }
+            
+            // Calculate trends for this exercise
+            let weights = sortedSets.map { Double($0.weight) }
+            let volumes = sortedSets.map { Double($0.weight * $0.reps) }
+            let rpes = sortedSets.map { Double($0.rpe) }
+            
+            if let firstWeight = weights.first, let lastWeight = weights.last, weights.count > 1 {
+                let weightChange = lastWeight - firstWeight
+                let weightChangePercent = (weightChange / firstWeight) * 100
+                formatted += "  Weight Progress: \(weightChange > 0 ? "+" : "")\(Int(weightChange)) lbs (\(String(format: "%.1f", weightChangePercent))%)\n"
+            }
+            
+            if let firstVolume = volumes.first, let lastVolume = volumes.last, volumes.count > 1 {
+                let volumeChange = lastVolume - firstVolume
+                let volumeChangePercent = (volumeChange / firstVolume) * 100
+                formatted += "  Volume Progress: \(volumeChange > 0 ? "+" : "")\(Int(volumeChange)) lbs×reps (\(String(format: "%.1f", volumeChangePercent))%)\n"
+            }
+            
+            if !rpes.isEmpty {
+                let averageRPE = rpes.reduce(0, +) / Double(rpes.count)
+                formatted += "  Average Effort: \(Int(averageRPE))% RPE\n"
+            }
+            
+            formatted += "  Total Sets: \(sortedSets.count)\n"
+        }
+        
+        return formatted
+    }
+    
     // MARK: - Helper Methods for Progressive Overload
     
     private func formatExerciseHistoryForProgressiveOverload(_ history: [WorkoutSet]) -> String {

@@ -140,8 +140,8 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow()
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
     
@@ -166,8 +166,8 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow()
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
     
@@ -210,8 +210,8 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow()
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
     
@@ -309,10 +309,15 @@ struct TimeframeButton: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentBlue : Color.offWhite)
-                .softOuterShadow()
+                .fill(isSelected ? Color.accentBlue : Color.white)
+                .shadow(
+                    color: isSelected ? Color.accentBlue.opacity(0.3) : Color.black.opacity(0.1),
+                    radius: isSelected ? 8 : 2,
+                    x: 0,
+                    y: isSelected ? 4 : 1
+                )
         )
-        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .scaleEffect(isSelected ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
@@ -333,10 +338,15 @@ struct ChartTypeButton: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentBlue : Color.offWhite)
-                .softOuterShadow()
+                .fill(isSelected ? Color.accentBlue : Color.white)
+                .shadow(
+                    color: isSelected ? Color.accentBlue.opacity(0.3) : Color.black.opacity(0.1),
+                    radius: isSelected ? 8 : 2,
+                    x: 0,
+                    y: isSelected ? 4 : 1
+                )
         )
-        .scaleEffect(isSelected ? 1.05 : 1.0)
+        .scaleEffect(isSelected ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }

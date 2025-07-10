@@ -210,7 +210,7 @@ struct StatItem: View {
     let icon: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.caption2)
