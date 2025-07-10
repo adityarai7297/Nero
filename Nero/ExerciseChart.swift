@@ -159,58 +159,35 @@ struct ChartLine: View {
     let maxValue: Double
     let minValue: Double
     
-    private var path: Path {
-        var path = Path()
-        
-        guard data.count > 1 else { return path }
-        
+    private var points: [CGPoint] {
         let sortedData = data.sorted { $0.date < $1.date }
-        let width = geometry.size.width
-        let height = geometry.size.height
+        let width = geometry.size.width - 16 // Add padding to keep within bounds
+        let height = geometry.size.height - 16 // Add padding to keep within bounds
         let valueRange = maxValue - minValue
         
-        // Calculate points
-        var points: [CGPoint] = []
-        for (index, point) in sortedData.enumerated() {
-            let x = width * CGFloat(index) / CGFloat(sortedData.count - 1)
+        return sortedData.enumerated().map { index, point in
+            let x = 8 + width * CGFloat(index) / CGFloat(max(sortedData.count - 1, 1)) // Start at 8px padding
             let normalizedValue = valueRange > 0 ? (point.value - minValue) / valueRange : 0.5
-            let y = height * (1 - normalizedValue)
-            points.append(CGPoint(x: x, y: y))
+            let y = 8 + height * (1 - normalizedValue) // Start at 8px padding
+            return CGPoint(x: x, y: y)
         }
+    }
+    
+    private var path: Path {
+        var path = Path()
+        let chartPoints = points
         
-        // Create smooth curve
-        if points.count > 1 {
-            path.move(to: points[0])
-            
-            if points.count == 2 {
-                // Just a straight line for 2 points
-                path.addLine(to: points[1])
-            } else {
-                // Use quadratic curves for smoothing
-                for i in 1..<points.count {
-                    let current = points[i]
-                    let previous = points[i-1]
-                    
-                    if i == 1 {
-                        // First curve segment
-                        let midX = (previous.x + current.x) / 2
-                        let midY = (previous.y + current.y) / 2
-                        path.addQuadCurve(to: CGPoint(x: midX, y: midY), control: previous)
-                    }
-                    
-                    if i < points.count - 1 {
-                        // Middle segments
-                        let next = points[i+1]
-                        let midX1 = (previous.x + current.x) / 2
-                        let midY1 = (previous.y + current.y) / 2
-                        let midX2 = (current.x + next.x) / 2
-                        let midY2 = (current.y + next.y) / 2
-                        path.addQuadCurve(to: CGPoint(x: midX2, y: midY2), control: current)
-                    } else {
-                        // Last segment
-                        path.addQuadCurve(to: current, control: current)
-                    }
-                }
+        guard chartPoints.count > 1 else { return path }
+        
+        path.move(to: chartPoints[0])
+        
+        if chartPoints.count == 2 {
+            // Simple line for 2 points
+            path.addLine(to: chartPoints[1])
+        } else {
+            // Simple line connections for multiple points to ensure points stay on line
+            for i in 1..<chartPoints.count {
+                path.addLine(to: chartPoints[i])
             }
         }
         
@@ -236,24 +213,27 @@ struct ChartPoints: View {
     let maxValue: Double
     let minValue: Double
     
+    private var points: [CGPoint] {
+        let sortedData = data.sorted { $0.date < $1.date }
+        let width = geometry.size.width - 16 // Same padding as line
+        let height = geometry.size.height - 16 // Same padding as line
+        let valueRange = maxValue - minValue
+        
+        return sortedData.enumerated().map { index, point in
+            let x = 8 + width * CGFloat(index) / CGFloat(max(sortedData.count - 1, 1)) // Same calculation as line
+            let normalizedValue = valueRange > 0 ? (point.value - minValue) / valueRange : 0.5
+            let y = 8 + height * (1 - normalizedValue) // Same calculation as line
+            return CGPoint(x: x, y: y)
+        }
+    }
+    
     var body: some View {
-        ForEach(Array(data.enumerated()), id: \.offset) { index, point in
-            let sortedData = data.sorted { $0.date < $1.date }
-            if let dataIndex = sortedData.firstIndex(where: { $0.date == point.date }) {
-                let width = geometry.size.width
-                let height = geometry.size.height
-                let valueRange = maxValue - minValue
-                
-                let x = width * CGFloat(dataIndex) / CGFloat(max(sortedData.count - 1, 1))
-                let normalizedValue = valueRange > 0 ? (point.value - minValue) / valueRange : 0.5
-                let y = height * (1 - normalizedValue)
-                
-                Circle()
-                    .fill(Color.accentBlue)
-                    .frame(width: 6, height: 6)
-                    .position(x: x, y: y)
-                    .shadow(color: Color.accentBlue.opacity(0.3), radius: 2, x: 0, y: 1)
-            }
+        ForEach(Array(points.enumerated()), id: \.offset) { index, point in
+            Circle()
+                .fill(Color.accentBlue)
+                .frame(width: 8, height: 8)
+                .position(x: point.x, y: point.y)
+                .shadow(color: Color.accentBlue.opacity(0.3), radius: 2, x: 0, y: 1)
         }
     }
 }
@@ -271,7 +251,7 @@ struct ChartLabels: View {
             if let first = first {
                 let valueRange = maxValue - minValue
                 let normalizedValue = valueRange > 0 ? (first.value - minValue) / valueRange : 0.5
-                let y = geometry.size.height * (1 - normalizedValue)
+                let y = 8 + (geometry.size.height - 16) * (1 - normalizedValue) // Same calculation as points
                 
                 VStack(spacing: 2) {
                     Text("\(Int(first.value))")
@@ -286,14 +266,14 @@ struct ChartLabels: View {
                                 .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
                         )
                 }
-                .position(x: 0, y: max(y - 20, 10))
+                .position(x: 20, y: max(y - 25, 15)) // Offset from edge
             }
             
             // Last point label
             if let last = last, first?.date != last.date {
                 let valueRange = maxValue - minValue
                 let normalizedValue = valueRange > 0 ? (last.value - minValue) / valueRange : 0.5
-                let y = geometry.size.height * (1 - normalizedValue)
+                let y = 8 + (geometry.size.height - 16) * (1 - normalizedValue) // Same calculation as points
                 
                 VStack(spacing: 2) {
                     Text("\(Int(last.value))")
@@ -308,7 +288,7 @@ struct ChartLabels: View {
                                 .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
                         )
                 }
-                .position(x: geometry.size.width, y: max(y - 20, 10))
+                .position(x: geometry.size.width - 20, y: max(y - 25, 15)) // Offset from edge
             }
         }
     }
