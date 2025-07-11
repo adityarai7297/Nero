@@ -995,162 +995,167 @@ struct ExerciseView: View {
                     }
                 }
             
-            // Centered menu content
-            VStack(spacing: 32) {
+            // Centered menu content with grid layout
+            VStack(spacing: 20) {
                 Spacer()
                 
-                VStack(spacing: 24) {
-                    // Workout Plan Generation Status Indicator or View Plan Button
-                    if preferencesService.generationStatus.isActive {
-                        // Show status indicator while generating
-                        WorkoutPlanStatusButton(
-                            status: preferencesService.generationStatus
-                        )
-                    } else if preferencesService.generationStatus == .completed || workoutService.hasWorkoutPlan {
-                        // Show "View Workout Plan" button when completed or plan exists
-                        GameStyleMenuButton(
-                            title: "View Workout Plan",
-                            icon: "doc.text.fill",
-                            color: Color.green
+                // Grid of menu tiles
+                VStack(spacing: 20) {
+                    // Grid of menu tiles
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                        // Workout Plan Generation Status Indicator or View Plan Button
+                        if preferencesService.generationStatus.isActive {
+                            // Show status indicator while generating
+                            WorkoutPlanStatusTile(
+                                status: preferencesService.generationStatus
+                            )
+                        } else if preferencesService.generationStatus == .completed || workoutService.hasWorkoutPlan {
+                            // Show "View Workout Plan" button when completed or plan exists
+                            NeumorphicMenuTile(
+                                title: "View Plan",
+                                icon: "doc.text.fill",
+                                color: Color.green
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingWorkoutPlan = true
+                                }
+                            }
+                        }
+                        
+                        // Edit Workout Plan button (only show if user has a workout plan)
+                        if workoutService.hasWorkoutPlan {
+                            NeumorphicMenuTile(
+                                title: "Edit Plan",
+                                icon: "bubble.left.and.bubble.right.fill",
+                                color: Color.orange
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingWorkoutEditChat = true
+                                }
+                            }
+                        }
+                        
+                        // Create Workout Plan button
+                        NeumorphicMenuTile(
+                            title: "Create Plan",
+                            icon: "dumbbell.fill",
+                            color: Color.accentBlue
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
                             }
                             // Small delay to let menu close animation finish
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingWorkoutPlan = true
+                                showingWorkoutQuestionnaire = true
                             }
                         }
-                    }
-                    
-                    // Edit Workout Plan button (only show if user has a workout plan)
-                    if workoutService.hasWorkoutPlan {
-                        GameStyleMenuButton(
-                            title: "Edit Workout Plan",
+                        
+                        // Personal Details button
+                        NeumorphicMenuTile(
+                            title: "Personal",
+                            icon: "person.fill",
+                            color: Color.accentBlue
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Small delay to let menu close animation finish
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingPersonalDetails = true
+                            }
+                        }
+                        
+                        // Notifications button
+                        NeumorphicMenuTile(
+                            title: "Alerts",
+                            icon: "bell.fill",
+                            color: Color.purple,
+                            unreadCount: notificationService.unreadCount
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Small delay to let menu close animation finish
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingNotifications = true
+                            }
+                        }
+                        
+                        // Exercise History button
+                        NeumorphicMenuTile(
+                            title: "History",
+                            icon: "chart.xyaxis.line",
+                            color: Color.blue
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            // Small delay to let menu close animation finish
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingExerciseHistory = true
+                            }
+                        }
+                        
+                        // AI Chat button
+                        NeumorphicMenuTile(
+                            title: "AI Chat",
                             icon: "bubble.left.and.bubble.right.fill",
-                            color: Color.orange
+                            color: Color.mint
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
                             }
                             // Small delay to let menu close animation finish
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingWorkoutEditChat = true
+                                showingAIChat = true
                             }
                         }
-                    }
-                    
-                    // Workout Preferences button
-                    GameStyleMenuButton(
-                        title: "Create Workout Plan",
-                        icon: "dumbbell.fill",
-                        color: Color.accentBlue
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
+                        
+                        // Progressive Overload Analysis Status or Button
+                        if notificationService.progressiveOverloadService.isAnalyzing {
+                            // Show loading indicator while analyzing
+                            ProgressiveOverloadStatusTile(isAnalyzing: true)
+                        } else if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
+                            // Show progressive overload button when analysis is complete
+                            NeumorphicMenuTile(
+                                title: "Overload",
+                                icon: "chart.line.uptrend.xyaxis",
+                                color: Color.green
+                            ) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingProgressiveOverload = true
+                                }
+                            }
                         }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingWorkoutQuestionnaire = true
-                        }
-                    }
-                    
-                    // Personal Details button
-                    GameStyleMenuButton(
-                        title: "Personal Details",
-                        icon: "person.fill",
-                        color: Color.accentBlue
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
-                        }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingPersonalDetails = true
-                        }
-                    }
-                    
-                    // Notifications button
-                    GameStyleMenuButton(
-                        title: "Notifications",
-                        icon: "bell.fill",
-                        color: Color.purple,
-                        unreadCount: notificationService.unreadCount
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
-                        }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingNotifications = true
-                        }
-                    }
-                    
-                    // Exercise History button
-                    GameStyleMenuButton(
-                        title: "Exercise History",
-                        icon: "chart.xyaxis.line",
-                        color: Color.blue
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
-                        }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingExerciseHistory = true
-                        }
-                    }
-                    
-                    // AI Chat button
-                    GameStyleMenuButton(
-                        title: "AI Chat",
-                        icon: "bubble.left.and.bubble.right.fill",
-                        color: Color.mint
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
-                        }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingAIChat = true
-                        }
-                    }
-                    
-                    // Progressive Overload Analysis Status or Button
-                    if notificationService.progressiveOverloadService.isAnalyzing {
-                        // Show loading indicator while analyzing
-                        ProgressiveOverloadStatusButton(isAnalyzing: true)
-                    } else if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
-                        // Show progressive overload button when analysis is complete
-                        GameStyleMenuButton(
-                            title: "Progressive Overload",
-                            icon: "chart.line.uptrend.xyaxis",
-                            color: Color.green
+                        
+                        // Sign Out button
+                        NeumorphicMenuTile(
+                            title: "Sign Out",
+                            icon: "power",
+                            color: .red
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
                             }
                             // Small delay to let menu close animation finish
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingProgressiveOverload = true
+                                showingLogoutAlert = true
                             }
                         }
                     }
-                    
-                    // Sign Out button
-                    GameStyleMenuButton(
-                        title: "Sign Out",
-                        icon: "power",
-                        color: .red
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showingSideMenu = false
-                        }
-                        // Small delay to let menu close animation finish
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            showingLogoutAlert = true
-                        }
-                    }
+                    .padding(.horizontal, 24)
                 }
                 
                 Spacer()
@@ -1904,6 +1909,247 @@ struct GameStyleMenuButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .frame(maxWidth: 300)
+    }
+}
+
+// MARK: - Neumorphic Menu Tile Component
+
+struct NeumorphicMenuTile: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let unreadCount: Int?
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    // Convenience initializer without unread count
+    init(title: String, icon: String, color: Color, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.unreadCount = nil
+        self.action = action
+    }
+    
+    // Full initializer with unread count
+    init(title: String, icon: String, color: Color, unreadCount: Int?, action: @escaping () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.unreadCount = unreadCount
+        self.action = action
+    }
+    
+    var body: some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = false
+                }
+                action()
+            }
+        }) {
+            VStack(spacing: 12) {
+                // Icon with enhanced neumorphic styling
+                ZStack {
+                    Circle()
+                        .fill(Color.offWhite)
+                        .frame(width: 50, height: 50)
+                        .softOuterShadow(
+                            darkShadow: Color.black.opacity(0.15),
+                            lightShadow: Color.white.opacity(0.9),
+                            offset: isPressed ? 2 : 4,
+                            radius: isPressed ? 4 : 8
+                        )
+                    
+                    Image(systemName: icon)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(color)
+                    
+                    // Unread count badge
+                    if let unreadCount = unreadCount, unreadCount > 0 {
+                        VStack {
+                            HStack {
+                                Spacer()
+                                ZStack {
+                                    Circle()
+                                        .fill(.red)
+                                        .frame(width: 18, height: 18)
+                                        .softOuterShadow(
+                                            darkShadow: Color.black.opacity(0.3),
+                                            lightShadow: Color.white.opacity(0.7),
+                                            offset: 1,
+                                            radius: 2
+                                        )
+                                    Text("\(min(unreadCount, 99))")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                .offset(x: 8, y: -8)
+                            }
+                            Spacer()
+                        }
+                    }
+                }
+                
+                // Title text
+                Text(title)
+                    .font(.system(.footnote, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 90)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .background(
+                Group {
+                    if isPressed {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.offWhite)
+                            .softInnerShadow(
+                                RoundedRectangle(cornerRadius: 16),
+                                darkShadow: Color.black.opacity(0.2),
+                                lightShadow: Color.white,
+                                spread: 0.15,
+                                radius: 3
+                            )
+                    } else {
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.offWhite)
+                            .softOuterShadow(
+                                darkShadow: Color.black.opacity(0.15),
+                                lightShadow: Color.white.opacity(0.9),
+                                offset: 3,
+                                radius: 6
+                            )
+                    }
+                }
+            )
+            .scaleEffect(isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: isPressed)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Status Tile Components
+
+struct WorkoutPlanStatusTile: View {
+    let status: WorkoutPlanGenerationStatus
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Status icon with animation
+            ZStack {
+                Circle()
+                    .fill(Color.offWhite)
+                    .frame(width: 50, height: 50)
+                    .softOuterShadow(
+                        darkShadow: Color.black.opacity(0.15),
+                        lightShadow: Color.white.opacity(0.9),
+                        offset: 4,
+                        radius: 8
+                    )
+                
+                if status.isActive {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color.orange))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "doc.text.fill")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.orange)
+                }
+            }
+            
+            // Status text
+            Text(status.isActive ? "Generating..." : "Plan Ready")
+                .font(.system(.footnote, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 90)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.offWhite)
+                .softOuterShadow(
+                    darkShadow: Color.black.opacity(0.15),
+                    lightShadow: Color.white.opacity(0.9),
+                    offset: 3,
+                    radius: 6
+                )
+        )
+    }
+}
+
+struct ProgressiveOverloadStatusTile: View {
+    let isAnalyzing: Bool
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Status icon with animation
+            ZStack {
+                Circle()
+                    .fill(Color.offWhite)
+                    .frame(width: 50, height: 50)
+                    .softOuterShadow(
+                        darkShadow: Color.black.opacity(0.15),
+                        lightShadow: Color.white.opacity(0.9),
+                        offset: 4,
+                        radius: 8
+                    )
+                
+                if isAnalyzing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color.green))
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                }
+            }
+            
+            // Status text
+            Text(isAnalyzing ? "Analyzing..." : "Analysis Ready")
+                .font(.system(.footnote, design: .rounded))
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 90)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.offWhite)
+                .softOuterShadow(
+                    darkShadow: Color.black.opacity(0.15),
+                    lightShadow: Color.white.opacity(0.9),
+                    offset: 3,
+                    radius: 6
+                )
+        )
     }
 }
 
