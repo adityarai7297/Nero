@@ -624,24 +624,17 @@ struct ExerciseView: View {
             .padding(.bottom, 5)
             .padding(.horizontal, 20)
             .overlay(alignment: .leading) {
-                // Hamburger menu icon positioned on the left
+                // Modern menu icon positioned on the left
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showingSideMenu.toggle()
                     }
                 }) {
-                    Image(systemName: "line.3.horizontal")
+                    Image(systemName: "square.grid.2x2")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(Color.accentBlue.opacity(0.8))
                 }
-                .softButtonStyle(
-                    Circle(),
-                    padding: 12,
-                    mainColor: Color.offWhite,
-                    textColor: Color.accentBlue.opacity(0.8),
-                    pressedEffect: .hard
-                )
                 .frame(width: 44, height: 44)
                 .padding(.leading, 20)
             }
@@ -1960,12 +1953,6 @@ struct NeumorphicMenuTile: View {
                     Circle()
                         .fill(Color.offWhite)
                         .frame(width: 50, height: 50)
-                        .softOuterShadow(
-                            darkShadow: Color.black.opacity(0.15),
-                            lightShadow: Color.white.opacity(0.9),
-                            offset: isPressed ? 2 : 4,
-                            radius: isPressed ? 4 : 8
-                        )
                     
                     Image(systemName: icon)
                         .font(.title2)
