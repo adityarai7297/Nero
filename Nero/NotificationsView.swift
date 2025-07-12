@@ -1,5 +1,4 @@
 import SwiftUI
-import Neumorphic
 
 struct NotificationsView: View {
     @StateObject private var notificationService = NotificationService.shared
@@ -196,22 +195,17 @@ struct NotificationCard: View {
                 Group {
                     if isPressed {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
-                            .softInnerShadow(
-                                RoundedRectangle(cornerRadius: 16),
-                                darkShadow: Color.black.opacity(0.15),
-                                lightShadow: Color.white,
-                                spread: 0.1,
-                                radius: 2
+                            .fill(Color.gray.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
                             )
                     } else {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
-                            .softOuterShadow(
-                                darkShadow: Color.black.opacity(notification.isRead ? 0.1 : 0.15),
-                                lightShadow: Color.white,
-                                offset: 2,
-                                radius: notification.isRead ? 3 : 5
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(notification.isRead ? Color.gray.opacity(0.15) : typeColor.opacity(0.2), lineWidth: notification.isRead ? 1 : 1.5)
                             )
                     }
                 }

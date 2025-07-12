@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Neumorphic
 
 // Personal Details Data Model
 struct PersonalDetails {
@@ -351,12 +350,13 @@ struct PersonalDetailsView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                 }
-                .softButtonStyle(
-                    RoundedRectangle(cornerRadius: 12),
-                    padding: 16,
-                    mainColor: Color.offWhite,
-                    textColor: Color.accentBlue,
-                    pressedEffect: .hard
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.accentBlue.opacity(0.3), lineWidth: 1.5)
+                        )
                 )
             }
             
@@ -376,13 +376,15 @@ struct PersonalDetailsView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
             }
-            .softButtonStyle(
-                RoundedRectangle(cornerRadius: 12),
-                padding: 16,
-                mainColor: Color.accentBlue,
-                textColor: .white,
-                pressedEffect: .hard
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.accentBlue)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.accentBlue.opacity(0.4), lineWidth: 1)
+                    )
             )
+            
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
@@ -852,19 +854,13 @@ struct PersonalDetailsTileButton: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
                 .frame(height: 80)
-                .background(
+                                .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? color.opacity(0.1) : Color.offWhite)
-                        .softOuterShadow(
-                            darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
-                            lightShadow: Color.white.opacity(0.9),
-                            offset: isPressed ? 1 : 2,
-                            radius: isPressed ? 2 : 4
+                        .fill(isSelected ? color.opacity(0.08) : Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? color.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: isSelected ? 1.5 : 1)
                         )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
                 )
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)

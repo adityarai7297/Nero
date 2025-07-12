@@ -1,5 +1,4 @@
 import SwiftUI
-import Neumorphic
 
 struct AuthView: View {
     @EnvironmentObject var authService: AuthService
@@ -158,12 +157,13 @@ struct AuthView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 42)
             }
-            .softButtonStyle(
-                RoundedRectangle(cornerRadius: 12),
-                padding: 14,
-                mainColor: isFormValid ? Color.accentBlue : Color.gray,
-                textColor: .white,
-                pressedEffect: .hard
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isFormValid ? Color.accentBlue : Color.gray)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isFormValid ? Color.accentBlue.opacity(0.4) : Color.gray.opacity(0.4), lineWidth: 1)
+                    )
             )
             .disabled(!isFormValid || authService.phase == .loading)
             .padding(.horizontal, 24)
@@ -348,17 +348,10 @@ struct ModernFieldStyle: TextFieldStyle {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.offWhite)
+                    .fill(Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(hasError ? Color.red : Color.clear, lineWidth: hasError ? 2 : 0)
-                    )
-                    .softInnerShadow(
-                        RoundedRectangle(cornerRadius: 12),
-                        darkShadow: Color.black.opacity(0.2),
-                        lightShadow: Color.white,
-                        spread: 0.15,
-                        radius: 3
+                            .stroke(hasError ? Color.red : Color.gray.opacity(0.2), lineWidth: hasError ? 2 : 1)
                     )
             )
             .modifier(ShakeEffect(shouldShake: shouldShake))
@@ -449,10 +442,13 @@ struct SocialButton: View {
                     if backgroundColor == .black {
                         RoundedRectangle(cornerRadius: 12)
                             .fill(backgroundColor)
-                    } else {
+                                        } else {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.offWhite)
-                            .softOuterShadow()
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            )
                     }
                 }
             )
@@ -513,21 +509,22 @@ struct NeumorphicSegmentedSwitch: View {
             let thumbWidth = width / CGFloat(labels.count)
 
             ZStack(alignment: .leading) {
-                // Groove (depressed)
+                // Groove (background)
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.offWhite)
-                    .softInnerShadow(
-                        RoundedRectangle(cornerRadius: cornerRadius),
-                        darkShadow: Color.black.opacity(0.2),
-                        lightShadow: Color.white,
-                        spread: 0.18,
-                        radius: 3
+                    .fill(Color.gray.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                     )
 
-                // Thumb (raised)
+                // Thumb (selected)
                 RoundedRectangle(cornerRadius: cornerRadius - 4)
-                    .fill(Color.offWhite)
-                    .softOuterShadow()
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius - 4)
+                            .stroke(Color.accentBlue.opacity(0.3), lineWidth: 1)
+                    )
+    
                     .frame(width: thumbWidth - 4, height: geo.size.height - 4)
                     .offset(x: selection ? thumbWidth + 2 : 2)
                     .animation(.easeInOut(duration: 0.25), value: selection)

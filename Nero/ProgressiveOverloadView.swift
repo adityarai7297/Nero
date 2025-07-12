@@ -1,5 +1,4 @@
 import SwiftUI
-import Neumorphic
 
 struct ProgressiveOverloadView: View {
     @Environment(\.dismiss) private var dismiss
@@ -53,12 +52,6 @@ struct ProgressiveOverloadView: View {
             ZStack {
                 Circle()
                     .fill(Color.offWhite)
-                    .softOuterShadow(
-                        darkShadow: Color.black.opacity(0.2),
-                        lightShadow: Color.white.opacity(0.9),
-                        offset: 6,
-                        radius: 8
-                    )
                     .frame(width: 80, height: 80)
                 
                 Image(systemName: "chart.line.uptrend.xyaxis")
@@ -101,12 +94,10 @@ struct ProgressiveOverloadView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow(
-                    darkShadow: Color.black.opacity(0.15),
-                    lightShadow: Color.white.opacity(0.9),
-                    offset: 4,
-                    radius: 6
+                .fill(Color.blue.opacity(0.03))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.blue.opacity(0.15), lineWidth: 1)
                 )
         )
     }
@@ -167,11 +158,9 @@ struct ProgressiveOverloadView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color.accentBlue)
-                        .softOuterShadow(
-                            darkShadow: Color.accentBlue.opacity(0.3),
-                            lightShadow: Color.white.opacity(0.8),
-                            offset: 4,
-                            radius: 6
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
                         )
                 )
             }
@@ -195,12 +184,10 @@ struct ProgressiveOverloadView: View {
                 .frame(height: 56)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.offWhite)
-                        .softOuterShadow(
-                            darkShadow: Color.black.opacity(0.15),
-                            lightShadow: Color.white.opacity(0.9),
-                            offset: 4,
-                            radius: 6
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                         )
                 )
             }
@@ -313,13 +300,10 @@ struct SuggestionCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.offWhite)
-                .softInnerShadow(
-                    RoundedRectangle(cornerRadius: 12),
-                    darkShadow: Color.black.opacity(0.1),
-                    lightShadow: Color.white.opacity(0.9),
-                    spread: 0.5,
-                    radius: 2
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                 )
         )
     }

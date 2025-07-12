@@ -1,5 +1,4 @@
 import SwiftUI
-import Neumorphic
 
 struct ExerciseDetailView: View {
     let exerciseName: String
@@ -455,13 +454,10 @@ struct ExerciseHistoryRow: View {
         .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.offWhite)
-                .softInnerShadow(
-                    RoundedRectangle(cornerRadius: 8),
-                    darkShadow: Color.black.opacity(0.1),
-                    lightShadow: Color.white.opacity(0.9),
-                    spread: 0.5,
-                    radius: 2
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                 )
         )
         .opacity(isDeleting ? 0.6 : 1.0)

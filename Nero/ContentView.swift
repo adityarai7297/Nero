@@ -8,7 +8,6 @@
 import Supabase
 import SwiftUI
 import UIKit
-import Neumorphic
 
 // Next-Set Recommendations Algorithm
 struct NextSetRecommendations {
@@ -450,13 +449,6 @@ struct ExerciseView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(Color.accentBlue.opacity(0.8))
                 }
-                .softButtonStyle(
-                    Circle(),
-                    padding: 12,
-                    mainColor: Color.offWhite,
-                    textColor: Color.accentBlue.opacity(0.8),
-                    pressedEffect: .hard
-                )
                 .frame(width: 44, height: 44)
                 
                 Spacer()
@@ -495,13 +487,6 @@ struct ExerciseView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                 }
-                .softButtonStyle(
-                    RoundedRectangle(cornerRadius: 12),
-                    padding: 14,
-                    mainColor: Color.accentBlue,
-                    textColor: .white,
-                    pressedEffect: .hard
-                )
                 .padding(.horizontal, 40)
                 .padding(.top, 8)
             }
@@ -525,13 +510,6 @@ struct ExerciseView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(Color.accentBlue.opacity(0.8))
                 }
-                .softButtonStyle(
-                    Circle(),
-                    padding: 12,
-                    mainColor: Color.offWhite,
-                    textColor: Color.accentBlue.opacity(0.8),
-                    pressedEffect: .hard
-                )
                 .frame(width: 44, height: 44)
                 
                 Spacer()
@@ -570,13 +548,6 @@ struct ExerciseView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(Color.accentBlue.opacity(0.8))
                 }
-                .softButtonStyle(
-                    Circle(),
-                    padding: 12,
-                    mainColor: Color.offWhite,
-                    textColor: Color.accentBlue.opacity(0.8),
-                    pressedEffect: .hard
-                )
                 .frame(width: 44, height: 44)
                 
                 Spacer()
@@ -675,13 +646,6 @@ struct ExerciseView: View {
                 }
             }
         }
-        .softButtonStyle(
-            RoundedRectangle(cornerRadius: showTargetCompletion ? 18 : 22),
-            padding: 12,
-            mainColor: Color.offWhite,
-            textColor: Color.green.opacity(0.8),
-            pressedEffect: .hard
-        )
         .frame(width: showTargetCompletion ? 80 : 44, height: 44)
         .animation(.bouncy(duration: 0.4), value: showTargetCompletion)
     }
@@ -742,15 +706,16 @@ struct ExerciseView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(Color.accentBlue.opacity(0.8))
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color.accentBlue.opacity(0.06))
+                        .overlay(
+                            Circle()
+                                .stroke(Color.accentBlue.opacity(0.2), lineWidth: 1)
+                        )
+                )
         }
-        .softButtonStyle(
-            Circle(),
-            padding: 12,
-            mainColor: Color.offWhite,
-            textColor: Color.accentBlue.opacity(0.8),
-            pressedEffect: .hard
-        )
-        .frame(width: 44, height: 44)
     }
     
     @ViewBuilder
@@ -761,16 +726,17 @@ struct ExerciseView: View {
             Image(systemName: "plus")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(Color.green.opacity(0.8))
+                .foregroundColor(.white)
+                .frame(width: 70, height: 70)
+                .background(
+                    Circle()
+                        .fill(Color.green.opacity(0.85))
+                        .overlay(
+                            Circle()
+                                .stroke(Color.green.opacity(0.4), lineWidth: 2)
+                        )
+                )
         }
-        .softButtonStyle(
-            Circle(),
-            padding: 23,
-            mainColor: Color.offWhite,
-            textColor: Color.green.opacity(0.8),
-            pressedEffect: .hard
-        )
-        .frame(width: 70, height: 70)
     }
     
     @ViewBuilder
@@ -787,15 +753,16 @@ struct ExerciseView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(Color.accentBlue.opacity(0.8))
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color.accentBlue.opacity(0.06))
+                        .overlay(
+                            Circle()
+                                .stroke(Color.accentBlue.opacity(0.2), lineWidth: 1)
+                        )
+                )
         }
-        .softButtonStyle(
-            Circle(),
-            padding: 12,
-            mainColor: Color.offWhite,
-            textColor: Color.accentBlue.opacity(0.8),
-            pressedEffect: .hard
-        )
-        .frame(width: 44, height: 44)
     }
     
     @ViewBuilder
@@ -1581,13 +1548,10 @@ struct ExerciseComponent: View {
             // Value viewport with label
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.offWhite)
-                    .softInnerShadow(
-                        RoundedRectangle(cornerRadius: 8),
-                        darkShadow: Color.black.opacity(0.3),
-                        lightShadow: Color.white.opacity(0.9),
-                        spread: 0.15,
-                        radius: 4
+                    .fill(Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.accentBlue.opacity(0.15), lineWidth: 1.5)
                     )
                 
                 Text("\(Int(value))")
@@ -1651,15 +1615,16 @@ struct PresetButton: View {
                 .foregroundColor(Color.accentBlue.opacity(0.8))
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
+                .frame(width: 75, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.accentBlue.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.accentBlue.opacity(0.2), lineWidth: 1)
+                        )
+                )
         }
-        .softButtonStyle(
-            RoundedRectangle(cornerRadius: 8),
-            padding: 12,
-            mainColor: Color.offWhite,
-            textColor: Color.accentBlue.opacity(0.8),
-            pressedEffect: .hard
-        )
-        .frame(width: 75, height: 40)
     }
 }
 
@@ -1882,18 +1847,18 @@ struct GameStyleMenuButton: View {
                 Group {
                     if isPressed {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
-                            .softInnerShadow(
-                                RoundedRectangle(cornerRadius: 16),
-                                darkShadow: Color.black.opacity(0.2),
-                                lightShadow: Color.white,
-                                spread: 0.15,
-                                radius: 3
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.gray.opacity(0.3), lineWidth: 1.5)
                             )
                     } else {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
-                            .softOuterShadow()
+                            .fill(Color.white)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            )
                     }
                 }
             )
@@ -1968,12 +1933,6 @@ struct NeumorphicMenuTile: View {
                                     Circle()
                                         .fill(.red)
                                         .frame(width: 18, height: 18)
-                                        .softOuterShadow(
-                                            darkShadow: Color.black.opacity(0.3),
-                                            lightShadow: Color.white.opacity(0.7),
-                                            offset: 1,
-                                            radius: 2
-                                        )
                                     Text("\(min(unreadCount, 99))")
                                         .font(.caption2)
                                         .fontWeight(.bold)
@@ -2004,21 +1963,16 @@ struct NeumorphicMenuTile: View {
                     if isPressed {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(Color.offWhite)
-                            .softInnerShadow(
-                                RoundedRectangle(cornerRadius: 16),
-                                darkShadow: Color.black.opacity(0.2),
-                                lightShadow: Color.white,
-                                spread: 0.15,
-                                radius: 3
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                             )
                     } else {
                         RoundedRectangle(cornerRadius: 16)
                             .fill(Color.offWhite)
-                            .softOuterShadow(
-                                darkShadow: Color.black.opacity(0.15),
-                                lightShadow: Color.white.opacity(0.9),
-                                offset: 3,
-                                radius: 6
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
                             )
                     }
                 }
@@ -2042,12 +1996,6 @@ struct WorkoutPlanStatusTile: View {
                 Circle()
                     .fill(Color.offWhite)
                     .frame(width: 50, height: 50)
-                    .softOuterShadow(
-                        darkShadow: Color.black.opacity(0.15),
-                        lightShadow: Color.white.opacity(0.9),
-                        offset: 4,
-                        radius: 8
-                    )
                 
                 if status.isActive {
                     ProgressView()
@@ -2075,12 +2023,10 @@ struct WorkoutPlanStatusTile: View {
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow(
-                    darkShadow: Color.black.opacity(0.15),
-                    lightShadow: Color.white.opacity(0.9),
-                    offset: 3,
-                    radius: 6
+                .fill(Color.orange.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
                 )
         )
     }
@@ -2096,12 +2042,6 @@ struct ProgressiveOverloadStatusTile: View {
                 Circle()
                     .fill(Color.offWhite)
                     .frame(width: 50, height: 50)
-                    .softOuterShadow(
-                        darkShadow: Color.black.opacity(0.15),
-                        lightShadow: Color.white.opacity(0.9),
-                        offset: 4,
-                        radius: 8
-                    )
                 
                 if isAnalyzing {
                     ProgressView()
@@ -2129,12 +2069,10 @@ struct ProgressiveOverloadStatusTile: View {
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow(
-                    darkShadow: Color.black.opacity(0.15),
-                    lightShadow: Color.white.opacity(0.9),
-                    offset: 3,
-                    radius: 6
+                .fill(Color.green.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.green.opacity(0.2), lineWidth: 1)
                 )
         )
     }
@@ -2247,8 +2185,11 @@ struct ProgressiveOverloadStatusButton: View {
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow()
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                )
         )
         .frame(maxWidth: 300)
     }
@@ -2330,8 +2271,11 @@ struct WorkoutPlanStatusButton: View {
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow()
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                )
         )
         .frame(maxWidth: 300)
     }
@@ -2536,12 +2480,13 @@ struct DayWorkoutCard: View {
                 .clipped()
             }
         }
-        .background(Color.offWhite)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.offWhite)
-                .softOuterShadow()
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.accentBlue.opacity(0.12), lineWidth: 2)
+                )
         )
         .animation(.easeInOut(duration: 0.3), value: isExpanded)
     }
@@ -2564,13 +2509,10 @@ struct ExerciseRowCard: View {
             // Exercise Icon
             ZStack {
                 Circle()
-                    .fill(Color.offWhite)
-                    .softInnerShadow(
-                        Circle(),
-                        darkShadow: Color.black.opacity(0.2),
-                        lightShadow: Color.white.opacity(0.9),
-                        spread: 0.1,
-                        radius: 2
+                    .fill(Color.accentBlue.opacity(0.08))
+                    .overlay(
+                        Circle()
+                            .stroke(Color.accentBlue.opacity(0.25), lineWidth: 1.5)
                     )
                 
                 Image(systemName: "dumbbell.fill")
@@ -2628,7 +2570,16 @@ struct ExerciseRowCard: View {
                 .transition(.scale.combined(with: .opacity))
             }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.12), lineWidth: 0.5)
+                    )
+            )
         }
         .buttonStyle(PlainButtonStyle())
     }

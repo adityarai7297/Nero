@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Neumorphic
 
 struct ChatMessage: Identifiable {
     let id = UUID()
@@ -234,7 +233,10 @@ struct WelcomeMessageView: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.white.opacity(0.7))
-                .softOuterShadow()
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                )
         )
     }
 }
@@ -290,7 +292,10 @@ struct MessageBubbleView: View {
                         .background(
                             RoundedRectangle(cornerRadius: 20)
                                 .fill(Color.white.opacity(0.8))
-                                .softOuterShadow()
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                )
                         )
                         .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: .leading)
                     
@@ -329,7 +334,10 @@ struct ProcessingMessageView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white.opacity(0.8))
-                        .softOuterShadow()
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                 )
             }
             
@@ -358,7 +366,10 @@ struct StatusMessageView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 20)
                         .fill(Color.white.opacity(0.8))
-                        .softOuterShadow()
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                 )
             }
             
@@ -402,7 +413,10 @@ struct CompletedMessageView: View {
             .background(
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color.white.opacity(0.8))
-                    .softOuterShadow()
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
             )
             
             Spacer()
@@ -430,7 +444,10 @@ struct MessageInputView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 20)
                             .fill(Color.white.opacity(0.8))
-                            .softInnerShadow(RoundedRectangle(cornerRadius: 20))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            )
                     )
                     .disabled(isProcessing)
                 

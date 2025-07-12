@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Neumorphic
 
 // Comprehensive Workout Preferences Data Model
 struct WorkoutPreferences {
@@ -744,13 +743,7 @@ struct WorkoutQuestionnaireView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                 }
-                .softButtonStyle(
-                    RoundedRectangle(cornerRadius: 12),
-                    padding: 16,
-                    mainColor: Color.offWhite,
-                    textColor: Color.accentBlue,
-                    pressedEffect: .hard
-                )
+
             } else {
                 Spacer()
                     .frame(maxWidth: .infinity)
@@ -787,13 +780,7 @@ struct WorkoutQuestionnaireView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
             }
-            .softButtonStyle(
-                RoundedRectangle(cornerRadius: 12),
-                padding: 16,
-                mainColor: Color.accentBlue,
-                textColor: .white,
-                pressedEffect: .hard
-            )
+            
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
@@ -1022,17 +1009,11 @@ struct MuscleGroupTileButton: View {
                 .frame(height: 60)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? color.opacity(0.1) : Color.offWhite)
-                        .softOuterShadow(
-                            darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
-                            lightShadow: Color.white.opacity(0.9),
-                            offset: isPressed ? 1 : 2,
-                            radius: isPressed ? 2 : 4
+                        .fill(isSelected ? color.opacity(0.08) : Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? color.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: isSelected ? 1.5 : 1)
                         )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
                 )
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)
@@ -1162,17 +1143,11 @@ struct QuestionnaireOptionButton: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? color.opacity(0.05) : Color.offWhite)
-                    .softOuterShadow(
-                        darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
-                        lightShadow: Color.white.opacity(0.9),
-                        offset: isPressed ? 1 : 3,
-                        radius: isPressed ? 2 : 6
+                    .fill(isSelected ? color.opacity(0.05) : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(isSelected ? color.opacity(0.3) : Color.gray.opacity(0.15), lineWidth: isSelected ? 1.5 : 1)
                     )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
             )
         }
         .scaleEffect(isPressed ? 0.98 : 1.0)
@@ -1322,17 +1297,11 @@ struct TileOptionButton: View {
                 .frame(height: 80)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? color.opacity(0.1) : Color.offWhite)
-                        .softOuterShadow(
-                            darkShadow: Color.black.opacity(isPressed ? 0.3 : 0.15),
-                            lightShadow: Color.white.opacity(0.9),
-                            offset: isPressed ? 1 : 2,
-                            radius: isPressed ? 2 : 4
+                        .fill(isSelected ? color.opacity(0.08) : Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? color.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: isSelected ? 1.5 : 1)
                         )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
                 )
         }
         .scaleEffect(isPressed ? 0.95 : 1.0)

@@ -1,5 +1,4 @@
 import SwiftUI
-import Neumorphic
 
 struct ExerciseHistoryListView: View {
     let workoutService: WorkoutService
@@ -188,11 +187,14 @@ struct ExerciseHistoryCard: View {
                 }
             }
             .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.offWhite)
-                    .softOuterShadow()
-            )
+                            .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                        )
+                )
         }
         .buttonStyle(PlainButtonStyle())
     }
