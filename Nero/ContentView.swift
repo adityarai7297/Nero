@@ -183,7 +183,6 @@ struct ContentView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
-    @EnvironmentObject var notificationService: NotificationService
     @StateObject private var workoutService = WorkoutService()
     
     var body: some View {
@@ -191,13 +190,11 @@ struct ContentView: View {
             .environmentObject(authService)
             .environmentObject(themeManager)
             .environmentObject(preferencesService)
-            .environmentObject(notificationService)
     }
 }
 
 struct ExerciseView: View {
     @StateObject private var workoutService = WorkoutService()
-    @EnvironmentObject var notificationService: NotificationService
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
     @State private var currentExerciseIndex: Int = 0
@@ -211,15 +208,11 @@ struct ExerciseView: View {
     @State private var showingPersonalDetails: Bool = false // Control personal details presentation
     @State private var showingWorkoutPlan: Bool = false // Control workout plan view presentation
     @State private var showingWorkoutEditChat: Bool = false // Control workout edit chat presentation
-    @State private var showingNotifications: Bool = false // Control notifications view presentation
     @State private var showingExerciseHistory: Bool = false // Control exercise history view presentation
     @State private var showingAIChat: Bool = false // Control AI chat view presentation
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
-    
-    // Progressive overload state
-    @State private var showingProgressiveOverload: Bool = false
 
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -331,20 +324,11 @@ struct ExerciseView: View {
             WorkoutEditChatView()
                 .environmentObject(preferencesService)
         }
-        .sheet(isPresented: $showingNotifications) {
-            NotificationsView()
-        }
         .sheet(isPresented: $showingExerciseHistory) {
             ExerciseHistoryListView(workoutService: workoutService)
         }
         .sheet(isPresented: $showingAIChat) {
             AIChatView(workoutService: workoutService)
-        }
-        .sheet(isPresented: $showingProgressiveOverload) {
-            if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
-                ProgressiveOverloadView(analysisResult: analysisResult)
-                    .environmentObject(notificationService)
-            }
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -397,14 +381,9 @@ struct ExerciseView: View {
         .onChange(of: authService.user) { _, newUser in
             // Initialize workout service when user changes
             workoutService.setUser(newUser?.id)
-            notificationService.setUser(newUser?.id)
             if newUser != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
-                // Request notification permissions
-                Task {
-                    await notificationService.requestNotificationPermission()
-                }
             }
         }
         .onAppear {
@@ -412,14 +391,9 @@ struct ExerciseView: View {
             setButtonFeedback.prepare()
             navigationFeedback.prepare()
             workoutService.setUser(authService.user?.id)
-            notificationService.setUser(authService.user?.id)
             if authService.user != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
-                // Request notification permissions
-                Task {
-                    await notificationService.requestNotificationPermission()
-                }
             }
         }
         .onTapGesture {
@@ -631,7 +605,9 @@ struct ExerciseView: View {
                     .foregroundColor(Color.green.opacity(0.8))
                     .lineLimit(1)
                 
-                if showTargetCompletion {
+                // Only show checkmark for exercises scheduled today that have reached their target
+                if showTargetCompletion && 
+                   (workoutService.getTargetSetsForToday(exerciseName: currentExercise.name) ?? 0) > 0 {
                     ZStack {
                         Circle()
                             .fill(Color.green.opacity(0.8))
@@ -646,7 +622,7 @@ struct ExerciseView: View {
                 }
             }
         }
-        .frame(width: showTargetCompletion ? 80 : 44, height: 44)
+        .frame(width: showTargetCompletion && (workoutService.getTargetSetsForToday(exerciseName: currentExercise.name) ?? 0) > 0 ? 80 : 44, height: 44)
         .animation(.bouncy(duration: 0.4), value: showTargetCompletion)
     }
     
@@ -886,9 +862,6 @@ struct ExerciseView: View {
             // Check if we've reached the target sets for today
             checkForTargetCompletionWithAnimation()
             
-            // Check if all exercises for today are completed (for notifications)
-            notificationService.checkWorkoutCompletion(workoutService: workoutService)
-            
             // Show radial burst effect
             withAnimation(.easeOut(duration: 0.15)) {
                 showRadialBurst = true
@@ -908,6 +881,7 @@ struct ExerciseView: View {
         let completedSets = currentExercise.setsCompleted
         
         if let targetSets = workoutService.getTargetSetsForToday(exerciseName: exerciseName),
+           targetSets > 0,  // Only show completion for exercises actually scheduled today
            completedSets >= targetSets {
             
             // Show checkmark (but don't animate if we're just switching exercises)
@@ -924,6 +898,7 @@ struct ExerciseView: View {
         let completedSets = currentExercise.setsCompleted
         
         if let targetSets = workoutService.getTargetSetsForToday(exerciseName: exerciseName),
+           targetSets > 0,  // Only show completion for exercises actually scheduled today
            completedSets >= targetSets && !showTargetCompletion {
             
             // Show checkmark with bouncy animation
@@ -1033,21 +1008,7 @@ struct ExerciseView: View {
                             }
                         }
                         
-                        // Notifications button
-                        NeumorphicMenuTile(
-                            title: "Alerts",
-                            icon: "bell.fill",
-                            color: Color.purple,
-                            unreadCount: notificationService.unreadCount
-                        ) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingSideMenu = false
-                            }
-                            // Small delay to let menu close animation finish
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingNotifications = true
-                            }
-                        }
+
                         
                         // Exercise History button
                         NeumorphicMenuTile(
@@ -1076,27 +1037,6 @@ struct ExerciseView: View {
                             // Small delay to let menu close animation finish
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 showingAIChat = true
-                            }
-                        }
-                        
-                        // Progressive Overload Analysis Status or Button
-                        if notificationService.progressiveOverloadService.isAnalyzing {
-                            // Show loading indicator while analyzing
-                            ProgressiveOverloadStatusTile(isAnalyzing: true)
-                        } else if let analysisResult = notificationService.progressiveOverloadService.lastAnalysisResult {
-                            // Show progressive overload button when analysis is complete
-                            NeumorphicMenuTile(
-                                title: "Overload",
-                                icon: "chart.line.uptrend.xyaxis",
-                                color: Color.green
-                            ) {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    showingSideMenu = false
-                                }
-                                // Small delay to let menu close animation finish
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showingProgressiveOverload = true
-                                }
                             }
                         }
                         
@@ -2032,52 +1972,6 @@ struct WorkoutPlanStatusTile: View {
     }
 }
 
-struct ProgressiveOverloadStatusTile: View {
-    let isAnalyzing: Bool
-    
-    var body: some View {
-        VStack(spacing: 12) {
-            // Status icon with animation
-            ZStack {
-                Circle()
-                    .fill(Color.offWhite)
-                    .frame(width: 50, height: 50)
-                
-                if isAnalyzing {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Color.green))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.green)
-                }
-            }
-            
-            // Status text
-            Text(isAnalyzing ? "Analyzing..." : "Analysis Ready")
-                .font(.system(.footnote, design: .rounded))
-                .fontWeight(.semibold)
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 90)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.green.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.green.opacity(0.2), lineWidth: 1)
-                )
-        )
-    }
-}
-
 // MARK: - Glass-Style Sign Out Popup
 
 struct SignOutGlassPopup: View {
@@ -2132,66 +2026,6 @@ struct SignOutGlassPopup: View {
             .padding(.horizontal, 40)
         }
         .transition(.opacity.combined(with: .scale))
-    }
-}
-
-// MARK: - Progressive Overload Status Button Component
-
-struct ProgressiveOverloadStatusButton: View {
-    let isAnalyzing: Bool
-    
-    var body: some View {
-        HStack(spacing: 16) {
-            // Status icon with animation
-            ZStack {
-                Circle()
-                    .fill(Color.offWhite)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.orange, lineWidth: 2)
-                    )
-                
-                if isAnalyzing {
-                    // Animated progress indicator
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Color.orange))
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "chart.line.uptrend.xyaxis")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.orange)
-                }
-            }
-            .frame(width: 44, height: 44)
-            
-            // Status text
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Progressive Overload")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                
-                Text(isAnalyzing ? "Analyzing..." : "Analysis Complete")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 32)
-        .padding(.vertical, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                )
-        )
-        .frame(maxWidth: 300)
     }
 }
 
@@ -2500,7 +2334,12 @@ struct ExerciseRowCard: View {
     let onTap: () -> Void
     
     private var isCompleted: Bool {
-        workoutService.isExerciseCompletedForToday(exerciseName: exercise.exerciseName)
+        let completed = workoutService.isExerciseCompletedForToday(exerciseName: exercise.exerciseName)
+        // Additional debug info 
+        if completed {
+            print("✅ UI: \(exercise.exerciseName) showing as completed")
+        }
+        return completed
     }
     
     var body: some View {

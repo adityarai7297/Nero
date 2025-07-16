@@ -168,6 +168,7 @@ class WorkoutService: ObservableObject {
                     
                     print("✅ WorkoutService: Loaded \(uniqueExercises.count) unique exercises from user's workout plan")
                     print("🏋️ WorkoutService: Exercise names: \(uniqueExercises.map { $0.name }.joined(separator: ", "))")
+                    print("📊 WorkoutService: Final state - hasWorkoutPlan: \(true), exercises.count: \(uniqueExercises.count), isLoading: \(false)")
                 } else {
                     // User has no workout plan
                     await MainActor.run {
@@ -195,36 +196,62 @@ class WorkoutService: ObservableObject {
         // Store the workout plan for later use
         self.currentWorkoutPlan = plan
         
-        // Get today's day of the week
+        // Get today's day of the week for prioritization
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
         let todayString = formatter.string(from: Date())
         
-        // Get exercises scheduled for today only
-        let todayExercises = plan.plan.filter { $0.dayOfWeek == todayString }
+        print("📅 WorkoutService: Today is \(todayString)")
         
-        // Get unique exercise names for today
+        // Get all unique exercise names from the entire plan (not just today)
+        let allExerciseNames = Set(plan.plan.map { $0.exerciseName })
+        
+        print("🏋️ WorkoutService: Found \(allExerciseNames.count) unique exercises in plan: \(Array(allExerciseNames).joined(separator: ", "))")
+        
+        // Get today's scheduled exercise names for prioritization
+        let todayExercises = plan.plan.filter { $0.dayOfWeek == todayString }
         let todayExerciseNames = Set(todayExercises.map { $0.exerciseName })
         
-        // Create Exercise objects only for today's exercises
-        let exercises = todayExerciseNames.map { exerciseName in
-            // Get plan data specifically for today's instance of this exercise
-            let todayPlanExercises = todayExercises.filter { $0.exerciseName == exerciseName }
+        // Create Exercise objects for all exercises in the plan
+        let exercises = allExerciseNames.map { exerciseName in
+            // Try to get today's specific exercise data first, otherwise use any available data
+            let todayExerciseData = plan.plan.filter { $0.dayOfWeek == todayString && $0.exerciseName == exerciseName }
+            let exerciseData = todayExerciseData.first ?? plan.plan.first { $0.exerciseName == exerciseName }!
             
-            // Use today's specific exercise data for defaults
-            let todayExercise = todayPlanExercises.first!
+            let isScheduledToday = todayExerciseNames.contains(exerciseName)
+            let scheduleInfo = isScheduledToday ? "scheduled for TODAY" : "scheduled on \(exerciseData.dayOfWeek)"
+            print("📝 WorkoutService: Creating exercise \(exerciseName) with \(exerciseData.sets) sets x \(exerciseData.reps) reps (\(scheduleInfo))")
             
             return Exercise(
                 name: exerciseName,
                 defaultWeight: getDefaultWeightForExercise(exerciseName),
-                defaultReps: CGFloat(todayExercise.reps),
+                defaultReps: CGFloat(exerciseData.reps),
                 defaultRPE: 70, // Default RPE
                 setsCompleted: 0,
-                exerciseType: todayExercise.exerciseType
+                exerciseType: exerciseData.exerciseType
             )
         }.sorted { lhs, rhs in
-            // Sort alphabetically
-            return lhs.name < rhs.name
+            let lhsIsToday = todayExerciseNames.contains(lhs.name)
+            let rhsIsToday = todayExerciseNames.contains(rhs.name)
+            
+            // Prioritize today's exercises first
+            if lhsIsToday && !rhsIsToday {
+                return true  // lhs (today's exercise) comes first
+            } else if !lhsIsToday && rhsIsToday {
+                return false // rhs (today's exercise) comes first
+            } else {
+                // Both are today's exercises or both are not - sort alphabetically
+                return lhs.name < rhs.name
+            }
+        }
+        
+        // Log the final ordering and today's status
+        if todayExercises.isEmpty {
+            print("⚠️ WorkoutService: No exercises scheduled for today (\(todayString)), showing all \(exercises.count) exercises in alphabetical order")
+        } else {
+            let todayCount = todayExerciseNames.count
+            print("✅ WorkoutService: \(todayCount) exercises scheduled for today (\(todayString)), prioritized at top of \(exercises.count) total exercises")
+            print("🔝 WorkoutService: Today's exercises (top priority): \(exercises.prefix(todayCount).map { $0.name }.joined(separator: ", "))")
         }
         
         return exercises
@@ -449,8 +476,21 @@ class WorkoutService: ObservableObject {
             $0.dayOfWeek == todayString && $0.exerciseName == exerciseName 
         }
         
-        // Return the target sets for today's exercise
-        return todayExercises.first?.sets
+        if let todayExercise = todayExercises.first {
+            // Exercise is scheduled for today
+            return todayExercise.sets
+        } else {
+            // Exercise is not scheduled for today, but let's find when it's scheduled
+            let exerciseInPlan = workoutPlan.plan.first { $0.exerciseName == exerciseName }
+            if let exercise = exerciseInPlan {
+                print("ℹ️ WorkoutService: \(exerciseName) is not scheduled for today (\(todayString)), but is scheduled on \(exercise.dayOfWeek)")
+                // Return 0 to indicate this exercise is not for today
+                return 0
+            } else {
+                print("⚠️ WorkoutService: \(exerciseName) not found in workout plan")
+                return nil
+            }
+        }
     }
     
     private func updateSetCounts() {
@@ -466,12 +506,26 @@ class WorkoutService: ObservableObject {
     
     /// Check if an exercise is completed for today (completed sets >= target sets)
     func isExerciseCompletedForToday(exerciseName: String) -> Bool {
-        guard let targetSets = getTargetSetsForToday(exerciseName: exerciseName) else { return false }
+        guard let targetSets = getTargetSetsForToday(exerciseName: exerciseName) else { 
+            print("🔍 WorkoutService: \(exerciseName) - no target sets found")
+            return false 
+        }
+        
+        // If target sets is 0, this exercise is not scheduled for today
+        // Don't mark it as completed just because target is 0
+        if targetSets == 0 {
+            print("🔍 WorkoutService: \(exerciseName) - not scheduled for today (target: 0)")
+            return false
+        }
+        
         let completedSets = todaySets.filter { $0.exerciseName == exerciseName }.count
-        return completedSets >= targetSets
+        let isCompleted = completedSets >= targetSets
+        print("🔍 WorkoutService: \(exerciseName) - completed: \(completedSets)/\(targetSets) = \(isCompleted)")
+        
+        return isCompleted
     }
     
-    // MARK: - Weekly Completion and Progressive Overload
+    // MARK: - Weekly Completion
     
     /// Check if today is the last workout day of the week and if it's completed
     func isLastWorkoutDayOfWeekCompleted() -> Bool {
@@ -502,69 +556,7 @@ class WorkoutService: ObservableObject {
             isExerciseCompletedForToday(exerciseName: exercise.name)
         }
     }
-    
-    /// Fetch up to the last 12 weeks of exercise history for progressive overload analysis
-    /// Returns all available data from the last 12 weeks, which may be less for new users
-    func fetchUpToLast12WeeksHistory() async -> [WorkoutSet]? {
-        guard let userId = currentUserId else { 
-            print("❌ WorkoutService: Cannot fetch history - no user ID")
-            return nil 
-        }
-        
-        do {
-            // Calculate date 12 weeks ago (but will return whatever data is available)
-            let twelveWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -12, to: Date()) ?? Date()
-            
-            print("🔍 WorkoutService: Fetching up to 12 weeks of exercise history (from \(twelveWeeksAgo) to now)")
-            
-            let response: [DBWorkoutSet] = try await supabase
-                .from("workout_sets")
-                .select()
-                .eq("user_id", value: userId.uuidString)
-                .gte("completed_at", value: twelveWeeksAgo.ISO8601Format())
-                .order("completed_at", ascending: true)
-                .execute()
-                .value
-            
-            let historyWorkoutSets = response.compactMap { dbSet -> WorkoutSet? in
-                guard let completedAt = dbSet.completedAt else { return nil }
-                return WorkoutSet(
-                    databaseId: dbSet.id,
-                    exerciseName: dbSet.exerciseName,
-                    weight: CGFloat(dbSet.weight),
-                    reps: CGFloat(dbSet.reps),
-                    rpe: CGFloat(dbSet.rpe),
-                    timestamp: completedAt,
-                    exerciseType: nil // Will be determined based on exercise name if needed
-                )
-            }
-            
-            // Calculate actual time span of the data
-            if let earliestDate = historyWorkoutSets.first?.timestamp,
-               let latestDate = historyWorkoutSets.last?.timestamp {
-                let timeSpan = Calendar.current.dateComponents([.weekOfYear], from: earliestDate, to: latestDate).weekOfYear ?? 0
-                print("✅ WorkoutService: Fetched \(historyWorkoutSets.count) workout sets spanning \(timeSpan) weeks")
-            } else if historyWorkoutSets.isEmpty {
-                print("✅ WorkoutService: No workout history found (new user or no previous workouts)")
-            } else {
-                print("✅ WorkoutService: Fetched \(historyWorkoutSets.count) workout sets")
-            }
-            
-            return historyWorkoutSets
-            
-        } catch {
-            print("❌ WorkoutService: Failed to fetch workout history: \(error.localizedDescription)")
-            await MainActor.run {
-                self.errorMessage = "Failed to fetch workout history: \(error.localizedDescription)"
-            }
-            return nil
-        }
-    }
-    
-    /// Get the current workout plan for progressive overload analysis
-    func getCurrentWorkoutPlan() -> DeepseekWorkoutPlan? {
-        return currentWorkoutPlan
-    }
+
     
     // MARK: - Exercise History Methods (New Feature)
     
