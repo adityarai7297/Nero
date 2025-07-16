@@ -186,7 +186,7 @@ struct ContentView: View {
     @StateObject private var workoutService = WorkoutService()
     
     var body: some View {
-        ExerciseView()
+        ExerciseView(workoutService: workoutService)
             .environmentObject(authService)
             .environmentObject(themeManager)
             .environmentObject(preferencesService)
@@ -194,7 +194,7 @@ struct ContentView: View {
 }
 
 struct ExerciseView: View {
-    @StateObject private var workoutService = WorkoutService()
+    let workoutService: WorkoutService
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var preferencesService: WorkoutPreferencesService
     @State private var currentExerciseIndex: Int = 0
@@ -321,7 +321,7 @@ struct ExerciseView: View {
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingWorkoutEditChat) {
-            WorkoutEditChatView()
+            WorkoutEditChatView(workoutService: workoutService)
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingExerciseHistory) {

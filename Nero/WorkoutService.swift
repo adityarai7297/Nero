@@ -87,6 +87,14 @@ class WorkoutService: ObservableObject {
             name: NSNotification.Name("WorkoutPlanUpdated"),
             object: nil
         )
+        
+        // Set up notification observer for workout sets updates
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleWorkoutSetsUpdate),
+            name: NSNotification.Name("WorkoutSetsUpdated"),
+            object: nil
+        )
     }
     
     deinit {
@@ -98,6 +106,14 @@ class WorkoutService: ObservableObject {
         // Reload exercises on the main thread after a short delay to ensure database is updated
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.loadUserExercises()
+        }
+    }
+    
+    @objc private func handleWorkoutSetsUpdate() {
+        print("🔔 WorkoutService: Received workout sets update notification")
+        // Reload today's sets to ensure UI stays in sync
+        DispatchQueue.main.async {
+            self.loadTodaySets()
         }
     }
     
@@ -400,6 +416,12 @@ class WorkoutService: ObservableObject {
                     self.todaySets.removeAll { $0.id == workoutSet.id }
                 }
                 self.updateSetCounts()
+                
+                // Notify other views that sets have been updated
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WorkoutSetsUpdated"), 
+                    object: nil
+                )
             }
             
             return true
@@ -449,6 +471,12 @@ class WorkoutService: ObservableObject {
                     self.todaySets[index] = workoutSet
                 }
                 self.updateSetCounts()
+                
+                // Notify other views that sets have been updated
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("WorkoutSetsUpdated"), 
+                    object: nil
+                )
             }
             
             return true

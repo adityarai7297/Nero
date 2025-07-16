@@ -15,6 +15,7 @@ struct ChatMessage: Identifiable {
 }
 
 struct WorkoutEditChatView: View {
+    let workoutService: WorkoutService
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferencesService: WorkoutPreferencesService
     @State private var messageText = ""
@@ -114,7 +115,7 @@ struct WorkoutEditChatView: View {
             // This will show the workout plan view when editing is complete
             WorkoutPlanView(
                 onExerciseSelected: { _ in }, // Not needed in this context
-                workoutService: WorkoutService() // You might want to pass this in
+                workoutService: workoutService
             )
         }
         .onAppear {
