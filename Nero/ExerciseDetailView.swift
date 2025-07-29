@@ -357,108 +357,166 @@ struct ExerciseHistoryRow: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(formatDate(set.timestamp))
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(isDeleting ? .gray : .primary)
-                    
-                    Text(formatTime(set.timestamp))
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .padding(.leading, 8)
-                }
+        VStack(spacing: 16) {
+            // Date and time row
+            HStack {
+                Text(formatDate(set.timestamp))
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDeleting ? .gray : .primary)
                 
-                HStack(spacing: 16) {
-                    HStack(spacing: 4) {
-                        Text("\(Int(set.weight))")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(isDeleting ? .gray : .primary)
-                        Text("lbs")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    HStack(spacing: 4) {
-                        Text("\(Int(set.reps))")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(isDeleting ? .gray : .primary)
-                        Text(set.exerciseType == "static_hold" ? "sec" : "reps")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    HStack(spacing: 4) {
-                        Text("\(Int(set.rpe))")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(isDeleting ? .gray : .primary)
-                        Text("%")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    Spacer()
-                    
-                    // Volume display
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Volume")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        Text("\(Int(set.weight * set.reps))")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.primary)
-                    }
-                }
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                Button(action: onEdit) {
-                    Image(systemName: "pencil")
-                        .font(.caption)
-                        .foregroundColor(Color.accentBlue)
-                        .frame(width: 32, height: 32)
-                        .background(Color.accentBlue.opacity(0.1))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(isDeleting)
-                .opacity(isDeleting ? 0.3 : 1.0)
+                Text(formatTime(set.timestamp))
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.leading, 8)
                 
-                Button(action: onDelete) {
-                    if isDeleting {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .frame(width: 32, height: 32)
-                    } else {
-                        Image(systemName: "trash")
+                Spacer()
+                
+                HStack(spacing: 8) {
+                    Button(action: onEdit) {
+                        Image(systemName: "pencil")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(Color.accentBlue)
                             .frame(width: 32, height: 32)
-                            .background(Color.red.opacity(0.1))
+                            .background(Color.accentBlue.opacity(0.1))
                             .clipShape(Circle())
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(isDeleting)
+                    .opacity(isDeleting ? 0.3 : 1.0)
+                    
+                    Button(action: onDelete) {
+                        if isDeleting {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .frame(width: 32, height: 32)
+                        } else {
+                            Image(systemName: "trash")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .frame(width: 32, height: 32)
+                                .background(Color.red.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(isDeleting)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .disabled(isDeleting)
+            }
+            
+            // Main data row with left boxed stats and right volume
+            HStack(alignment: .center, spacing: 20) {
+                // Left side: Boxed vertical stats
+                VStack(spacing: 12) {
+                    // Weight
+                    HStack {
+                        Image(systemName: "scalemass.fill")
+                            .font(.caption)
+                            .foregroundColor(Color.accentBlue)
+                            .frame(width: 16)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Weight")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Text("\(Int(set.weight))")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(isDeleting ? .gray : .primary)
+                                Text("lbs")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        Spacer()
+                    }
+                    
+                    // Reps
+                    HStack {
+                        Image(systemName: "repeat")
+                            .font(.caption)
+                            .foregroundColor(Color.accentBlue)
+                            .frame(width: 16)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(set.exerciseType == "static_hold" ? "Duration" : "Reps")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Text("\(Int(set.reps))")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(isDeleting ? .gray : .primary)
+                                Text(set.exerciseType == "static_hold" ? "sec" : "reps")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        Spacer()
+                    }
+                    
+                    // RPE
+                    HStack {
+                        Image(systemName: "gauge.high")
+                            .font(.caption)
+                            .foregroundColor(Color.accentBlue)
+                            .frame(width: 16)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("RPE")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Text("\(Int(set.rpe))")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(isDeleting ? .gray : .primary)
+                                Text("%")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                        Spacer()
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                        )
+                )
+                
+                Spacer()
+                
+                // Right side: Volume display
+                VStack(alignment: .center, spacing: 8) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.title2)
+                        .foregroundColor(Color.accentBlue)
+                    
+                    VStack(spacing: 4) {
+                        Text("Volume")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(Int(set.weight * set.reps))")
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(isDeleting ? .gray : .primary)
+                    }
+                }
+                .frame(minWidth: 80)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                )
+                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
         .opacity(isDeleting ? 0.6 : 1.0)
         .scaleEffect(isDeleting ? 0.95 : 1.0)

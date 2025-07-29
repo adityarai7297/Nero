@@ -134,67 +134,77 @@ struct ExerciseHistoryCard: View {
     
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 12) {
-                // Exercise name and chevron
+            VStack(alignment: .leading, spacing: 20) {
+                // Header section with exercise name and chevron
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text(exerciseName)
-                            .font(.title3)
+                            .font(.title2)
                             .fontWeight(.bold)
                             .foregroundColor(.primary)
                             .multilineTextAlignment(.leading)
                         
                         if let stats = stats {
-                            Text("\(stats.totalSets) sets recorded")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "list.bullet.clipboard.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(Color.accentBlue)
+                                Text("\(stats.totalSets) sets recorded")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                     
                     Spacer()
                     
                     Image(systemName: "chevron.right")
-                        .font(.caption)
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .padding(.top, 4)
                 }
                 
-                // Stats row
+                // Stats section with better organization
                 if let stats = stats {
-                    HStack(alignment: .top, spacing: 0) {
-                        StatItem(
-                            title: "Max Weight",
-                            value: "\(Int(stats.maxWeight)) lbs",
-                            icon: "scalemass.fill"
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        StatItem(
-                            title: "Max Volume", 
-                            value: "\(Int(stats.maxVolume))",
-                            icon: "chart.bar.fill"
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        
-                        if let lastWorkout = stats.lastWorkout {
-                            StatItem(
-                                title: "Last Workout",
-                                value: relativeDateString(from: lastWorkout),
-                                icon: "calendar.circle.fill"
+                    VStack(spacing: 16) {
+                        // Top row: Max Weight and Max Volume
+                        HStack(spacing: 16) {
+                            StatCard(
+                                title: "Max Weight",
+                                value: "\(Int(stats.maxWeight)) lbs",
+                                icon: "scalemass.fill",
+                                color: Color.accentBlue
                             )
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            StatCard(
+                                title: "Max Volume", 
+                                value: "\(Int(stats.maxVolume))",
+                                icon: "chart.bar.fill",
+                                color: Color.accentBlue
+                            )
+                        }
+                        
+                        // Bottom section: Last Workout (if available)
+                        if let lastWorkout = stats.lastWorkout {
+                            HStack {
+                                StatCard(
+                                    title: "Last Workout",
+                                    value: relativeDateString(from: lastWorkout),
+                                    icon: "calendar.circle.fill",
+                                    color: Color.accentBlue
+                                )
+                                Spacer()
+                            }
                         }
                     }
                 }
             }
-            .padding(16)
-                            .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.white)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                        )
-                )
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white)
+                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+            )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -203,6 +213,48 @@ struct ExerciseHistoryCard: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            // Icon container
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+                .frame(width: 24, height: 24)
+            
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fontWeight(.medium)
+                
+                Text(value)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.gray.opacity(0.12), lineWidth: 1)
+                )
+        )
     }
 }
 
