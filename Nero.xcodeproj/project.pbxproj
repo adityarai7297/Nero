@@ -20,9 +20,22 @@
 		404A09F32DDBACEB004B72B8 /* Nero.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nero.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		409C391E2E39FF95003BBC0C /* Exceptions for "Nero" folder in "Nero" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 404A09F22DDBACEB004B72B8 /* Nero */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		404A09F52DDBACEB004B72B8 /* Nero */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				409C391E2E39FF95003BBC0C /* Exceptions for "Nero" folder in "Nero" target */,
+			);
 			path = Nero;
 			sourceTree = "<group>";
 		};
@@ -291,6 +304,7 @@
 				DEVELOPMENT_TEAM = XK6AQX4LZN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Nero/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Cerro;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -321,6 +335,7 @@
 				DEVELOPMENT_TEAM = XK6AQX4LZN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Nero/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Cerro;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

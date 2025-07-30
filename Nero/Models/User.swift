@@ -152,9 +152,11 @@ class AuthService: ObservableObject {
     }
     
     private func checkSession() {
+        print("🔍 checkSession() called")
         // Skip session check if this is a fresh install
         let hasLaunchedBefore = UserDefaults.standard.bool(forKey: firstLaunchKey)
         if !hasLaunchedBefore {
+            print("🆕 Fresh install detected - setting phase to idle")
             phase = .idle
             return
         }
@@ -188,6 +190,43 @@ class AuthService: ObservableObject {
                     self.user = nil
                     self.phase = .idle
                 }
+            }
+        }
+    }
+    
+    func refreshSession() async {
+        print("🔄 Refreshing session after OAuth callback...")
+        do {
+            let session = try await supabase.auth.session
+            let authUser = session.user
+            
+            print("✅ Found OAuth session for user: \(authUser.email ?? "unknown")")
+            
+            // Ensure profile exists for OAuth user
+            let profileExists = await UserProfileService.ensureUserProfileExists(for: authUser)
+            if profileExists {
+                print("✅ Profile verified for OAuth user: \(authUser.email ?? "unknown")")
+            } else {
+                print("⚠️ Profile creation failed for OAuth user: \(authUser.email ?? "unknown")")
+            }
+            
+            let user = User(
+                id: authUser.id,
+                email: authUser.email ?? "",
+                createdAt: authUser.createdAt
+            )
+            
+            await MainActor.run {
+                self.user = user
+                self.phase = .success(user)
+                self.isLoading = false
+            }
+        } catch {
+            print("❌ No valid session found after OAuth: \(error)")
+            await MainActor.run {
+                self.user = nil
+                self.phase = .idle
+                self.isLoading = false
             }
         }
     }
@@ -370,17 +409,40 @@ class AuthService: ObservableObject {
         do {
             print("🔄 Initiating Google OAuth sign-in...")
             let response = try await supabase.auth.signInWithOAuth(
-                provider: .google,
-                redirectTo: URL(string: "com.yourapp.nero://login")
+                provider: .google
+            )
+            print("✅ Google OAuth initiated successfully")
+            
+            // Now check for session (like email/password flow)
+            let session = try await supabase.auth.session
+            let authUser = session.user
+            
+            print("✅ Google OAuth session confirmed for: \(authUser.email ?? "unknown")")
+            
+            // Create user profile if needed
+            let profileExists = await UserProfileService.ensureUserProfileExists(for: authUser)
+            if profileExists {
+                print("✅ Profile verified for OAuth user: \(authUser.email ?? "unknown")")
+            } else {
+                print("⚠️ Profile creation failed for OAuth user: \(authUser.email ?? "unknown")")
+            }
+            
+            let user = User(
+                id: authUser.id,
+                email: authUser.email ?? "",
+                createdAt: authUser.createdAt
             )
             
-            // OAuth sign-in will handle the redirect, so we return true here
-            // The actual user will be set when the app receives the callback
+            // Update state DIRECTLY like email/password does
             await MainActor.run {
+                self.user = user
+                self.phase = .success(user)
                 self.isLoading = false
             }
-            print("✅ Google OAuth initiated successfully")
+            
+            print("🎉 Google OAuth completed successfully!")
             return true
+            
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
@@ -398,11 +460,10 @@ class AuthService: ObservableObject {
         do {
             print("🔄 Initiating Apple OAuth sign-in...")
             let response = try await supabase.auth.signInWithOAuth(
-                provider: .apple,
-                redirectTo: URL(string: "com.yourapp.nero://login")
+                provider: .apple
             )
             
-            // OAuth sign-in will handle the redirect, so we return true here
+            // OAuth sign-in will handle the redirect via the Supabase callback
             // The actual user will be set when the app receives the callback
             await MainActor.run {
                 self.isLoading = false
