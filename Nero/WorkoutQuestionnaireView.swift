@@ -723,7 +723,7 @@ struct WorkoutQuestionnaireView: View {
     
     @ViewBuilder
     private func NavigationButtonsView() -> some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             // Back Button
             if currentStep > 0 {
                 Button(action: {
@@ -743,10 +743,14 @@ struct WorkoutQuestionnaireView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                 }
-
-            } else {
-                Spacer()
-                    .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.accentBlue.opacity(0.3), lineWidth: 1.5)
+                        )
+                )
             }
             
             // Next/Finish Button
@@ -780,7 +784,10 @@ struct WorkoutQuestionnaireView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
             }
-            
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.accentBlue)
+            )
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
