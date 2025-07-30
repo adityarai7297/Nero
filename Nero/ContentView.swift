@@ -418,7 +418,7 @@ struct ExerciseView: View {
                         showingSideMenu.toggle()
                     }
                 }) {
-                    Image(systemName: "line.3.horizontal")
+                    Image(systemName: "square.grid.2x2")
                         .font(.title2)
                         .fontWeight(.semibold)
                         .foregroundColor(Color.accentBlue.opacity(0.8))
@@ -460,6 +460,10 @@ struct ExerciseView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.accentBlue)
+                        )
                 }
                 .padding(.horizontal, 40)
                 .padding(.top, 8)
