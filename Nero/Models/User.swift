@@ -463,13 +463,38 @@ class AuthService: ObservableObject {
                 provider: .apple
             )
             
-            // OAuth sign-in will handle the redirect via the Supabase callback
-            // The actual user will be set when the app receives the callback
+            print("✅ Apple OAuth initiated successfully")
+            
+            // Now check for session (like email/password flow)
+            let session = try await supabase.auth.session
+            let authUser = session.user
+            
+            print("✅ Apple OAuth session confirmed for: \(authUser.email ?? "unknown")")
+            
+            // Create user profile if needed
+            let profileExists = await UserProfileService.ensureUserProfileExists(for: authUser)
+            if profileExists {
+                print("✅ Profile verified for OAuth user: \(authUser.email ?? "unknown")")
+            } else {
+                print("⚠️ Profile creation failed for OAuth user: \(authUser.email ?? "unknown")")
+            }
+            
+            let user = User(
+                id: authUser.id,
+                email: authUser.email ?? "",
+                createdAt: authUser.createdAt
+            )
+            
+            // Update state DIRECTLY like email/password does
             await MainActor.run {
+                self.user = user
+                self.phase = .success(user)
                 self.isLoading = false
             }
-            print("✅ Apple OAuth initiated successfully")
+            
+            print("🎉 Apple OAuth completed successfully!")
             return true
+            
         } catch {
             await MainActor.run {
                 self.errorMessage = error.localizedDescription
