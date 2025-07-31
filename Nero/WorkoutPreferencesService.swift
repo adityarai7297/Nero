@@ -454,7 +454,13 @@ class WorkoutPreferencesService: ObservableObject {
         } catch {
             print("❌ Edit workflow failed with error: \(error)")
             print("🔍 Error details: \(error.localizedDescription)")
-            await updateStatus(.failed("Edit failed"))
+            
+            // Check if this is a "could not understand" error
+            if let deepseekError = error as? DeepseekError, deepseekError == .couldNotUnderstand {
+                await updateStatus(.failed("Could not understand"))
+            } else {
+                await updateStatus(.failed("Edit failed"))
+            }
         }
         
         endBackgroundTask()

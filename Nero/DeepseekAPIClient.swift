@@ -1,5 +1,26 @@
 import Foundation
 
+// MARK: - Custom Error Types
+enum DeepseekError: Error, LocalizedError, Equatable {
+    case couldNotUnderstand
+    case apiError(String)
+    case configurationError(String)
+    case parsingError(String)
+    
+    var errorDescription: String? {
+        switch self {
+        case .couldNotUnderstand:
+            return "I couldn't understand your request. Please try rephrasing your request with more specific details about what you'd like to change in your workout plan."
+        case .apiError(let message):
+            return "API Error: \(message)"
+        case .configurationError(let message):
+            return "Configuration Error: \(message)"
+        case .parsingError(let message):
+            return "Parsing Error: \(message)"
+        }
+    }
+}
+
 struct DeepseekWorkoutPlanDay: Codable {
     let dayOfWeek: String
     let exerciseName: String
@@ -101,11 +122,14 @@ class DeepseekAPIClient {
 
         Design Principles:
         - Honor the exact session frequency specified by the user—never add or omit training days.
+        - For higher frequency splits (5+ days), distribute workout days across the entire week INCLUDING Saturday and Sunday. Do not avoid weekends.
+        - For 6-day splits, include at least one weekend day (Saturday or Sunday). For 7-day splits, include both Saturday and Sunday.
         - Match their equipment access and movement style preferences
         - Consider their experience level and goals
         - Organize each workout around the user's preferred split (full body, push/pull/legs, upper/lower, etc.)
         - Prioritize focus muscle groups with additional sets, angles, and exercises; give lower-priority areas only the minimum effective volume to maintain balance.
-        - Lead sessions with large compound lifts for efficiency and strength, then layer accessory compounds and isolation work—finishing with core or metabolic/finisher drills if time permits.
+        - Lead sessions with large compound lifts for efficiency and strength, then layer accessory compounds and isolation work.
+        - ONLY include core/ab exercises if: (1) the user specifically requests them, (2) they're in the "more focus" muscle groups, or (3) they're truly necessary for the training split. Do not automatically add core work as "finishers."
         - Use your fitness expertise to create a balanced, effective program
         - Include variety while maintaining focus on their primary goal
         - Pay attention to focus muscle groups and less focus muscle groups and make sure to include exercises that emphasize this
@@ -275,7 +299,9 @@ class DeepseekAPIClient {
         let systemPrompt = """
         You are an expert fitness coach. The user has an existing workout plan and wants to make specific changes to it. Modify the plan according to their request while keeping the same JSON format.
 
-        Return ONLY a valid JSON object in this exact format:
+        IMPORTANT: If the user's request is unclear, gibberish, nonsensical, or doesn't relate to workout planning, respond with exactly this text: "COULD_NOT_UNDERSTAND_REQUEST"
+
+        Otherwise, return ONLY a valid JSON object in this exact format:
         {
           "plan": [
             {
@@ -309,10 +335,15 @@ class DeepseekAPIClient {
 
         Editing Guidelines:
         - Make the requested changes while preserving the overall structure and balance of the plan
+        - For higher frequency splits (5+ days), ensure workout days are distributed across the entire week INCLUDING Saturday and Sunday. Do not avoid weekends.
+        - For 6-day splits, include at least one weekend day (Saturday or Sunday). For 7-day splits, include both Saturday and Sunday.
         - If adding exercises, ensure they fit logically with the existing workout split
         - If removing exercises, maintain balance across muscle groups unless specifically requested otherwise
+        - ONLY include core/ab exercises if: (1) the user specifically requests them, (2) they're in the "more focus" muscle groups, or (3) they're truly necessary for the training split. Do not automatically add core work as "finishers."
         - Keep user's training experience, goals, and equipment access in mind
         - Maintain appropriate volume and intensity for their level
+
+        Remember: If you can't understand the request or it's not related to workout editing, respond with "COULD_NOT_UNDERSTAND_REQUEST"
         """
         
         let userPrompt = """
@@ -380,8 +411,15 @@ class DeepseekAPIClient {
             
             print("📝 Edit content from API: \(content)")
             
+            // Check if DeepSeek couldn't understand the request
+            let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedContent == "COULD_NOT_UNDERSTAND_REQUEST" {
+                print("❌ DeepSeek could not understand the edit request")
+                throw DeepseekError.couldNotUnderstand
+            }
+            
             // Clean the content - remove markdown code blocks if present
-            var cleanedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            var cleanedContent = trimmedContent
             
             // Remove markdown code blocks (```json ... ``` or ``` ... ```)
             if cleanedContent.hasPrefix("```") {

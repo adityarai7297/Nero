@@ -2130,7 +2130,7 @@ struct WorkoutPlanView: View {
     let onExerciseSelected: (String) -> Void
     let workoutService: WorkoutService
     
-    private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
     var body: some View {
         NavigationView {

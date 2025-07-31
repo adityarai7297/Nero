@@ -86,7 +86,7 @@ struct LoadingView: View {
                 .font(.system(size: 60))
                 .foregroundStyle(.blue)
             
-            Text("Nero")
+            Text("Cerro")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             

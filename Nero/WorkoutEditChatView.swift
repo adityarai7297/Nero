@@ -88,6 +88,36 @@ struct WorkoutEditChatView: View {
                                 withAnimation(.easeInOut(duration: 0.5)) {
                                     proxy.scrollTo("completed", anchor: .bottom)
                                 }
+                            } else if case .failed(let error) = status, error == "Could not understand" {
+                                // Handle "could not understand" error specifically
+                                isProcessing = false
+                                messages.append(ChatMessage(
+                                    text: "I couldn't understand your request. Please try rephrasing with more specific details about what you'd like to change in your workout plan.",
+                                    isFromUser: false,
+                                    timestamp: Date()
+                                ))
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    proxy.scrollTo(messages.last?.id, anchor: .bottom)
+                                }
+                                // Reset status so user can try again
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    preferencesService.generationStatus = .idle
+                                }
+                            } else if case .failed(_) = status {
+                                // Handle other failures
+                                isProcessing = false
+                                messages.append(ChatMessage(
+                                    text: "Sorry, there was an error processing your request. Please try again.",
+                                    isFromUser: false,
+                                    timestamp: Date()
+                                ))
+                                withAnimation(.easeInOut(duration: 0.5)) {
+                                    proxy.scrollTo(messages.last?.id, anchor: .bottom)
+                                }
+                                // Reset status so user can try again
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    preferencesService.generationStatus = .idle
+                                }
                             }
                         }
                     }
