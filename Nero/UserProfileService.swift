@@ -74,4 +74,7 @@ class UserProfileService: ObservableObject {
             return false
         }
     }
+    
+    /// Note: User account deletion is handled by Supabase Edge Function
+    /// See Models/User.swift deleteAccount() method for implementation
 } 

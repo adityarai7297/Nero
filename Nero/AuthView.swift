@@ -28,7 +28,7 @@ struct AuthView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
-                        Text("Track your workouts with precision")
+                        Text("Lift with AI")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }

@@ -504,4 +504,66 @@ class AuthService: ObservableObject {
             return false
         }
     }
+    
+    func completeAccountDeletionCleanup() async {
+        print("🧹 Completing final account deletion cleanup...")
+        
+        // Clear local session cache to prevent ghost sessions
+        do {
+            try await supabase.auth.signOut()
+            print("✅ Local session cleared successfully")
+        } catch {
+            print("⚠️ Warning: Failed to clear local session: \(error.localizedDescription)")
+            // Continue anyway since the account is deleted on server
+        }
+        
+        // Reset first launch flag to treat next install as fresh
+        UserDefaults.standard.removeObject(forKey: firstLaunchKey)
+        UserDefaults.standard.synchronize()
+        
+        // Clear local state
+        await MainActor.run {
+            self.user = nil
+            self.phase = .idle
+            self.isLoading = false
+            self.errorMessage = nil
+        }
+        
+        print("✅ Account deletion cleanup completed")
+    }
+    
+    func deleteAccount() async -> Bool {
+        guard let currentUser = user else {
+            print("❌ No user logged in to delete")
+            return false
+        }
+        
+        print("🗑️ Starting account deletion process for user: \(currentUser.email)")
+        
+        do {
+            // Call the Supabase Edge Function to delete the user account
+            // This will delete both auth user and all database records
+            let userIdBody = ["user_id": currentUser.id.uuidString]
+            let jsonData = try JSONSerialization.data(withJSONObject: userIdBody)
+            
+            let _ = try await supabase.functions.invoke(
+                "delete-user-account",
+                options: FunctionInvokeOptions(body: jsonData)
+            )
+            
+            // Don't clear session immediately - let success screen show first
+            print("✅ Account deleted from server, keeping session for success screen")
+            
+            print("✅ Account deletion completed successfully for: \(currentUser.email)")
+            return true
+            
+        } catch {
+            await MainActor.run {
+                self.errorMessage = "Failed to delete account: \(error.localizedDescription)"
+                self.isLoading = false
+            }
+            print("❌ Account deletion failed: \(error.localizedDescription)")
+            return false
+        }
+    }
 } 
