@@ -16,6 +16,7 @@ struct MacroChatView: View {
     @State private var messageText: String = ""
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
+    @FocusState private var isTextFieldFocused: Bool
     
     var body: some View {
         NavigationView {
@@ -74,6 +75,8 @@ struct MacroChatView: View {
                                 .background(Color.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
                                 .lineLimit(1...5)
+                                .focused($isTextFieldFocused)
+                                .onSubmit { sendMessage() }
                             Button(action: sendMessage) {
                                 Image(systemName: "arrow.up.circle.fill")
                                     .font(.title2)
@@ -99,6 +102,7 @@ struct MacroChatView: View {
         }
         .onAppear {
             macroService.setUser(userId)
+            isTextFieldFocused = true
         }
     }
     
@@ -110,6 +114,7 @@ struct MacroChatView: View {
         messageText = ""
         isLoading = true
         errorMessage = nil
+        isTextFieldFocused = true
         
         Task {
             do {

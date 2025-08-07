@@ -158,34 +158,11 @@ struct MacroDayDetailView: View {
                 } else if meals.isEmpty {
                     Text("No meals for this day").foregroundColor(.secondary)
                 } else {
-                    List {
-                        ForEach(meals) { meal in
-                            Section(header: Text(meal.title).font(.headline)) {
-                                ForEach(meal.items) { item in
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(item.name).font(.body).fontWeight(.medium)
-                                            Text(item.quantityDescription).font(.caption).foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        VStack(alignment: .trailing) {
-                                            Text("\(Int(item.calories)) kcal").font(.caption)
-                                            HStack(spacing: 8) {
-                                                Text("P \(Int(item.protein))g").font(.caption2).foregroundColor(.blue)
-                                                Text("C \(Int(item.carbs))g").font(.caption2).foregroundColor(.orange)
-                                                Text("F \(Int(item.fat))g").font(.caption2).foregroundColor(.purple)
-                                            }
-                                        }
-                                    }
-                                }
-                                HStack {
-                                    Text("Totals").font(.subheadline).fontWeight(.semibold)
-                                    Spacer()
-                                    Text("\(Int(meal.totals.calories)) kcal | P \(Int(meal.totals.protein)) C \(Int(meal.totals.carbs)) F \(Int(meal.totals.fat))")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                ActionButtonsRow(
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(meals) { meal in
+                                MealCard(
+                                    meal: meal,
                                     onEditManual: { editingMeal = meal; showingManualEditSheet = true },
                                     onEditAI: {
                                         editingMeal = meal
@@ -198,9 +175,9 @@ struct MacroDayDetailView: View {
                                 )
                             }
                         }
-                        .listRowBackground(Color.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 16)
                     }
-                    .listStyle(InsetGroupedListStyle())
                 }
             }
             .navigationTitle(dateString(date))
@@ -365,6 +342,89 @@ struct AIEditingToast: View {
             RoundedRectangle(cornerRadius: 14)
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 6)
+        )
+    }
+}
+
+// MARK: - Meal Card Component
+
+private extension String {
+    var titleCased: String { self.localizedCapitalized }
+}
+
+struct MealCard: View {
+    let meal: MacroMeal
+    let onEditManual: () -> Void
+    let onEditAI: () -> Void
+    let onDelete: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header row with title-cased meal name and calories badge
+            HStack {
+                Text(meal.title.titleCased)
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                Spacer()
+                Text("\(Int(meal.totals.calories)) kcal")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.red.opacity(0.08)))
+            }
+
+            // Items list
+            VStack(spacing: 10) {
+                ForEach(meal.items) { item in
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text(item.quantityDescription)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(Int(item.calories)) kcal")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                Text("P \(Int(item.protein))g").font(.caption2).foregroundColor(.blue)
+                                Text("C \(Int(item.carbs))g").font(.caption2).foregroundColor(.orange)
+                                Text("F \(Int(item.fat))g").font(.caption2).foregroundColor(.purple)
+                            }
+                        }
+                    }
+                    if item.id != meal.items.last?.id {
+                        Divider().padding(.leading, 0)
+                    }
+                }
+            }
+
+            // Totals row
+            HStack {
+                Text("Totals")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Spacer()
+                Text("\(Int(meal.totals.calories)) kcal | P \(Int(meal.totals.protein)) C \(Int(meal.totals.carbs)) F \(Int(meal.totals.fat))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Actions
+            ActionButtonsRow(onEditManual: onEditManual, onEditAI: onEditAI, onDelete: onDelete)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
         )
     }
 }

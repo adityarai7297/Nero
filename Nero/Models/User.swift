@@ -541,6 +541,9 @@ class AuthService: ObservableObject {
         print("🗑️ Starting account deletion process for user: \(currentUser.email)")
         
         do {
+            // Best-effort client-side cleanup of user data (including macros)
+            await cleanupUserData(userId: currentUser.id)
+
             // Call the Supabase Edge Function to delete the user account
             // This will delete both auth user and all database records
             let userIdBody = ["user_id": currentUser.id.uuidString]
@@ -564,6 +567,44 @@ class AuthService: ObservableObject {
             }
             print("❌ Account deletion failed: \(error.localizedDescription)")
             return false
+        }
+    }
+
+    /// Best-effort cleanup of user data in public tables prior to account deletion
+    private func cleanupUserData(userId: UUID) async {
+        // Delete macro meals first; items cascade via FK
+        do {
+            try await supabase
+                .from("macro_meals")
+                .delete()
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+            print("✅ Deleted macro_meals for user \(userId)")
+        } catch {
+            print("⚠️ Failed to delete macro_meals for user: \(error.localizedDescription)")
+        }
+
+        // Delete workout data as well (redundant with Edge Function but safe)
+        do {
+            try await supabase
+                .from("workout_sets")
+                .delete()
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+            print("✅ Deleted workout_sets for user \(userId)")
+        } catch {
+            print("⚠️ Failed to delete workout_sets for user: \(error.localizedDescription)")
+        }
+
+        do {
+            try await supabase
+                .from("workout_plans")
+                .delete()
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+            print("✅ Deleted workout_plans for user \(userId)")
+        } catch {
+            print("⚠️ Failed to delete workout_plans for user: \(error.localizedDescription)")
         }
     }
 } 
