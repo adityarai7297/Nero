@@ -212,6 +212,8 @@ struct ExerciseView: View {
     @State private var showingWorkoutEditChat: Bool = false // Control workout edit chat presentation
     @State private var showingExerciseHistory: Bool = false // Control exercise history view presentation
     @State private var showingAIChat: Bool = false // Control AI chat view presentation
+    @State private var showingMacroChat: Bool = false // Macro chat
+    @State private var showingMacroHistory: Bool = false // Macro history
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -331,6 +333,12 @@ struct ExerciseView: View {
         }
         .sheet(isPresented: $showingAIChat) {
             AIChatView(workoutService: workoutService)
+        }
+        .sheet(isPresented: $showingMacroChat) {
+            MacroChatView(userId: authService.user?.id)
+        }
+        .sheet(isPresented: $showingMacroHistory) {
+            MacroHistoryView(userId: authService.user?.id)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -1089,6 +1097,34 @@ struct ExerciseView: View {
                             // Small delay to let menu close animation finish
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                                 showingAIChat = true
+                            }
+                        }
+                        
+                        // Macro Tracker button
+                        NeumorphicMenuTile(
+                            title: "Macro Tracker",
+                            icon: "fork.knife",
+                            color: Color.orange
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingMacroChat = true
+                            }
+                        }
+                        
+                        // Macro History button
+                        NeumorphicMenuTile(
+                            title: "Macro History",
+                            icon: "chart.pie.fill",
+                            color: Color.orange
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                showingSideMenu = false
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showingMacroHistory = true
                             }
                         }
                         

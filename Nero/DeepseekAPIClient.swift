@@ -271,6 +271,177 @@ class DeepseekAPIClient {
         }
     }
     
+    // MARK: - Macro Parsing Models
+    struct DeepseekMealItem: Codable {
+        let name: String
+        let quantity: String
+        let calories: Double
+        let protein: Double
+        let carbs: Double
+        let fat: Double
+    }
+
+    struct DeepseekParsedMeal: Codable {
+        let mealTitle: String
+        let items: [DeepseekMealItem]
+        let totals: MacroTotals
+    }
+
+    // MARK: - Macro Parsing
+    func getMealFromDescription(userText: String) async throws -> DeepseekParsedMeal {
+        guard Config.validateConfiguration() else {
+            throw NSError(domain: "DeepseekAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "DeepSeek API key not configured. Please set your API key in Config.swift"])
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        let systemPrompt = """
+        You are a nutrition analyst AI. Parse the user's free-text description of what they ate into a structured meal JSON.
+
+        Return ONLY a valid JSON object with this exact schema:
+        {
+          "mealTitle": "string", // short title inferred from description (e.g., "Breakfast", "Lunch", or key item)
+          "items": [
+            {
+              "name": "string",
+              "quantity": "string", // include units like "1 cup", "2 slices", "1 tbsp"
+              "calories": number,
+              "protein": number, // grams
+              "carbs": number,   // grams
+              "fat": number      // grams
+            }
+          ],
+          "totals": {
+            "calories": number,
+            "protein": number,
+            "carbs": number,
+            "fat": number
+          }
+        }
+
+        Rules:
+        - Infer reasonable amounts only if missing; prefer using given quantities or brands if supplied
+        - Keep items granular (bread, eggs, butter separately)
+        - Use common nutrition references when unspecified
+        - Never include markdown or code fences
+        """
+
+        let userPrompt = """
+        User description of meal:
+        \(userText)
+        """
+
+        let chatRequest = DeepseekChatRequest(
+            model: "deepseek-chat",
+            messages: [
+                DeepseekRequestMessage(role: "system", content: systemPrompt),
+                DeepseekRequestMessage(role: "user", content: userPrompt)
+            ],
+            stream: false,
+            temperature: 0.3
+        )
+
+        request.httpBody = try JSONEncoder().encode(chatRequest)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
+        }
+
+        let chatResponse = try JSONDecoder().decode(DeepseekChatResponse.self, from: data)
+        guard var content = chatResponse.choices.first?.message.content else {
+            throw NSError(domain: "DeepseekAPI", code: 2, userInfo: [NSLocalizedDescriptionKey: "No content in API response"])
+        }
+        content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if content.hasPrefix("```") {
+            if let firstNewline = content.firstIndex(of: "\n") { content = String(content[content.index(after: firstNewline)...]) }
+            if content.hasSuffix("```") { content = String(content.dropLast(3)) }
+            content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard let contentData = content.data(using: .utf8) else {
+            throw NSError(domain: "DeepseekAPI", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to convert content to data"])
+        }
+
+        // Decode via a local wrapper that reuses MacroTotals from app domain
+        let parsed = try JSONDecoder().decode(DeepseekParsedMeal.self, from: contentData)
+        return parsed
+    }
+
+    func editMealFromRequest(editRequest: String, currentMeal: MacroMeal) async throws -> DeepseekParsedMeal {
+        guard Config.validateConfiguration() else {
+            throw NSError(domain: "DeepseekAPI", code: 0, userInfo: [NSLocalizedDescriptionKey: "DeepSeek API key not configured. Please set your API key in Config.swift"])
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+        // Encode current meal to JSON for context
+        struct CurrentMealContext: Codable { let mealTitle: String; let items: [DeepseekMealItem]; let totals: MacroTotals }
+        let items: [DeepseekMealItem] = currentMeal.items.map { DeepseekMealItem(name: $0.name, quantity: $0.quantityDescription, calories: $0.calories, protein: $0.protein, carbs: $0.carbs, fat: $0.fat) }
+        let context = CurrentMealContext(mealTitle: currentMeal.title, items: items, totals: currentMeal.totals)
+        let encoder = JSONEncoder(); encoder.outputFormatting = .prettyPrinted
+        let contextString = String(data: try encoder.encode(context), encoding: .utf8) ?? "{}"
+
+        let systemPrompt = """
+        You are a nutrition analyst AI. Adjust the provided meal JSON according to the user's edit request (portion changes, substitutions, etc.).
+        Return ONLY a valid JSON object with the same schema as before (mealTitle, items[], totals).
+        Keep items granular and ensure totals equal the sum of items. No markdown.
+        If the request is unclear, respond with exactly: COULD_NOT_UNDERSTAND_REQUEST
+        """
+
+        let userPrompt = """
+        CURRENT MEAL (JSON):
+        \(contextString)
+
+        EDIT REQUEST:
+        \(editRequest)
+        """
+
+        let chatRequest = DeepseekChatRequest(
+            model: "deepseek-chat",
+            messages: [
+                DeepseekRequestMessage(role: "system", content: systemPrompt),
+                DeepseekRequestMessage(role: "user", content: userPrompt)
+            ],
+            stream: false,
+            temperature: 0.2
+        )
+
+        request.httpBody = try JSONEncoder().encode(chatRequest)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
+        }
+
+        let chatResponse = try JSONDecoder().decode(DeepseekChatResponse.self, from: data)
+        guard var content = chatResponse.choices.first?.message.content else {
+            throw NSError(domain: "DeepseekAPI", code: 2, userInfo: [NSLocalizedDescriptionKey: "No content in API response"])
+        }
+        content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if content == "COULD_NOT_UNDERSTAND_REQUEST" {
+            throw DeepseekError.couldNotUnderstand
+        }
+        if content.hasPrefix("```") {
+            if let firstNewline = content.firstIndex(of: "\n") { content = String(content[content.index(after: firstNewline)...]) }
+            if content.hasSuffix("```") { content = String(content.dropLast(3)) }
+            content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard let contentData = content.data(using: .utf8) else {
+            throw NSError(domain: "DeepseekAPI", code: 3, userInfo: [NSLocalizedDescriptionKey: "Failed to convert content to data"])
+        }
+        let parsed = try JSONDecoder().decode(DeepseekParsedMeal.self, from: contentData)
+        return parsed
+    }
+
     func editWorkoutPlan(editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async throws -> DeepseekWorkoutPlan {
         // Validate API key before making request
         guard Config.validateConfiguration() else {
