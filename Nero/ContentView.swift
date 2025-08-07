@@ -991,13 +991,13 @@ struct ExerciseView: View {
                 }
             
             // Centered menu content with grid layout
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 Spacer()
                 
                 // Grid of menu tiles
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
                     // Grid of menu tiles
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 2), spacing: 16) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
                         // Workout Plan Generation Status Indicator or View Plan Button
                         if preferencesService.generationStatus.isActive {
                             // Show status indicator while generating

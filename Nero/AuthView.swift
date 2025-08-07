@@ -1,11 +1,19 @@
 import SwiftUI
 
+// Focus targets for login form
+private enum FocusedField: Hashable {
+    case email
+    case password
+    case confirm
+}
+
 struct AuthView: View {
     @EnvironmentObject var authService: AuthService
     @State private var isSignUp = false
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @FocusState private var focusedField: FocusedField?
     
     // ID-based shake animation - new ID triggers new animation
     @State private var emailShakeID = UUID()
@@ -19,20 +27,7 @@ struct AuthView: View {
             ScrollView {
                 VStack(spacing: 32) {
                     // Header
-                    VStack(spacing: 20) {
-                        Image(systemName: "dumbbell.fill")
-                            .font(.system(size: 60, weight: .bold))
-                            .foregroundColor(.blue)
-                        
-                        Text("Cerro")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        
-                        Text("Lift with AI")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 40)
+                    HeaderSection()
                     
                     // Main Content - switches based on AuthPhase
                     switch authService.phase {
@@ -49,11 +44,18 @@ struct AuthView: View {
                 }
                 .padding(.vertical, 20)
             }
+            .scrollDismissesKeyboard(.interactively)
         }
         .animation(.easeInOut(duration: 0.3), value: isSignUp)
         .onChange(of: authService.phase) { _, newPhase in
             if case .error(let authError) = newPhase {
                 handleAuthError(authError)
+            }
+        }
+        .onAppear {
+            // Small delay to ensure view is mounted before focusing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                focusedField = .email
             }
         }
     }
@@ -102,7 +104,12 @@ struct AuthView: View {
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
+                        .focused($focusedField, equals: .email)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .password }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { focusedField = .email }
                 
                 // Password Field
                 VStack(alignment: .leading, spacing: 8) {
@@ -128,7 +135,18 @@ struct AuthView: View {
                             hasError: isPasswordFieldError,
                             shouldShake: isPasswordFieldError
                         ))
+                        .focused($focusedField, equals: .password)
+                        .submitLabel(isSignUp ? .next : .go)
+                        .onSubmit {
+                            if isSignUp {
+                                focusedField = .confirm
+                            } else {
+                                handleAuth()
+                            }
+                        }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { focusedField = .password }
                 
                 // Confirm Password (Sign Up only)
                 if isSignUp {
@@ -139,7 +157,12 @@ struct AuthView: View {
                         
                         SecureField("Confirm your password", text: $confirmPassword)
                             .textFieldStyle(ModernFieldStyle(hasError: false, shouldShake: false))
+                            .focused($focusedField, equals: .confirm)
+                            .submitLabel(.go)
+                            .onSubmit { handleAuth() }
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { focusedField = .confirm }
                     .transition(.opacity.combined(with: .slide))
                 }
             }
@@ -187,33 +210,36 @@ struct AuthView: View {
             .padding(.horizontal, 24)
             .padding(.vertical, 24)
             
-            // Social Login
-            VStack(spacing: 12) {
-                SocialButton(
-                    title: "Continue with Google",
-                    iconName: "google_logo",
-                    imageURL: nil,
-                    isSystemImage: false,
-                    backgroundColor: Color(.systemGray6),
-                    foregroundColor: .primary,
-                    logoSize: 32
-                ) {
-                    Task { await authService.signInWithGoogle() }
+            // Social Login (hidden while editing to prevent bottom artifact)
+            if focusedField == nil {
+                VStack(spacing: 12) {
+                    SocialButton(
+                        title: "Continue with Google",
+                        iconName: "google_logo",
+                        imageURL: nil,
+                        isSystemImage: false,
+                        backgroundColor: Color(.systemGray6),
+                        foregroundColor: .primary,
+                        logoSize: 30
+                    ) {
+                        Task { await authService.signInWithGoogle() }
+                    }
+                    
+                    SocialButton(
+                        title: "Continue with Apple",
+                        iconName: "applelogo",
+                        imageURL: nil,
+                        isSystemImage: true,
+                        backgroundColor: .black,
+                        foregroundColor: .white
+                    ) {
+                        Task { await authService.signInWithApple() }
+                    }
                 }
-                
-                SocialButton(
-                    title: "Continue with Apple",
-                    iconName: "applelogo",
-                    imageURL: nil,
-                    isSystemImage: true,
-                    backgroundColor: .black,
-                    foregroundColor: .white
-                ) {
-                    Task { await authService.signInWithApple() }
-                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 32)
         }
         .background(
             RoundedRectangle(cornerRadius: 24)
@@ -336,6 +362,38 @@ struct AuthView: View {
     }
 }
 
+// MARK: - Responsive Header Section
+private struct HeaderSection: View {
+    var body: some View {
+        GeometryReader { geo in
+            let h = geo.size.height
+            let isCompact = h < 750
+            let logoSize: CGFloat = isCompact ? 44 : 60
+            let titleFont: Font = isCompact ? .title : .largeTitle
+            let subtitleFont: Font = isCompact ? .caption : .subheadline
+            let topPad: CGFloat = isCompact ? 16 : 40
+
+            VStack(spacing: isCompact ? 12 : 20) {
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: logoSize, weight: .bold))
+                    .foregroundColor(.blue)
+                    .accessibilityHidden(true)
+
+                Text("Cerro")
+                    .font(titleFont)
+                    .fontWeight(.bold)
+
+                Text("Lift with AI")
+                    .font(subtitleFont)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, topPad)
+            .frame(maxWidth: .infinity)
+        }
+        .frame(height: 140)
+    }
+}
+
 // MARK: - Custom Styles & Components
 
 struct ModernFieldStyle: TextFieldStyle {
@@ -436,7 +494,7 @@ struct SocialButton: View {
                     .foregroundColor(foregroundColor)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(height: 52)
             .background(
                 Group {
                     if backgroundColor == .black {
@@ -452,6 +510,8 @@ struct SocialButton: View {
                     }
                 }
             )
+            .compositingGroup()
+            .drawingGroup(opaque: false)
         }
     }
     
@@ -531,7 +591,7 @@ struct NeumorphicSegmentedSwitch: View {
 
                 // Labels overlay
                 HStack(spacing: 0) {
-                    ForEach(labels.indices, id: \ .self) { idx in
+                    ForEach(labels.indices, id: \.self) { idx in
                         Button(action: {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 selection = idx == 1
