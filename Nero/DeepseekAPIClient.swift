@@ -327,6 +327,7 @@ class DeepseekAPIClient {
         - Keep items granular (bread, eggs, butter separately)
         - Use common nutrition references when unspecified
         - Never include markdown or code fences
+        - If the user's input is gibberish, unclear, not about food, or impossible (e.g., "1 mountain"), respond with exactly: COULD_NOT_UNDERSTAND_REQUEST
         """
 
         let userPrompt = """
@@ -357,6 +358,9 @@ class DeepseekAPIClient {
             throw NSError(domain: "DeepseekAPI", code: 2, userInfo: [NSLocalizedDescriptionKey: "No content in API response"])
         }
         content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if content == "COULD_NOT_UNDERSTAND_REQUEST" {
+            throw DeepseekError.couldNotUnderstand
+        }
         if content.hasPrefix("```") {
             if let firstNewline = content.firstIndex(of: "\n") { content = String(content[content.index(after: firstNewline)...]) }
             if content.hasSuffix("```") { content = String(content.dropLast(3)) }

@@ -1026,7 +1026,7 @@ struct ExerciseView: View {
                             NeumorphicMenuTile(
                                 title: "Edit Plan",
                                 icon: "bubble.left.and.bubble.right.fill",
-                                color: Color.orange
+                                color: Color.mint
                             ) {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     showingSideMenu = false

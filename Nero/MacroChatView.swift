@@ -17,6 +17,7 @@ struct MacroChatView: View {
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
     @FocusState private var isTextFieldFocused: Bool
+    @State private var textFieldResetId = UUID()
     
     var body: some View {
         NavigationView {
@@ -69,6 +70,7 @@ struct MacroChatView: View {
                         }
                         HStack(spacing: 12) {
                             TextField("e.g. 2 eggs scrambled in 1 tsp butter with toast and coffee", text: $messageText, axis: .vertical)
+                                .id(textFieldResetId)
                                 .font(.body)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
@@ -112,6 +114,7 @@ struct MacroChatView: View {
         
         messages.append(MacroChatMessage(content: trimmed, isFromUser: true, timestamp: Date()))
         messageText = ""
+        textFieldResetId = UUID()
         isLoading = true
         errorMessage = nil
         isTextFieldFocused = true
@@ -123,6 +126,16 @@ struct MacroChatView: View {
                     let confirmation = MacroChatMessage(content: "Logged your meal. Totals updated above.", isFromUser: false, timestamp: Date())
                     messages.append(confirmation)
                     isLoading = false
+                }
+            } catch let deepseekError as DeepseekError {
+                await MainActor.run {
+                    isLoading = false
+                    switch deepseekError {
+                    case .couldNotUnderstand:
+                        messages.append(MacroChatMessage(content: "I couldn't understand that. Try describing your meal with ingredients and amounts (e.g., ‘2 eggs scrambled in 1 tsp butter with 1 slice toast’).", isFromUser: false, timestamp: Date()))
+                    default:
+                        errorMessage = deepseekError.localizedDescription
+                    }
                 }
             } catch {
                 await MainActor.run {

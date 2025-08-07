@@ -76,44 +76,52 @@ struct MacroDayCard: View {
     
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 14) {
-                // Date chip
-                VStack(spacing: 6) {
-                    Text(shortWeekday(summary.date)).font(.caption2).foregroundColor(.secondary)
-                    Text(dayNumber(summary.date)).font(.title3).fontWeight(.bold)
-                }
-                .frame(width: 46, height: 56)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.15), lineWidth: 1))
+            HStack(spacing: 16) {
+                    // Date chip
+                    VStack(spacing: 6) {
+                        Text(shortWeekday(summary.date)).font(.caption2).foregroundColor(.secondary)
+                        Text(dayNumber(summary.date)).font(.title3).fontWeight(.bold)
+                    }
+                    .frame(width: 46, height: 56)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.white))
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.15), lineWidth: 1))
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(dateString(summary.date))
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    HStack(spacing: 12) {
-                        MacroInlineStat(label: "kcal", value: Int(summary.totals.calories), color: .red)
-                        MacroInlineStat(label: "P", value: Int(summary.totals.protein), color: .blue)
-                        MacroInlineStat(label: "C", value: Int(summary.totals.carbs), color: .orange)
-                        MacroInlineStat(label: "F", value: Int(summary.totals.fat), color: .purple)
+                    // Center: date and meals
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(dateString(summary.date))
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        HStack(spacing: 6) {
+                            Image(systemName: "fork.knife").font(.caption).foregroundColor(.secondary)
+                            Text("\(summary.mealsCount) meals")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "fork.knife").font(.caption).foregroundColor(.secondary)
-                        Text("\(summary.mealsCount)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    .layoutPriority(1)
+
+                    Spacer(minLength: 8)
+
+                    // Right: vertical stats list (Protein, Carbs, Fat, Calories)
+                    VStack(alignment: .leading, spacing: 10) {
+                        MacroInlineStat(label: "Protein", value: Int(summary.totals.protein), color: .blue)
+                        MacroInlineStat(label: "Carbs", value: Int(summary.totals.carbs), color: .orange)
+                        MacroInlineStat(label: "Fat", value: Int(summary.totals.fat), color: .purple)
+                        MacroInlineStat(label: "Calories", value: Int(summary.totals.calories), color: .red)
                     }
-                    Image(systemName: "chevron.right").foregroundColor(.secondary)
+                    .padding(.trailing, 4)
+
+                    // Dedicated space for chevron
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.secondary)
+                        .frame(width: 16)
                 }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
-            )
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
+                )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -130,12 +138,30 @@ struct MacroInlineStat: View {
     let value: Int
     let color: Color
     var body: some View {
-        HStack(spacing: 4) {
-            Text(label).font(.caption2).foregroundColor(.secondary)
-            Text("\(value)").font(.subheadline).fontWeight(.semibold).foregroundColor(color)
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.caption2)
+                .fontWeight(.bold)
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+            Text("\(value)")
+                .font(.footnote)
+                .fontWeight(.semibold)
+                .foregroundColor(.primary)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(color.opacity(0.08))
+                .overlay(Capsule().stroke(color.opacity(0.18), lineWidth: 1))
+        )
+        .fixedSize(horizontal: true, vertical: true)
     }
 }
+
+// Removed old StatsPanel in favor of single vertical stack
 
 struct MacroDayDetailView: View {
     let date: Date
@@ -375,6 +401,8 @@ struct MealCard: View {
                     .padding(.vertical, 6)
                     .background(Capsule().fill(Color.red.opacity(0.08)))
             }
+
+            Divider().padding(.vertical, 2)
 
             // Items list
             VStack(spacing: 10) {
