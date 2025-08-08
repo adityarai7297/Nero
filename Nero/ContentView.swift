@@ -177,6 +177,12 @@ struct ExerciseStats {
 // Simple ThemeManager for the WheelPicker
 class ThemeManager: ObservableObject {
     @Published var wheelPickerColor: Color = .black.opacity(0.7)
+    @Published var isDarkMode: Bool = false
+    
+    func updateForDarkMode(_ enabled: Bool) {
+        isDarkMode = enabled
+        wheelPickerColor = enabled ? .white.opacity(0.7) : .black.opacity(0.7)
+    }
 }
 
 struct ContentView: View {
@@ -214,6 +220,7 @@ struct ExerciseView: View {
     @State private var showingAIChat: Bool = false // Control AI chat view presentation
     @State private var showingMacroChat: Bool = false // Macro chat
     @State private var showingMacroHistory: Bool = false // Macro history
+    @State private var menuDarkModeEnabled: Bool = false // Dark mode switch state for menu UI only
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -248,7 +255,7 @@ struct ExerciseView: View {
     
     var body: some View {
         ZStack {
-            Color.offWhite.ignoresSafeArea()
+            (menuDarkModeEnabled ? Color.black : Color.offWhite).ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Debug the state
@@ -452,6 +459,9 @@ struct ExerciseView: View {
                 updateRecommendationsForCurrentExercise()
             }
         }
+        .onChange(of: menuDarkModeEnabled) { oldValue, newValue in
+            themeManager.updateForDarkMode(newValue)
+        }
         .onTapGesture {
             // Close side menu when tapping outside
             if showingSideMenu {
@@ -619,8 +629,8 @@ struct ExerciseView: View {
                 Text(currentExercise.name)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(.black)
-                    .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                    .foregroundColor(menuDarkModeEnabled ? .white : .black)
+                    .shadow(color: menuDarkModeEnabled ? .black.opacity(0.8) : .white.opacity(0.8), radius: 1, x: 0, y: 0)
                     .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
                 
                 Spacer()
@@ -693,21 +703,24 @@ struct ExerciseView: View {
                 value: $weights[0], 
                 type: .weight, 
                 recommendations: currentRecommendations,
-                exerciseType: currentExercise.exerciseType
+                exerciseType: currentExercise.exerciseType,
+                isDarkMode: menuDarkModeEnabled
             )
                 .environmentObject(themeManager)
             ExerciseComponent(
                 value: $weights[1], 
                 type: .repetitions, 
                 recommendations: currentRecommendations,
-                exerciseType: currentExercise.exerciseType
+                exerciseType: currentExercise.exerciseType,
+                isDarkMode: menuDarkModeEnabled
             )
                 .environmentObject(themeManager)
             ExerciseComponent(
                 value: $weights[2], 
                 type: .rpe, 
                 recommendations: currentRecommendations,
-                exerciseType: currentExercise.exerciseType
+                exerciseType: currentExercise.exerciseType,
+                isDarkMode: menuDarkModeEnabled
             )
                 .environmentObject(themeManager)
         }
@@ -745,10 +758,10 @@ struct ExerciseView: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(Color.accentBlue.opacity(0.06))
+                        .fill(menuDarkModeEnabled ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.06))
                         .overlay(
                             Circle()
-                                .stroke(Color.accentBlue.opacity(0.2), lineWidth: 1)
+                                .stroke(menuDarkModeEnabled ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.2), lineWidth: 1)
                         )
                 )
         }
@@ -792,10 +805,10 @@ struct ExerciseView: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(Color.accentBlue.opacity(0.06))
+                        .fill(menuDarkModeEnabled ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.06))
                         .overlay(
                             Circle()
-                                .stroke(Color.accentBlue.opacity(0.2), lineWidth: 1)
+                                .stroke(menuDarkModeEnabled ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.2), lineWidth: 1)
                         )
                 )
         }
@@ -980,10 +993,10 @@ struct ExerciseView: View {
     @ViewBuilder
     private func SideMenuView() -> some View {
         ZStack {
-            // Blur background overlay - keeping white background
-            Color.white.opacity(0.1)
+            // Blur background overlay - dynamic based on dark mode
+            (menuDarkModeEnabled ? Color.black.opacity(0.8) : Color.white.opacity(0.1))
                 .ignoresSafeArea()
-                .background(.ultraThinMaterial)
+                .background(menuDarkModeEnabled ? AnyShapeStyle(Color.black.opacity(0.9)) : AnyShapeStyle(Material.ultraThinMaterial))
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showingSideMenu = false
@@ -1002,14 +1015,16 @@ struct ExerciseView: View {
                         if preferencesService.generationStatus.isActive {
                             // Show status indicator while generating
                             WorkoutPlanStatusTile(
-                                status: preferencesService.generationStatus
+                                status: preferencesService.generationStatus,
+                                isDarkMode: menuDarkModeEnabled
                             )
                         } else if preferencesService.generationStatus == .completed || workoutService.hasWorkoutPlan {
                             // Show "View Workout Plan" button when completed or plan exists
                             NeumorphicMenuTile(
                                 title: "View Plan",
                                 icon: "doc.text.fill",
-                                color: Color.green
+                                color: Color.green,
+                                isDarkMode: menuDarkModeEnabled
                             ) {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     showingSideMenu = false
@@ -1026,7 +1041,8 @@ struct ExerciseView: View {
                             NeumorphicMenuTile(
                                 title: "Edit Plan",
                                 icon: "bubble.left.and.bubble.right.fill",
-                                color: Color.mint
+                                color: Color.mint,
+                                isDarkMode: menuDarkModeEnabled
                             ) {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     showingSideMenu = false
@@ -1042,7 +1058,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "Create Plan",
                             icon: "dumbbell.fill",
-                            color: Color.accentBlue
+                            color: Color.accentBlue,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1057,7 +1074,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "Personal",
                             icon: "person.fill",
-                            color: Color.accentBlue
+                            color: Color.accentBlue,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1074,7 +1092,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "History",
                             icon: "chart.xyaxis.line",
-                            color: Color.blue
+                            color: Color.blue,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1089,7 +1108,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "AI Chat",
                             icon: "bubble.left.and.bubble.right.fill",
-                            color: Color.mint
+                            color: Color.mint,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1104,7 +1124,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "Macro Tracker",
                             icon: "fork.knife",
-                            color: Color.orange
+                            color: Color.orange,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1118,7 +1139,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "Macro History",
                             icon: "chart.pie.fill",
-                            color: Color.orange
+                            color: Color.orange,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1132,7 +1154,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "Sign Out",
                             icon: "power",
-                            color: .red
+                            color: .red,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1147,7 +1170,8 @@ struct ExerciseView: View {
                         NeumorphicMenuTile(
                             title: "Delete Account",
                             icon: "trash.fill",
-                            color: .red
+                            color: .red,
+                            isDarkMode: menuDarkModeEnabled
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1164,6 +1188,21 @@ struct ExerciseView: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity)
+        }
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: 8) {
+                Image(systemName: menuDarkModeEnabled ? "moon.fill" : "sun.max.fill")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(menuDarkModeEnabled ? .yellow : .orange)
+                Toggle("", isOn: $menuDarkModeEnabled)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(menuDarkModeEnabled ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(Material.ultraThinMaterial), in: Capsule())
+            .padding(.trailing, 16)
+            .padding(.top, 16)
         }
     }
     
@@ -1573,6 +1612,7 @@ struct ExerciseComponent: View {
     @EnvironmentObject var themeManager: ThemeManager
     let recommendations: NextSetRecommendations
     let exerciseType: String?
+    let isDarkMode: Bool
     
     // Get recommendation values based on component type
     private var recommendationValues: [Int] {
@@ -1591,15 +1631,15 @@ struct ExerciseComponent: View {
             // Value viewport with label
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white)
+                    .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.accentBlue.opacity(0.15), lineWidth: 1.5)
+                            .stroke(isDarkMode ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.15), lineWidth: 1.5)
                     )
                 
                 Text("\(Int(value))")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.black)
+                    .foregroundColor(isDarkMode ? .white : .black)
                     .contentTransition(.numericText())
                     .animation(.bouncy(duration: 0.3), value: value)
             }
@@ -1607,8 +1647,8 @@ struct ExerciseComponent: View {
             .overlay(alignment: Alignment.leading) {
                 Text(type.label(exerciseType: exerciseType))
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.black)
-                    .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                    .foregroundColor(isDarkMode ? .white : .black)
+                    .shadow(color: isDarkMode ? .black.opacity(0.8) : .white.opacity(0.8), radius: 1, x: 0, y: 0)
                     .offset(x: 85) // 75px (box width) + 10px spacing
             }
             .padding(.top, 5)
@@ -1634,7 +1674,8 @@ struct ExerciseComponent: View {
                     ForEach(recommendationValues, id: \.self) { presetValue in
                         PresetButton(
                             value: presetValue, 
-                            currentValue: $value
+                            currentValue: $value,
+                            isDarkMode: isDarkMode
                         )
                     }
                 }
@@ -1647,6 +1688,7 @@ struct ExerciseComponent: View {
 struct PresetButton: View {
     let value: Int
     @Binding var currentValue: CGFloat
+    let isDarkMode: Bool
     
     var body: some View {
         Button(action: {
@@ -1655,16 +1697,16 @@ struct PresetButton: View {
             Text("\(value)")
                 .font(.subheadline)
                 .fontWeight(.bold)
-                .foregroundColor(Color.accentBlue.opacity(0.8))
+                .foregroundColor(isDarkMode ? Color.accentBlue.opacity(0.9) : Color.accentBlue.opacity(0.8))
                 .frame(maxWidth: .infinity)
                 .multilineTextAlignment(.center)
                 .frame(width: 75, height: 40)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.accentBlue.opacity(0.05))
+                        .fill(isDarkMode ? Color.accentBlue.opacity(0.15) : Color.accentBlue.opacity(0.05))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.accentBlue.opacity(0.2), lineWidth: 1)
+                                .stroke(isDarkMode ? Color.accentBlue.opacity(0.4) : Color.accentBlue.opacity(0.2), lineWidth: 1)
                         )
                 )
         }
@@ -1710,8 +1752,8 @@ struct WheelPicker: View {
                                         Text("\(value)")
                                             .font(.caption)
                                             .fontWeight(.bold)
-                                            .foregroundColor(.black)
-                                            .shadow(color: .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                                            .foregroundColor(themeManager.isDarkMode ? .white : .black)
+                                            .shadow(color: themeManager.isDarkMode ? .black.opacity(0.8) : .white.opacity(0.8), radius: 1, x: 0, y: 0)
                                             .textScale(.secondary)
                                             .fixedSize()
                                             .offset(y: 20)
@@ -1741,7 +1783,7 @@ struct WheelPicker: View {
             }))
             .overlay(alignment: .center) {
                 Rectangle()
-                    .fill(Color.accentBlue)
+                    .fill(themeManager.isDarkMode ? .white : Color.accentBlue)
                     .frame(width: 2, height: 40)
                     .padding(.bottom, 20)
             }
@@ -1920,25 +1962,28 @@ struct NeumorphicMenuTile: View {
     let icon: String
     let color: Color
     let unreadCount: Int?
+    let isDarkMode: Bool
     let action: () -> Void
     
     @State private var isPressed = false
     
     // Convenience initializer without unread count
-    init(title: String, icon: String, color: Color, action: @escaping () -> Void) {
+    init(title: String, icon: String, color: Color, isDarkMode: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.icon = icon
         self.color = color
         self.unreadCount = nil
+        self.isDarkMode = isDarkMode
         self.action = action
     }
     
     // Full initializer with unread count
-    init(title: String, icon: String, color: Color, unreadCount: Int?, action: @escaping () -> Void) {
+    init(title: String, icon: String, color: Color, unreadCount: Int?, isDarkMode: Bool = false, action: @escaping () -> Void) {
         self.title = title
         self.icon = icon
         self.color = color
         self.unreadCount = unreadCount
+        self.isDarkMode = isDarkMode
         self.action = action
     }
     
@@ -1958,10 +2003,6 @@ struct NeumorphicMenuTile: View {
             VStack(spacing: 12) {
                 // Icon with enhanced neumorphic styling
                 ZStack {
-                    Circle()
-                        .fill(Color.offWhite)
-                        .frame(width: 50, height: 50)
-                    
                     Image(systemName: icon)
                         .font(.title2)
                         .fontWeight(.bold)
@@ -1992,7 +2033,7 @@ struct NeumorphicMenuTile: View {
                 Text(title)
                     .font(.system(.footnote, design: .rounded))
                     .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -2005,17 +2046,17 @@ struct NeumorphicMenuTile: View {
                 Group {
                     if isPressed {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
+                            .fill(isDarkMode ? Color.white.opacity(0.25) : Color.offWhite)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                    .stroke(isDarkMode ? Color.white.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: 1)
                             )
                     } else {
                         RoundedRectangle(cornerRadius: 16)
-                            .fill(Color.offWhite)
+                            .fill(isDarkMode ? Color.white.opacity(0.12) : Color.offWhite)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                                    .stroke(isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.15), lineWidth: 1)
                             )
                     }
                 }
@@ -2031,15 +2072,12 @@ struct NeumorphicMenuTile: View {
 
 struct WorkoutPlanStatusTile: View {
     let status: WorkoutPlanGenerationStatus
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 12) {
             // Status icon with animation
             ZStack {
-                Circle()
-                    .fill(Color.offWhite)
-                    .frame(width: 50, height: 50)
-                
                 if status.isActive {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: Color.orange))
@@ -2056,7 +2094,7 @@ struct WorkoutPlanStatusTile: View {
             Text(status.isActive ? "Generating..." : "Plan Ready")
                 .font(.system(.footnote, design: .rounded))
                 .fontWeight(.semibold)
-                .foregroundColor(.primary)
+                .foregroundColor(isDarkMode ? .white : .primary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
         }
@@ -2066,10 +2104,10 @@ struct WorkoutPlanStatusTile: View {
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.orange.opacity(0.05))
+                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.offWhite)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                        .stroke(isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.15), lineWidth: 1)
                 )
         )
     }
