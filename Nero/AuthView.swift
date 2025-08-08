@@ -46,18 +46,17 @@ struct AuthView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+        .onTapGesture {
+            // Dismiss keyboard when tapping outside text fields
+            focusedField = nil
+        }
         .animation(.easeInOut(duration: 0.3), value: isSignUp)
         .onChange(of: authService.phase) { _, newPhase in
             if case .error(let authError) = newPhase {
                 handleAuthError(authError)
             }
         }
-        .onAppear {
-            // Small delay to ensure view is mounted before focusing
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedField = .email
-            }
-        }
+
     }
     
     // MARK: - Login Form
@@ -108,7 +107,6 @@ struct AuthView: View {
                         .submitLabel(.next)
                         .onSubmit { focusedField = .password }
                 }
-                .contentShape(Rectangle())
                 .onTapGesture { focusedField = .email }
                 
                 // Password Field
@@ -145,7 +143,6 @@ struct AuthView: View {
                             }
                         }
                 }
-                .contentShape(Rectangle())
                 .onTapGesture { focusedField = .password }
                 
                 // Confirm Password (Sign Up only)
@@ -161,7 +158,6 @@ struct AuthView: View {
                             .submitLabel(.go)
                             .onSubmit { handleAuth() }
                     }
-                    .contentShape(Rectangle())
                     .onTapGesture { focusedField = .confirm }
                     .transition(.opacity.combined(with: .slide))
                 }
