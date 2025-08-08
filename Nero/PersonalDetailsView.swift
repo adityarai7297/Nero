@@ -218,6 +218,7 @@ enum WorkoutHistory: String, CaseIterable {
 // MARK: - Personal Details View
 
 struct PersonalDetailsView: View {
+    let isDarkMode: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var currentStep: Int = 0
     @State private var personalDetails = PersonalDetails()
@@ -245,7 +246,7 @@ struct PersonalDetailsView: View {
         NavigationView {
             ZStack {
                 // Background
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Progress indicator
@@ -271,29 +272,29 @@ struct PersonalDetailsView: View {
                             // Question content
                             switch currentStep {
                             case 0:
-                                AgeStep(age: $personalDetails.age)
+                                AgeStep(age: $personalDetails.age, isDarkMode: isDarkMode)
                             case 1:
-                                GenderStep(selectedGender: $personalDetails.gender)
+                                GenderStep(selectedGender: $personalDetails.gender, isDarkMode: isDarkMode)
                             case 2:
-                                HeightStep(heightFeet: $personalDetails.heightFeet, heightInches: $personalDetails.heightInches)
+                                HeightStep(heightFeet: $personalDetails.heightFeet, heightInches: $personalDetails.heightInches, isDarkMode: isDarkMode)
                             case 3:
-                                WeightStep(weight: $personalDetails.weight)
+                                WeightStep(weight: $personalDetails.weight, isDarkMode: isDarkMode)
                             case 4:
-                                BodyFatStep(bodyFatPercentage: $personalDetails.bodyFatPercentage)
+                                BodyFatStep(bodyFatPercentage: $personalDetails.bodyFatPercentage, isDarkMode: isDarkMode)
                             case 5:
-                                ActivityLevelStep(selectedLevel: $personalDetails.activityLevel)
+                                ActivityLevelStep(selectedLevel: $personalDetails.activityLevel, isDarkMode: isDarkMode)
                             case 6:
-                                FitnessGoalStep(selectedGoal: $personalDetails.primaryFitnessGoal)
+                                FitnessGoalStep(selectedGoal: $personalDetails.primaryFitnessGoal, isDarkMode: isDarkMode)
                             case 7:
-                                InjuryHistoryStep(selectedHistory: $personalDetails.injuryHistory)
+                                InjuryHistoryStep(selectedHistory: $personalDetails.injuryHistory, isDarkMode: isDarkMode)
                             case 8:
-                                SleepHoursStep(selectedHours: $personalDetails.sleepHours)
+                                SleepHoursStep(selectedHours: $personalDetails.sleepHours, isDarkMode: isDarkMode)
                             case 9:
-                                StressLevelStep(selectedLevel: $personalDetails.stressLevel)
+                                StressLevelStep(selectedLevel: $personalDetails.stressLevel, isDarkMode: isDarkMode)
                             case 10:
-                                WorkoutHistoryStep(selectedHistory: $personalDetails.workoutHistory)
+                                WorkoutHistoryStep(selectedHistory: $personalDetails.workoutHistory, isDarkMode: isDarkMode)
                             case 11:
-                                SummaryStep(personalDetails: personalDetails)
+                                SummaryStep(personalDetails: personalDetails, isDarkMode: isDarkMode)
                             default:
                                 EmptyView()
                             }
@@ -312,6 +313,8 @@ struct PersonalDetailsView: View {
             }
             .navigationTitle("Personal Details")
             .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -352,7 +355,7 @@ struct PersonalDetailsView: View {
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white)
+                        .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color.accentBlue.opacity(0.3), lineWidth: 1.5)
@@ -388,14 +391,14 @@ struct PersonalDetailsView: View {
         }
         .padding(.horizontal, 24)
         .padding(.bottom, 40)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [Color.clear, Color.offWhite.opacity(0.95)]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 120)
-        )
+                                .background(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color.clear, (isDarkMode ? Color.black.opacity(0.95) : Color.offWhite.opacity(0.95))]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .frame(height: 120)
+                        )
     }
     
     private func nextFinishAction() {
@@ -423,6 +426,7 @@ struct PersonalDetailsView: View {
 
 struct AgeStep: View {
     @Binding var age: Int
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -431,10 +435,11 @@ struct AgeStep: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("This helps us customize your fitness recommendations")
                     .font(.body)
-                    .foregroundColor(.gray)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                     .multilineTextAlignment(.center)
             }
             
@@ -453,11 +458,11 @@ struct AgeStep: View {
                 HStack {
                     Text("16")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                     Spacer()
                     Text("80")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                 }
             }
         }
@@ -466,13 +471,15 @@ struct AgeStep: View {
 
 struct GenderStep: View {
     @Binding var selectedGender: Gender
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsQuestionStepView(
             title: "What's your gender?",
             subtitle: "This helps us provide more accurate health insights",
             options: Gender.allCases,
-            selectedOption: $selectedGender
+            selectedOption: $selectedGender,
+            isDarkMode: isDarkMode
         )
     }
 }
@@ -480,6 +487,7 @@ struct GenderStep: View {
 struct HeightStep: View {
     @Binding var heightFeet: Int
     @Binding var heightInches: Int
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -488,6 +496,7 @@ struct HeightStep: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
             }
             
             VStack(spacing: 20) {
@@ -500,7 +509,7 @@ struct HeightStep: View {
                     VStack {
                         Text("Feet")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                         
                         Picker("Feet", selection: $heightFeet) {
                             ForEach(4...7, id: \.self) { feet in
@@ -514,7 +523,7 @@ struct HeightStep: View {
                     VStack {
                         Text("Inches")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                         
                         Picker("Inches", selection: $heightInches) {
                             ForEach(0...11, id: \.self) { inches in
@@ -532,6 +541,7 @@ struct HeightStep: View {
 
 struct WeightStep: View {
     @Binding var weight: Int
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -540,6 +550,7 @@ struct WeightStep: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
             }
             
             VStack(spacing: 16) {
@@ -557,11 +568,11 @@ struct WeightStep: View {
                 HStack {
                     Text("80 lbs")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                     Spacer()
                     Text("400 lbs")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                 }
             }
         }
@@ -570,6 +581,7 @@ struct WeightStep: View {
 
 struct BodyFatStep: View {
     @Binding var bodyFatPercentage: Int
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -578,10 +590,11 @@ struct BodyFatStep: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("Don't worry if you're not sure - just give your best estimate")
                     .font(.body)
-                    .foregroundColor(.gray)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                     .multilineTextAlignment(.center)
             }
             
@@ -600,11 +613,11 @@ struct BodyFatStep: View {
                 HStack {
                     Text("5%")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                     Spacer()
                     Text("40%")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                 }
             }
         }
@@ -613,84 +626,97 @@ struct BodyFatStep: View {
 
 struct ActivityLevelStep: View {
     @Binding var selectedLevel: ActivityLevel
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsQuestionStepView(
             title: "What's your activity level?",
             subtitle: "Consider your daily activities and current exercise routine",
             options: ActivityLevel.allCases,
-            selectedOption: $selectedLevel
+            selectedOption: $selectedLevel,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct FitnessGoalStep: View {
     @Binding var selectedGoal: FitnessGoal
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsTileSelectionView(
             title: "What's your primary fitness goal?",
             subtitle: "This will help us tailor your workout recommendations",
             options: FitnessGoal.allCases,
-            selectedOption: $selectedGoal
+            selectedOption: $selectedGoal,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct InjuryHistoryStep: View {
     @Binding var selectedHistory: InjuryHistory
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsQuestionStepView(
             title: "Do you have any injury history?",
             subtitle: "This helps us recommend safer exercises for you",
             options: InjuryHistory.allCases,
-            selectedOption: $selectedHistory
+            selectedOption: $selectedHistory,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct SleepHoursStep: View {
     @Binding var selectedHours: SleepHours
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsQuestionStepView(
             title: "How many hours do you typically sleep?",
             subtitle: "Sleep is crucial for recovery and performance",
             options: SleepHours.allCases,
-            selectedOption: $selectedHours
+            selectedOption: $selectedHours,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct StressLevelStep: View {
     @Binding var selectedLevel: StressLevel
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsQuestionStepView(
             title: "What's your current stress level?",
             subtitle: "Stress affects recovery and training capacity",
             options: StressLevel.allCases,
-            selectedOption: $selectedLevel
+            selectedOption: $selectedLevel,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct WorkoutHistoryStep: View {
     @Binding var selectedHistory: WorkoutHistory
+    let isDarkMode: Bool
     
     var body: some View {
         PersonalDetailsQuestionStepView(
             title: "What's your workout experience?",
             subtitle: "This helps us set appropriate training intensity",
             options: WorkoutHistory.allCases,
-            selectedOption: $selectedHistory
+            selectedOption: $selectedHistory,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct SummaryStep: View {
     let personalDetails: PersonalDetails
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -699,24 +725,25 @@ struct SummaryStep: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("Here's what we've learned about you")
                     .font(.body)
-                    .foregroundColor(.gray)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                     .multilineTextAlignment(.center)
             }
             
             VStack(spacing: 16) {
-                SummaryRow(title: "Age", value: "\(personalDetails.age) years")
-                SummaryRow(title: "Gender", value: personalDetails.gender.rawValue)
-                SummaryRow(title: "Height", value: "\(personalDetails.heightFeet)' \(personalDetails.heightInches)\"")
-                SummaryRow(title: "Weight", value: "\(personalDetails.weight) lbs")
-                SummaryRow(title: "Body Fat", value: "\(personalDetails.bodyFatPercentage)%")
-                SummaryRow(title: "Activity Level", value: personalDetails.activityLevel.rawValue)
-                SummaryRow(title: "Primary Goal", value: personalDetails.primaryFitnessGoal.rawValue)
+                SummaryRow(title: "Age", value: "\(personalDetails.age) years", isDarkMode: isDarkMode)
+                SummaryRow(title: "Gender", value: personalDetails.gender.rawValue, isDarkMode: isDarkMode)
+                SummaryRow(title: "Height", value: "\(personalDetails.heightFeet)' \(personalDetails.heightInches)\"", isDarkMode: isDarkMode)
+                SummaryRow(title: "Weight", value: "\(personalDetails.weight) lbs", isDarkMode: isDarkMode)
+                SummaryRow(title: "Body Fat", value: "\(personalDetails.bodyFatPercentage)%", isDarkMode: isDarkMode)
+                SummaryRow(title: "Activity Level", value: personalDetails.activityLevel.rawValue, isDarkMode: isDarkMode)
+                SummaryRow(title: "Primary Goal", value: personalDetails.primaryFitnessGoal.rawValue, isDarkMode: isDarkMode)
             }
             .padding(.vertical, 16)
-            .background(Color.gray.opacity(0.1))
+            .background(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.1))
             .cornerRadius(12)
         }
     }
@@ -725,12 +752,14 @@ struct SummaryStep: View {
 struct SummaryRow: View {
     let title: String
     let value: String
+    let isDarkMode: Bool
     
     var body: some View {
         HStack {
             Text(title)
                 .font(.body)
                 .fontWeight(.medium)
+                .foregroundColor(isDarkMode ? .white : .primary)
             Spacer()
             Text(value)
                 .font(.body)
@@ -748,6 +777,7 @@ struct PersonalDetailsQuestionStepView<T: RawRepresentable & CaseIterable & Hash
     let subtitle: String
     let options: [T]
     @Binding var selectedOption: T
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -773,7 +803,8 @@ struct PersonalDetailsQuestionStepView<T: RawRepresentable & CaseIterable & Hash
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOption == option,
-                        color: Color.accentBlue
+                        color: Color.accentBlue,
+                        isDarkMode: isDarkMode
                     ) {
                         selectedOption = option
                     }
@@ -790,6 +821,7 @@ struct PersonalDetailsTileSelectionView<T: RawRepresentable & CaseIterable & Has
     let subtitle: String
     let options: [T]
     @Binding var selectedOption: T
+    let isDarkMode: Bool
     
     // Grid layout with 2 columns for better space utilization
     private let columns = [
@@ -820,7 +852,8 @@ struct PersonalDetailsTileSelectionView<T: RawRepresentable & CaseIterable & Has
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOption == option,
-                        color: Color.accentBlue
+                        color: Color.accentBlue,
+                        isDarkMode: isDarkMode
                     ) {
                         selectedOption = option
                     }
@@ -838,9 +871,27 @@ struct PersonalDetailsTileButton: View {
     let letter: String
     let isSelected: Bool
     let color: Color
+    let isDarkMode: Bool
     let action: () -> Void
     
     @State private var isPressed = false
+    
+    // Computed properties to simplify complex expressions
+    private var textColor: Color {
+        isDarkMode ? .white : .primary
+    }
+    
+    private var backgroundColor: Color {
+        isSelected ? color.opacity(0.08) : (isDarkMode ? Color.white.opacity(0.12) : Color.white)
+    }
+    
+    private var borderColor: Color {
+        isSelected ? color.opacity(0.4) : (isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.2))
+    }
+    
+    private var borderWidth: CGFloat {
+        isSelected ? 1.5 : 1
+    }
     
     var body: some View {
         Button(action: action) {
@@ -848,18 +899,18 @@ struct PersonalDetailsTileButton: View {
             Text(title)
                 .font(.system(.subheadline, design: .rounded))
                 .fontWeight(.semibold)
-                .foregroundColor(.primary)
+                .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
                 .frame(height: 80)
-                                .background(
+                .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? color.opacity(0.08) : Color.white)
+                        .fill(backgroundColor)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? color.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: isSelected ? 1.5 : 1)
+                                .stroke(borderColor, lineWidth: borderWidth)
                         )
                 )
         }

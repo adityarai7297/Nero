@@ -621,6 +621,7 @@ enum MuscleGroup: String, CaseIterable {
 // MARK: - Main View
 
 struct WorkoutQuestionnaireView: View {
+    let isDarkMode: Bool
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferencesService: WorkoutPreferencesService
     
@@ -633,7 +634,8 @@ struct WorkoutQuestionnaireView: View {
     private let totalSteps = 9
     
     // Initialize with optional completion callback
-    init(onCompletion: (() -> Void)? = nil) {
+    init(isDarkMode: Bool = false, onCompletion: (() -> Void)? = nil) {
+        self.isDarkMode = isDarkMode
         self.onCompletion = onCompletion
     }
     
@@ -653,7 +655,7 @@ struct WorkoutQuestionnaireView: View {
         NavigationView {
             ZStack {
                 // Background gradient
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Progress indicator
@@ -668,23 +670,23 @@ struct WorkoutQuestionnaireView: View {
                             // Question content
                             switch currentStep {
                             case 0:
-                                PrimaryGoalStep(selectedGoal: $preferences.primaryGoal)
+                                PrimaryGoalStep(selectedGoal: $preferences.primaryGoal, isDarkMode: isDarkMode)
                             case 1:
-                                TrainingExperienceStep(selectedExperience: $preferences.trainingExperience)
+                                TrainingExperienceStep(selectedExperience: $preferences.trainingExperience, isDarkMode: isDarkMode)
                             case 2:
-                                SessionFrequencyStep(selectedFrequency: $preferences.sessionFrequency)
+                                SessionFrequencyStep(selectedFrequency: $preferences.sessionFrequency, isDarkMode: isDarkMode)
                             case 3:
-                                SessionLengthStep(selectedLength: $preferences.sessionLength)
+                                SessionLengthStep(selectedLength: $preferences.sessionLength, isDarkMode: isDarkMode)
                             case 4:
-                                EquipmentAccessStep(selectedEquipment: $preferences.equipmentAccess)
+                                EquipmentAccessStep(selectedEquipment: $preferences.equipmentAccess, isDarkMode: isDarkMode)
                             case 5:
-                                MovementStylesStep(selectedStyles: $preferences.movementStyles)
+                                MovementStylesStep(selectedStyles: $preferences.movementStyles, isDarkMode: isDarkMode)
                             case 6:
-                                WeeklySplitStep(selectedSplit: $preferences.weeklySplit, sessionFrequency: preferences.sessionFrequency)
+                                WeeklySplitStep(selectedSplit: $preferences.weeklySplit, sessionFrequency: preferences.sessionFrequency, isDarkMode: isDarkMode)
                             case 7:
-                                MoreFocusMuscleGroupsStep(selectedGroups: $preferences.moreFocusMuscleGroups)
+                                MoreFocusMuscleGroupsStep(selectedGroups: $preferences.moreFocusMuscleGroups, isDarkMode: isDarkMode)
                             case 8:
-                                LessFocusMuscleGroupsStep(selectedGroups: $preferences.lessFocusMuscleGroups)
+                                LessFocusMuscleGroupsStep(selectedGroups: $preferences.lessFocusMuscleGroups, isDarkMode: isDarkMode)
                             default:
                                 EmptyView()
                             }
@@ -703,6 +705,8 @@ struct WorkoutQuestionnaireView: View {
             }
             .navigationTitle("Workout Setup")
             .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -745,7 +749,7 @@ struct WorkoutQuestionnaireView: View {
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.white)
+                        .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
                                 .stroke(Color.accentBlue.opacity(0.3), lineWidth: 1.5)
@@ -793,7 +797,7 @@ struct WorkoutQuestionnaireView: View {
         .padding(.bottom, 40)
         .background(
             LinearGradient(
-                gradient: Gradient(colors: [Color.clear, Color.offWhite.opacity(0.95)]),
+                gradient: Gradient(colors: [Color.clear, (isDarkMode ? Color.black.opacity(0.95) : Color.offWhite.opacity(0.95))]),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -808,6 +812,7 @@ struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable & Question
     let title: String
     let options: [T]
     @Binding var selectedOption: T
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -815,6 +820,7 @@ struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable & Question
                 .font(.title2)
                 .fontWeight(.bold)
                 .multilineTextAlignment(.center)
+                .foregroundColor(isDarkMode ? .white : .primary)
             
             VStack(spacing: 16) {
                 ForEach(options, id: \.self) { option in
@@ -824,7 +830,8 @@ struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable & Question
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOption == option,
-                        color: .blue
+                        color: .blue,
+                        isDarkMode: isDarkMode
                     ) {
                         selectedOption = option
                     }
@@ -838,75 +845,87 @@ struct QuestionStepView<T: RawRepresentable & CaseIterable & Hashable & Question
 
 struct PrimaryGoalStep: View {
     @Binding var selectedGoal: PrimaryGoal
+    let isDarkMode: Bool
     
     var body: some View {
         TileSelectionView(
             title: "Primary physical goal right now?",
             subtitle: nil,
             options: PrimaryGoal.allCases,
-            selectedOption: $selectedGoal
+            selectedOption: $selectedGoal,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct TrainingExperienceStep: View {
     @Binding var selectedExperience: TrainingExperience
+    let isDarkMode: Bool
     
     var body: some View {
         QuestionStepView(
             title: "Training experience with free weights & machines?",
             options: TrainingExperience.allCases,
-            selectedOption: $selectedExperience
+            selectedOption: $selectedExperience,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct SessionFrequencyStep: View {
     @Binding var selectedFrequency: SessionFrequency
+    let isDarkMode: Bool
     
     var body: some View {
         TileSelectionView(
             title: "How many separate resistance sessions can you commit to each week?",
             subtitle: nil,
             options: SessionFrequency.allCases,
-            selectedOption: $selectedFrequency
+            selectedOption: $selectedFrequency,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct SessionLengthStep: View {
     @Binding var selectedLength: SessionLength
+    let isDarkMode: Bool
     
     var body: some View {
         QuestionStepView(
             title: "Typical session length you can reliably spare?",
             options: SessionLength.allCases,
-            selectedOption: $selectedLength
+            selectedOption: $selectedLength,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct EquipmentAccessStep: View {
     @Binding var selectedEquipment: EquipmentAccess
+    let isDarkMode: Bool
     
     var body: some View {
         QuestionStepView(
             title: "Equipment you always have access to:",
             options: EquipmentAccess.allCases,
-            selectedOption: $selectedEquipment
+            selectedOption: $selectedEquipment,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct MovementStylesStep: View {
     @Binding var selectedStyles: Set<MovementStyles>
+    let isDarkMode: Bool
     
     var body: some View {
         MultiTileSelectionView(
             title: "Movement styles you most enjoy (or want emphasized):",
             subtitle: nil,
             options: MovementStyles.allCases,
-            selectedOptions: $selectedStyles
+            selectedOptions: $selectedStyles,
+            isDarkMode: isDarkMode
         )
     }
 }
@@ -914,37 +933,43 @@ struct MovementStylesStep: View {
 struct WeeklySplitStep: View {
     @Binding var selectedSplit: WeeklySplit
     let sessionFrequency: SessionFrequency
+    let isDarkMode: Bool
     
     var body: some View {
         TileSelectionView(
             title: "Preferred weekly split:",
             subtitle: nil,
             options: WeeklySplit.allCases,
-            selectedOption: $selectedSplit
+            selectedOption: $selectedSplit,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct MoreFocusMuscleGroupsStep: View {
     @Binding var selectedGroups: Set<MuscleGroup>
+    let isDarkMode: Bool
     
     var body: some View {
         MuscleGroupTileSelectionView(
             title: "Muscle groups you want MORE focus on:",
             options: MuscleGroup.allCases,
-            selectedOptions: $selectedGroups
+            selectedOptions: $selectedGroups,
+            isDarkMode: isDarkMode
         )
     }
 }
 
 struct LessFocusMuscleGroupsStep: View {
     @Binding var selectedGroups: Set<MuscleGroup>
+    let isDarkMode: Bool
     
     var body: some View {
         MuscleGroupTileSelectionView(
             title: "Muscle groups you want LESS focus on:",
             options: MuscleGroup.allCases,
-            selectedOptions: $selectedGroups
+            selectedOptions: $selectedGroups,
+            isDarkMode: isDarkMode
         )
     }
 }
@@ -955,6 +980,7 @@ struct MuscleGroupTileSelectionView: View {
     let title: String
     let options: [MuscleGroup]
     @Binding var selectedOptions: Set<MuscleGroup>
+    let isDarkMode: Bool
     
     // Grid layout with 2 columns
     private let columns = [
@@ -969,10 +995,11 @@ struct MuscleGroupTileSelectionView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("Select all that apply")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
             }
             
             LazyVGrid(columns: columns, spacing: 16) {
@@ -980,7 +1007,8 @@ struct MuscleGroupTileSelectionView: View {
                     MuscleGroupTileButton(
                         title: option.rawValue,
                         isSelected: selectedOptions.contains(option),
-                        color: .blue
+                        color: .blue,
+                        isDarkMode: isDarkMode
                     ) {
                         if selectedOptions.contains(option) {
                             selectedOptions.remove(option)
@@ -1000,26 +1028,52 @@ struct MuscleGroupTileButton: View {
     let title: String
     let isSelected: Bool
     let color: Color
+    let isDarkMode: Bool
     let action: () -> Void
     
     @State private var isPressed = false
+    
+    // Computed properties to simplify complex expressions
+    private var textColor: Color {
+        isDarkMode ? .white : .primary
+    }
+    
+    private var backgroundColor: Color {
+        if isSelected {
+            return color.opacity(0.08)
+        } else {
+            return isDarkMode ? Color.white.opacity(0.12) : Color.white
+        }
+    }
+    
+    private var borderColor: Color {
+        if isSelected {
+            return color.opacity(0.4)
+        } else {
+            return isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.2)
+        }
+    }
+    
+    private var borderWidth: CGFloat {
+        isSelected ? 1.5 : 1
+    }
     
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(.subheadline, design: .rounded))
                 .fontWeight(.semibold)
-                .foregroundColor(.primary)
+                .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .frame(maxWidth: .infinity)
                 .frame(height: 60)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? color.opacity(0.08) : Color.white)
+                        .fill(backgroundColor)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? color.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: isSelected ? 1.5 : 1)
+                                .stroke(borderColor, lineWidth: borderWidth)
                         )
                 )
         }
@@ -1040,6 +1094,7 @@ struct MultipleSelectionQuestionStepView<T: RawRepresentable & CaseIterable & Ha
     let title: String
     let options: [T]
     @Binding var selectedOptions: Set<T>
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 24) {
@@ -1062,7 +1117,8 @@ struct MultipleSelectionQuestionStepView<T: RawRepresentable & CaseIterable & Ha
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOptions.contains(option),
-                        color: .blue
+                        color: .blue,
+                        isDarkMode: isDarkMode
                     ) {
                         if selectedOptions.contains(option) {
                             selectedOptions.remove(option)
@@ -1114,6 +1170,7 @@ struct QuestionnaireOptionButton: View {
     let letter: String
     let isSelected: Bool
     let color: Color
+    let isDarkMode: Bool
     let action: () -> Void
     
     @State private var isPressed = false
@@ -1126,13 +1183,13 @@ struct QuestionnaireOptionButton: View {
                     Text(title)
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                         .multilineTextAlignment(.leading)
                     
                     if !subtitle.isEmpty {
                         Text(subtitle)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                             .multilineTextAlignment(.leading)
                     }
                 }
@@ -1150,10 +1207,10 @@ struct QuestionnaireOptionButton: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? color.opacity(0.05) : Color.white)
+                    .fill(isSelected ? color.opacity(0.05) : (isDarkMode ? Color.white.opacity(0.12) : Color.white))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(isSelected ? color.opacity(0.3) : Color.gray.opacity(0.15), lineWidth: isSelected ? 1.5 : 1)
+                            .stroke(isSelected ? color.opacity(0.3) : (isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.15)), lineWidth: isSelected ? 1.5 : 1)
                     )
             )
         }
@@ -1185,6 +1242,7 @@ struct TileSelectionView<T: RawRepresentable & CaseIterable & Hashable & Questio
     let subtitle: String?
     let options: [T]
     @Binding var selectedOption: T
+    let isDarkMode: Bool
     
     // Grid layout with 2 columns for better space utilization
     private let columns = [
@@ -1199,11 +1257,12 @@ struct TileSelectionView<T: RawRepresentable & CaseIterable & Hashable & Questio
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 if let subtitle = subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.body)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                         .multilineTextAlignment(.center)
                 }
             }
@@ -1215,7 +1274,8 @@ struct TileSelectionView<T: RawRepresentable & CaseIterable & Hashable & Questio
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOption == option,
-                        color: Color.accentBlue
+                        color: Color.accentBlue,
+                        isDarkMode: isDarkMode
                     ) {
                         selectedOption = option
                     }
@@ -1230,6 +1290,7 @@ struct MultiTileSelectionView<T: RawRepresentable & CaseIterable & Hashable & Qu
     let subtitle: String?
     let options: [T]
     @Binding var selectedOptions: Set<T>
+    let isDarkMode: Bool
     
     // Grid layout with 2 columns
     private let columns = [
@@ -1244,16 +1305,17 @@ struct MultiTileSelectionView<T: RawRepresentable & CaseIterable & Hashable & Qu
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 if let subtitle = subtitle, !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.body)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                         .multilineTextAlignment(.center)
                 } else {
                     Text("Select all that apply")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                 }
             }
             
@@ -1264,7 +1326,8 @@ struct MultiTileSelectionView<T: RawRepresentable & CaseIterable & Hashable & Qu
                         icon: option.icon,
                         letter: option.letter,
                         isSelected: selectedOptions.contains(option),
-                        color: Color.accentBlue
+                        color: Color.accentBlue,
+                        isDarkMode: isDarkMode
                     ) {
                         if selectedOptions.contains(option) {
                             selectedOptions.remove(option)
@@ -1286,9 +1349,35 @@ struct TileOptionButton: View {
     let letter: String
     let isSelected: Bool
     let color: Color
+    let isDarkMode: Bool
     let action: () -> Void
     
     @State private var isPressed = false
+    
+    // Computed properties to simplify complex expressions
+    private var textColor: Color {
+        isDarkMode ? .white : .primary
+    }
+    
+    private var backgroundColor: Color {
+        if isSelected {
+            return color.opacity(0.08)
+        } else {
+            return isDarkMode ? Color.white.opacity(0.12) : Color.white
+        }
+    }
+    
+    private var borderColor: Color {
+        if isSelected {
+            return color.opacity(0.4)
+        } else {
+            return isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.2)
+        }
+    }
+    
+    private var borderWidth: CGFloat {
+        isSelected ? 1.5 : 1
+    }
     
     var body: some View {
         Button(action: action) {
@@ -1296,7 +1385,7 @@ struct TileOptionButton: View {
             Text(title)
                 .font(.system(.subheadline, design: .rounded))
                 .fontWeight(.semibold)
-                .foregroundColor(.primary)
+                .foregroundColor(textColor)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -1304,10 +1393,10 @@ struct TileOptionButton: View {
                 .frame(height: 80)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? color.opacity(0.08) : Color.white)
+                        .fill(backgroundColor)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? color.opacity(0.4) : Color.gray.opacity(0.2), lineWidth: isSelected ? 1.5 : 1)
+                                .stroke(borderColor, lineWidth: borderWidth)
                         )
                 )
         }

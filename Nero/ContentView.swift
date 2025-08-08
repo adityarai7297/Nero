@@ -296,7 +296,7 @@ struct ExerciseView: View {
             .environmentObject(themeManager)
         }
         .sheet(isPresented: $showingWorkoutQuestionnaire) {
-            WorkoutQuestionnaireView() {
+                                        WorkoutQuestionnaireView(isDarkMode: menuDarkModeEnabled) {
                 // Show side menu after completion
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -312,7 +312,7 @@ struct ExerciseView: View {
             }
         }
         .sheet(isPresented: $showingPersonalDetails) {
-            PersonalDetailsView()
+                                        PersonalDetailsView(isDarkMode: menuDarkModeEnabled)
         }
         .sheet(isPresented: $showingWorkoutPlan) {
             WorkoutPlanView(
@@ -2529,6 +2529,8 @@ struct WorkoutPlanView: View {
             }
             .navigationTitle("Workout Plan")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
