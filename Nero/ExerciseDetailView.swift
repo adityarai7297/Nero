@@ -3,6 +3,7 @@ import SwiftUI
 struct ExerciseDetailView: View {
     let exerciseName: String
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     
     @Environment(\.dismiss) private var dismiss
     @State private var selectedTimeframe: ExerciseHistoryTimeframe = .all
@@ -16,22 +17,22 @@ struct ExerciseDetailView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     if isLoading {
-                        LoadingView()
+                        LoadingView(isDarkMode: isDarkMode)
                     } else {
                         ScrollView {
                             VStack(spacing: 24) {
                                 // Controls section
-                                ControlsSection()
+                                ControlsSection(isDarkMode: isDarkMode)
                                 
                                 // Chart section
-                                ChartSection()
+                                ChartSection(isDarkMode: isDarkMode)
                                 
                                 // History list section
-                                HistorySection()
+                                HistorySection(isDarkMode: isDarkMode)
                             }
                             .padding(.horizontal, 20)
                             .padding(.vertical, 16)
@@ -41,6 +42,8 @@ struct ExerciseDetailView: View {
             }
             .navigationTitle(exerciseName)
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -75,7 +78,7 @@ struct ExerciseDetailView: View {
     }
     
     @ViewBuilder
-    private func LoadingView() -> some View {
+    private func LoadingView(isDarkMode: Bool) -> some View {
         VStack(spacing: 20) {
             ProgressView()
                 .progressViewStyle(CircularProgressViewStyle())
@@ -83,20 +86,20 @@ struct ExerciseDetailView: View {
             
             Text("Loading exercise history...")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     @ViewBuilder
-    private func ControlsSection() -> some View {
+    private func ControlsSection(isDarkMode: Bool) -> some View {
         VStack(spacing: 16) {
             // Timeframe selector
             VStack(alignment: .leading, spacing: 8) {
                 Text("Timeframe")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
@@ -104,6 +107,7 @@ struct ExerciseDetailView: View {
                             TimeframeButton(
                                 timeframe: timeframe,
                                 isSelected: selectedTimeframe == timeframe,
+                                isDarkMode: isDarkMode,
                                 action: {
                                     selectedTimeframe = timeframe
                                 }
@@ -120,13 +124,14 @@ struct ExerciseDetailView: View {
                 Text("Chart Type")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 HStack(spacing: 12) {
                     ForEach(ExerciseChartType.allCases, id: \.self) { chartType in
                         ChartTypeButton(
                             chartType: chartType,
                             isSelected: selectedChartType == chartType,
+                            isDarkMode: isDarkMode,
                             action: {
                                 selectedChartType = chartType
                             }
@@ -139,61 +144,63 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
     
     @ViewBuilder
-    private func ChartSection() -> some View {
+    private func ChartSection(isDarkMode: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Progress Chart")
                 .font(.headline)
                 .fontWeight(.semibold)
-                .foregroundColor(.primary)
+                .foregroundColor(isDarkMode ? .white : .primary)
             
             if exerciseHistory.isEmpty {
-                EmptyChartView()
+                EmptyChartView(isDarkMode: isDarkMode)
             } else {
                 ExerciseChart(
                     data: exerciseHistory,
                     chartType: selectedChartType,
-                    timeframe: selectedTimeframe
+                    timeframe: selectedTimeframe,
+                    isDarkMode: isDarkMode
                 )
             }
         }
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
     
     @ViewBuilder
-    private func HistorySection() -> some View {
+    private func HistorySection(isDarkMode: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("Workout History")
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Spacer()
                 
                 Text("\(exerciseHistory.count) sets")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
             }
             
             if exerciseHistory.isEmpty {
-                EmptyHistoryView()
+                EmptyHistoryView(isDarkMode: isDarkMode)
             } else {
                 LazyVStack(spacing: 12) {
                     ForEach(exerciseHistory.sorted(by: { $0.timestamp > $1.timestamp })) { set in
                         ExerciseHistoryRow(
                             set: set,
                             isDeleting: deletingSetIds.contains(set.id),
+                            isDarkMode: isDarkMode,
                             onEdit: {
                                 editingSet = set
                                 showingEditSheet = true
@@ -209,36 +216,36 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
     
     @ViewBuilder
-    private func EmptyChartView() -> some View {
+    private func EmptyChartView(isDarkMode: Bool) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "chart.line.uptrend.xyaxis")
                 .font(.system(size: 40))
-                .foregroundColor(.gray.opacity(0.6))
+                .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray.opacity(0.6))
             
             Text("No data for selected timeframe")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
         }
         .frame(height: 200)
         .frame(maxWidth: .infinity)
     }
     
     @ViewBuilder
-    private func EmptyHistoryView() -> some View {
+    private func EmptyHistoryView(isDarkMode: Bool) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "list.bullet.clipboard")
                 .font(.system(size: 40))
-                .foregroundColor(.gray.opacity(0.6))
+                .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray.opacity(0.6))
             
             Text("No workout history for selected timeframe")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
         }
         .frame(height: 100)
         .frame(maxWidth: .infinity)
@@ -295,6 +302,7 @@ struct ExerciseDetailView: View {
 struct TimeframeButton: View {
     let timeframe: ExerciseHistoryTimeframe
     let isSelected: Bool
+    let isDarkMode: Bool
     let action: () -> Void
     
     var body: some View {
@@ -308,9 +316,9 @@ struct TimeframeButton: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentBlue : Color.white)
+                .fill(isSelected ? Color.accentBlue : (isDarkMode ? Color.white.opacity(0.12) : Color.white))
                 .shadow(
-                    color: isSelected ? Color.accentBlue.opacity(0.3) : Color.black.opacity(0.1),
+                    color: isSelected ? Color.accentBlue.opacity(0.3) : (isDarkMode ? Color.clear : Color.black.opacity(0.1)),
                     radius: isSelected ? 8 : 2,
                     x: 0,
                     y: isSelected ? 4 : 1
@@ -324,6 +332,7 @@ struct TimeframeButton: View {
 struct ChartTypeButton: View {
     let chartType: ExerciseChartType
     let isSelected: Bool
+    let isDarkMode: Bool
     let action: () -> Void
     
     var body: some View {
@@ -337,9 +346,9 @@ struct ChartTypeButton: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentBlue : Color.white)
+                .fill(isSelected ? Color.accentBlue : (isDarkMode ? Color.white.opacity(0.12) : Color.white))
                 .shadow(
-                    color: isSelected ? Color.accentBlue.opacity(0.3) : Color.black.opacity(0.1),
+                    color: isSelected ? Color.accentBlue.opacity(0.3) : (isDarkMode ? Color.clear : Color.black.opacity(0.1)),
                     radius: isSelected ? 8 : 2,
                     x: 0,
                     y: isSelected ? 4 : 1
@@ -353,8 +362,34 @@ struct ChartTypeButton: View {
 struct ExerciseHistoryRow: View {
     let set: WorkoutSet
     let isDeleting: Bool
+    let isDarkMode: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
+    
+    // Computed properties to simplify complex expressions
+    private var primaryTextColor: Color {
+        isDeleting ? .gray : (isDarkMode ? .white : .primary)
+    }
+    
+    private var secondaryTextColor: Color {
+        isDarkMode ? .white.opacity(0.7) : .secondary
+    }
+    
+    private var statsBackgroundColor: Color {
+        isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.05)
+    }
+    
+    private var statsStrokeColor: Color {
+        isDarkMode ? Color.white.opacity(0.15) : Color.gray.opacity(0.15)
+    }
+    
+    private var cardBackgroundColor: Color {
+        isDarkMode ? Color.white.opacity(0.12) : Color.white
+    }
+    
+    private var cardShadowColor: Color {
+        isDarkMode ? Color.clear : Color.black.opacity(0.05)
+    }
     
     var body: some View {
         VStack(spacing: 16) {
@@ -363,7 +398,7 @@ struct ExerciseHistoryRow: View {
                 Text(formatDate(set.timestamp))
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundColor(isDeleting ? .gray : .primary)
+                    .foregroundColor(primaryTextColor)
                 
                 Text(formatTime(set.timestamp))
                     .font(.caption)
@@ -418,12 +453,12 @@ struct ExerciseHistoryRow: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Weight")
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(secondaryTextColor)
                             HStack(spacing: 4) {
                                 Text("\(Int(set.weight))")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(isDeleting ? .gray : .primary)
+                                    .foregroundColor(primaryTextColor)
                                 Text("lbs")
                                     .font(.caption)
                                     .foregroundColor(.gray)
@@ -442,12 +477,12 @@ struct ExerciseHistoryRow: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(set.exerciseType == "static_hold" ? "Duration" : "Reps")
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(secondaryTextColor)
                             HStack(spacing: 4) {
                                 Text("\(Int(set.reps))")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(isDeleting ? .gray : .primary)
+                                    .foregroundColor(primaryTextColor)
                                 Text(set.exerciseType == "static_hold" ? "sec" : "reps")
                                     .font(.caption)
                                     .foregroundColor(.gray)
@@ -466,12 +501,12 @@ struct ExerciseHistoryRow: View {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("RPE")
                                 .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(secondaryTextColor)
                             HStack(spacing: 4) {
                                 Text("\(Int(set.rpe))")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(isDeleting ? .gray : .primary)
+                                    .foregroundColor(primaryTextColor)
                                 Text("%")
                                     .font(.caption)
                                     .foregroundColor(.gray)
@@ -483,10 +518,10 @@ struct ExerciseHistoryRow: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.05))
+                        .fill(statsBackgroundColor)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                                .stroke(statsStrokeColor, lineWidth: 1)
                         )
                 )
                 
@@ -501,11 +536,11 @@ struct ExerciseHistoryRow: View {
                     VStack(spacing: 4) {
                         Text("Volume")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(secondaryTextColor)
                         Text("\(Int(set.weight * set.reps))")
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(isDeleting ? .gray : .primary)
+                            .foregroundColor(primaryTextColor)
                     }
                 }
                 .frame(minWidth: 80)
@@ -515,8 +550,8 @@ struct ExerciseHistoryRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+                .fill(cardBackgroundColor)
+                .shadow(color: cardShadowColor, radius: 4, x: 0, y: 2)
         )
         .opacity(isDeleting ? 0.6 : 1.0)
         .scaleEffect(isDeleting ? 0.95 : 1.0)

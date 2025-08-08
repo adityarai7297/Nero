@@ -145,7 +145,8 @@ struct WorkoutEditChatView: View {
             // This will show the workout plan view when editing is complete
             WorkoutPlanView(
                 onExerciseSelected: { _ in }, // Not needed in this context
-                workoutService: workoutService
+                workoutService: workoutService,
+                isDarkMode: false // Default to light mode for now
             )
         }
         .onAppear {

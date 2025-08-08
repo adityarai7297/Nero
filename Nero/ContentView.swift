@@ -327,7 +327,8 @@ struct ExerciseView: View {
                     // Dismiss the workout plan sheet
                     showingWorkoutPlan = false
                 },
-                workoutService: workoutService
+                workoutService: workoutService,
+                isDarkMode: menuDarkModeEnabled
             )
                 .environmentObject(preferencesService)
         }
@@ -336,7 +337,7 @@ struct ExerciseView: View {
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingExerciseHistory) {
-            ExerciseHistoryListView(workoutService: workoutService)
+            ExerciseHistoryListView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
         }
         .sheet(isPresented: $showingAIChat) {
             AIChatView(workoutService: workoutService)
@@ -2509,20 +2510,21 @@ struct WorkoutPlanView: View {
     @State private var groupedExercises: [String: [DeepseekWorkoutPlanDay]] = [:]
     let onExerciseSelected: (String) -> Void
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     
     private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 if isLoading {
-                    LoadingStateView()
+                    LoadingStateView(isDarkMode: isDarkMode)
                 } else if let plan = workoutPlan {
-                    WorkoutPlanContentView(groupedExercises: groupedExercises)
+                    WorkoutPlanContentView(groupedExercises: groupedExercises, isDarkMode: isDarkMode)
                 } else {
-                    EmptyPlanStateView()
+                    EmptyPlanStateView(isDarkMode: isDarkMode)
                 }
             }
             .navigationTitle("Workout Plan")
@@ -2560,7 +2562,7 @@ struct WorkoutPlanView: View {
     }
     
     @ViewBuilder
-    private func LoadingStateView() -> some View {
+    private func LoadingStateView(isDarkMode: Bool) -> some View {
         VStack(spacing: 20) {
             ProgressView()
                 .progressViewStyle(CircularProgressViewStyle())
@@ -2568,26 +2570,26 @@ struct WorkoutPlanView: View {
             
             Text("Loading workout plan...")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
         }
     }
     
     @ViewBuilder
-    private func EmptyPlanStateView() -> some View {
+    private func EmptyPlanStateView(isDarkMode: Bool) -> some View {
         VStack(spacing: 24) {
             Image(systemName: "doc.text.fill")
                 .font(.system(size: 60, weight: .bold))
-                .foregroundColor(.gray.opacity(0.6))
+                .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray.opacity(0.6))
             
             VStack(spacing: 16) {
                 Text("No Workout Plan Found")
                     .font(.title)
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("Create a workout plan through the questionnaire to see your personalized exercises")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
@@ -2595,7 +2597,7 @@ struct WorkoutPlanView: View {
     }
     
     @ViewBuilder
-    private func WorkoutPlanContentView(groupedExercises: [String: [DeepseekWorkoutPlanDay]]) -> some View {
+    private func WorkoutPlanContentView(groupedExercises: [String: [DeepseekWorkoutPlanDay]], isDarkMode: Bool) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 24) {
@@ -2606,6 +2608,7 @@ struct WorkoutPlanView: View {
                                 exercises: dayExercises, 
                                 onExerciseSelected: onExerciseSelected, 
                                 workoutService: workoutService,
+                                isDarkMode: isDarkMode,
                                 onExpansionChange: { isExpanded in
                                     if isExpanded {
                                         // Add a small delay to let the expansion animation start
@@ -2635,6 +2638,7 @@ struct DayWorkoutCard: View {
     let exercises: [DeepseekWorkoutPlanDay]
     let onExerciseSelected: (String) -> Void
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     let onExpansionChange: (Bool) -> Void
     @State private var isExpanded = false
     
@@ -2652,11 +2656,11 @@ struct DayWorkoutCard: View {
                         Text(day)
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primary)
+                            .foregroundColor(isDarkMode ? .white : .primary)
                         
                         Text("\(exercises.count) exercises")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     }
                     
                     Spacer()
@@ -2679,7 +2683,7 @@ struct DayWorkoutCard: View {
             if isExpanded {
                 VStack(spacing: 12) {
                     ForEach(exercises.indices, id: \.self) { index in
-                        ExerciseRowCard(exercise: exercises[index], workoutService: workoutService, onTap: {
+                        ExerciseRowCard(exercise: exercises[index], workoutService: workoutService, isDarkMode: isDarkMode, onTap: {
                             onExerciseSelected(exercises[index].exerciseName)
                         })
                         
@@ -2700,10 +2704,10 @@ struct DayWorkoutCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
+                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.accentBlue.opacity(0.12), lineWidth: 2)
+                        .stroke(isDarkMode ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.12), lineWidth: 2)
                 )
         )
         .animation(.easeInOut(duration: 0.3), value: isExpanded)
@@ -2715,6 +2719,7 @@ struct DayWorkoutCard: View {
 struct ExerciseRowCard: View {
     let exercise: DeepseekWorkoutPlanDay
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     let onTap: () -> Void
     
     private var isCompleted: Bool {
@@ -2750,7 +2755,7 @@ struct ExerciseRowCard: View {
                 Text(exercise.exerciseName)
                     .font(.headline)
                     .fontWeight(.semibold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                     .lineLimit(2)
                 
                 HStack(spacing: 16) {
@@ -2761,7 +2766,7 @@ struct ExerciseRowCard: View {
                             .foregroundColor(Color.accentBlue)
                         Text("sets")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     }
                     
                     HStack(spacing: 4) {
@@ -2771,7 +2776,7 @@ struct ExerciseRowCard: View {
                             .foregroundColor(Color.accentBlue)
                         Text(exercise.exerciseType == "static_hold" ? "seconds" : "reps")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     }
                 }
             }

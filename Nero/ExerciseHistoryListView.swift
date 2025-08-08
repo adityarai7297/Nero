@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ExerciseHistoryListView: View {
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var exercises: [String] = []
     @State private var exerciseStats: [String: ExerciseStats] = [:]
@@ -12,20 +13,22 @@ struct ExerciseHistoryListView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     if isLoading {
-                        LoadingView()
+                        LoadingView(isDarkMode: isDarkMode)
                     } else if exercises.isEmpty {
-                        EmptyStateView()
+                        EmptyStateView(isDarkMode: isDarkMode)
                     } else {
-                        ExerciseListView()
+                        ExerciseListView(isDarkMode: isDarkMode)
                     }
                 }
             }
             .navigationTitle("Exercise History")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -43,14 +46,15 @@ struct ExerciseHistoryListView: View {
             if let selectedExercise = selectedExercise {
                 ExerciseDetailView(
                     exerciseName: selectedExercise,
-                    workoutService: workoutService
+                    workoutService: workoutService,
+                    isDarkMode: isDarkMode
                 )
             }
         }
     }
     
     @ViewBuilder
-    private func LoadingView() -> some View {
+    private func LoadingView(isDarkMode: Bool) -> some View {
         VStack(spacing: 20) {
             ProgressView()
                 .progressViewStyle(CircularProgressViewStyle())
@@ -58,27 +62,27 @@ struct ExerciseHistoryListView: View {
             
             Text("Loading exercise history...")
                 .font(.headline)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     @ViewBuilder
-    private func EmptyStateView() -> some View {
+    private func EmptyStateView(isDarkMode: Bool) -> some View {
         VStack(spacing: 24) {
             Image(systemName: "chart.xyaxis.line")
                 .font(.system(size: 60, weight: .bold))
-                .foregroundColor(.gray.opacity(0.6))
+                .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray.opacity(0.6))
             
             VStack(spacing: 16) {
                 Text("No Exercise History")
                     .font(.title)
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("Complete some workouts to see your exercise history and progress")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
             }
@@ -87,13 +91,14 @@ struct ExerciseHistoryListView: View {
     }
     
     @ViewBuilder
-    private func ExerciseListView() -> some View {
+    private func ExerciseListView(isDarkMode: Bool) -> some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 ForEach(exercises, id: \.self) { exerciseName in
                     ExerciseHistoryCard(
                         exerciseName: exerciseName,
                         stats: exerciseStats[exerciseName],
+                        isDarkMode: isDarkMode,
                         onTap: {
                             selectedExercise = exerciseName
                             showingExerciseDetail = true
@@ -130,6 +135,7 @@ struct ExerciseHistoryListView: View {
 struct ExerciseHistoryCard: View {
     let exerciseName: String
     let stats: ExerciseStats?
+    let isDarkMode: Bool
     let onTap: () -> Void
     
     var body: some View {
@@ -141,7 +147,7 @@ struct ExerciseHistoryCard: View {
                         Text(exerciseName)
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primary)
+                            .foregroundColor(isDarkMode ? .white : .primary)
                             .multilineTextAlignment(.leading)
                         
                         if let stats = stats {
@@ -151,7 +157,7 @@ struct ExerciseHistoryCard: View {
                                     .foregroundColor(Color.accentBlue)
                                 Text("\(stats.totalSets) sets recorded")
                                     .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                             }
                         }
                     }
@@ -160,7 +166,7 @@ struct ExerciseHistoryCard: View {
                     
                     Image(systemName: "chevron.right")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                         .padding(.top, 4)
                 }
                 
@@ -173,14 +179,16 @@ struct ExerciseHistoryCard: View {
                                 title: "Max Weight",
                                 value: "\(Int(stats.maxWeight)) lbs",
                                 icon: "scalemass.fill",
-                                color: Color.accentBlue
+                                color: Color.accentBlue,
+                                isDarkMode: isDarkMode
                             )
                             
                             StatCard(
                                 title: "Max Volume", 
                                 value: "\(Int(stats.maxVolume))",
                                 icon: "chart.bar.fill",
-                                color: Color.accentBlue
+                                color: Color.accentBlue,
+                                isDarkMode: isDarkMode
                             )
                         }
                         
@@ -191,7 +199,8 @@ struct ExerciseHistoryCard: View {
                                     title: "Last Workout",
                                     value: relativeDateString(from: lastWorkout),
                                     icon: "calendar.circle.fill",
-                                    color: Color.accentBlue
+                                    color: Color.accentBlue,
+                                    isDarkMode: isDarkMode
                                 )
                                 Spacer()
                             }
@@ -202,8 +211,8 @@ struct ExerciseHistoryCard: View {
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white)
-                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+                    .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                    .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -221,6 +230,7 @@ struct StatCard: View {
     let value: String
     let icon: String
     let color: Color
+    let isDarkMode: Bool
     
     var body: some View {
         HStack(spacing: 12) {
@@ -234,13 +244,13 @@ struct StatCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     .fontWeight(.medium)
                 
                 Text(value)
                     .font(.subheadline)
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                     .lineLimit(1)
             }
             
@@ -249,10 +259,10 @@ struct StatCard: View {
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.05))
+                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.gray.opacity(0.12), lineWidth: 1)
+                        .stroke(isDarkMode ? Color.white.opacity(0.15) : Color.gray.opacity(0.12), lineWidth: 1)
                 )
         )
     }

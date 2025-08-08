@@ -4,6 +4,7 @@ struct ExerciseChart: View {
     let data: [WorkoutSet]
     let chartType: ExerciseChartType
     let timeframe: ExerciseHistoryTimeframe
+    let isDarkMode: Bool
     
     private var chartData: [ChartDataPoint] {
         switch chartType {
@@ -48,7 +49,7 @@ struct ExerciseChart: View {
             GeometryReader { geometry in
                 ZStack {
                     // Background grid
-                    ChartGrid(geometry: geometry)
+                    ChartGrid(geometry: geometry, isDarkMode: isDarkMode)
                     
                     // Chart line
                     if chartData.count > 1 {
@@ -74,17 +75,18 @@ struct ExerciseChart: View {
                         last: labelsToShow.last,
                         geometry: geometry,
                         maxValue: maxValue,
-                        minValue: minValue
+                        minValue: minValue,
+                        isDarkMode: isDarkMode
                     )
                 }
             }
             .frame(height: 200)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.white)
+                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                            .stroke(isDarkMode ? Color.white.opacity(0.15) : Color.gray.opacity(0.15), lineWidth: 1)
                     )
             )
             .padding(8)
@@ -94,12 +96,12 @@ struct ExerciseChart: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(chartType.unit)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     
                     if !chartData.isEmpty {
                         Text("Range: \(Int(minValue)) - \(Int(maxValue))")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     }
                 }
                 
@@ -109,7 +111,7 @@ struct ExerciseChart: View {
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("\(chartData.count) data points")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                         
                         if let first = chartData.first, let last = chartData.last {
                             let change = last.value - first.value
@@ -132,6 +134,7 @@ struct ChartDataPoint {
 
 struct ChartGrid: View {
     let geometry: GeometryProxy
+    let isDarkMode: Bool
     
     var body: some View {
         Path { path in
@@ -145,7 +148,7 @@ struct ChartGrid: View {
                 path.addLine(to: CGPoint(x: geometry.size.width, y: y))
             }
         }
-        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+        .stroke(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.2), lineWidth: 1)
     }
 }
 
@@ -240,6 +243,7 @@ struct ChartLabels: View {
     let geometry: GeometryProxy
     let maxValue: Double
     let minValue: Double
+    let isDarkMode: Bool
     
     var body: some View {
         Group {
@@ -253,13 +257,13 @@ struct ChartLabels: View {
                     Text("\(Int(first.value))")
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.offWhite)
-                                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                                .fill(isDarkMode ? Color.white.opacity(0.2) : Color.offWhite)
+                                .shadow(color: isDarkMode ? Color.clear : .black.opacity(0.1), radius: 1, x: 0, y: 1)
                         )
                 }
                 .position(x: 20, y: max(y - 25, 15)) // Offset from edge
@@ -275,13 +279,13 @@ struct ChartLabels: View {
                     Text("\(Int(last.value))")
                         .font(.caption2)
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.offWhite)
-                                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                                .fill(isDarkMode ? Color.white.opacity(0.2) : Color.offWhite)
+                                .shadow(color: isDarkMode ? Color.clear : .black.opacity(0.1), radius: 1, x: 0, y: 1)
                         )
                 }
                 .position(x: geometry.size.width - 20, y: max(y - 25, 15)) // Offset from edge
