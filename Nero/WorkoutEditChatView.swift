@@ -16,6 +16,7 @@ struct ChatMessage: Identifiable {
 
 struct WorkoutEditChatView: View {
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var preferencesService: WorkoutPreferencesService
     @State private var messageText = ""
@@ -26,7 +27,7 @@ struct WorkoutEditChatView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Messages List
@@ -35,28 +36,28 @@ struct WorkoutEditChatView: View {
                             LazyVStack(spacing: 16) {
                                 // Welcome message
                                 if messages.isEmpty {
-                                    WelcomeMessageView()
+                                    WelcomeMessageView(isDarkMode: isDarkMode)
                                         .padding(.horizontal, 16)
                                         .padding(.top, 20)
                                 }
                                 
                                 ForEach(messages) { message in
-                                    MessageBubbleView(message: message)
+                                    MessageBubbleView(message: message, isDarkMode: isDarkMode)
                                         .padding(.horizontal, 16)
                                         .id(message.id)
                                 }
                                 
                                 // Processing indicator
                                 if isProcessing && !preferencesService.generationStatus.isActive {
-                                    ProcessingMessageView()
+                                    ProcessingMessageView(isDarkMode: isDarkMode)
                                         .padding(.horizontal, 16)
                                         .id("processing")
                                 } else if preferencesService.generationStatus.isActive {
-                                    StatusMessageView(status: preferencesService.generationStatus)
+                                    StatusMessageView(status: preferencesService.generationStatus, isDarkMode: isDarkMode)
                                         .padding(.horizontal, 16)
                                         .id("status")
                                 } else if preferencesService.generationStatus == .completed {
-                                    CompletedMessageView {
+                                    CompletedMessageView(isDarkMode: isDarkMode) {
                                         showingWorkoutPlan = true
                                     }
                                     .padding(.horizontal, 16)
@@ -126,12 +127,15 @@ struct WorkoutEditChatView: View {
                     MessageInputView(
                         messageText: $messageText,
                         isProcessing: isProcessing || preferencesService.generationStatus.isActive,
-                        onSend: sendMessage
+                        onSend: sendMessage,
+                        isDarkMode: isDarkMode
                     )
                 }
             }
             .navigationTitle("Edit Workout Plan")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -146,7 +150,7 @@ struct WorkoutEditChatView: View {
             WorkoutPlanView(
                 onExerciseSelected: { _ in }, // Not needed in this context
                 workoutService: workoutService,
-                isDarkMode: false // Default to light mode for now
+                isDarkMode: isDarkMode
             )
         }
         .onAppear {
@@ -236,6 +240,8 @@ struct WorkoutEditChatView: View {
 // MARK: - Supporting Views
 
 struct WelcomeMessageView: View {
+    let isDarkMode: Bool
+    
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "bubble.left.and.bubble.right.fill")
@@ -246,28 +252,29 @@ struct WelcomeMessageView: View {
                 Text("Edit Your Workout Plan")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
                 
                 Text("Tell me what you'd like to change about your current workout plan. For example:")
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                     .multilineTextAlignment(.center)
             }
             
             VStack(alignment: .leading, spacing: 8) {
-                ExamplePromptView(text: "Add more chest exercises")
-                ExamplePromptView(text: "Remove all leg workouts")
-                ExamplePromptView(text: "Make the workouts shorter")
-                ExamplePromptView(text: "Focus more on arms and shoulders")
+                ExamplePromptView(text: "Add more chest exercises", isDarkMode: isDarkMode)
+                ExamplePromptView(text: "Remove all leg workouts", isDarkMode: isDarkMode)
+                ExamplePromptView(text: "Make the workouts shorter", isDarkMode: isDarkMode)
+                ExamplePromptView(text: "Focus more on arms and shoulders", isDarkMode: isDarkMode)
             }
             .padding(.top, 8)
         }
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.7))
+                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.7))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
                 )
         )
     }
@@ -275,6 +282,7 @@ struct WelcomeMessageView: View {
 
 struct ExamplePromptView: View {
     let text: String
+    let isDarkMode: Bool
     
     var body: some View {
         HStack(spacing: 8) {
@@ -284,7 +292,7 @@ struct ExamplePromptView: View {
             
             Text("\"\(text)\"")
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 .italic()
         }
     }
@@ -292,6 +300,7 @@ struct ExamplePromptView: View {
 
 struct MessageBubbleView: View {
     let message: ChatMessage
+    let isDarkMode: Bool
     
     var body: some View {
         HStack {
@@ -312,28 +321,28 @@ struct MessageBubbleView: View {
                     
                     Text(formatTime(message.timestamp))
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(message.text)
                         .font(.body)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background(
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.white.opacity(0.8))
+                                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 20)
-                                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                        .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
                                 )
                         )
                         .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: .leading)
                     
                     Text(formatTime(message.timestamp))
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
                 
                 Spacer()
@@ -349,6 +358,8 @@ struct MessageBubbleView: View {
 }
 
 struct ProcessingMessageView: View {
+    let isDarkMode: Bool
+    
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -359,16 +370,16 @@ struct ProcessingMessageView: View {
                     
                     Text("Processing your request...")
                         .font(.body)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(0.8))
+                        .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
                         )
                 )
             }
@@ -380,6 +391,7 @@ struct ProcessingMessageView: View {
 
 struct StatusMessageView: View {
     let status: WorkoutPlanGenerationStatus
+    let isDarkMode: Bool
     
     var body: some View {
         HStack {
@@ -391,16 +403,16 @@ struct StatusMessageView: View {
                     
                     Text(status.displayText)
                         .font(.body)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 20)
-                        .fill(Color.white.opacity(0.8))
+                        .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
                         )
                 )
             }
@@ -411,6 +423,7 @@ struct StatusMessageView: View {
 }
 
 struct CompletedMessageView: View {
+    let isDarkMode: Bool
     let onViewPlan: () -> Void
     
     var body: some View {
@@ -424,7 +437,7 @@ struct CompletedMessageView: View {
                     Text("Workout plan updated!")
                         .font(.body)
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                 }
                 
                 Button(action: onViewPlan) {
@@ -444,10 +457,10 @@ struct CompletedMessageView: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white.opacity(0.8))
+                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
                     .overlay(
                         RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
                     )
             )
             
@@ -460,11 +473,12 @@ struct MessageInputView: View {
     @Binding var messageText: String
     let isProcessing: Bool
     let onSend: () -> Void
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 0) {
             Divider()
-                .background(Color.gray.opacity(0.3))
+                .background(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.3))
             
             HStack(spacing: 12) {
                 TextField("Describe what you'd like to change...", text: $messageText, axis: .vertical)
@@ -475,10 +489,10 @@ struct MessageInputView: View {
                     .padding(.vertical, 12)
                     .background(
                         RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.white.opacity(0.8))
+                            .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                                    .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
                             )
                     )
                     .disabled(isProcessing)
@@ -493,6 +507,6 @@ struct MessageInputView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
-        .background(Color.offWhite)
+        .background(isDarkMode ? Color.black : Color.offWhite)
     }
 } 

@@ -333,14 +333,14 @@ struct ExerciseView: View {
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingWorkoutEditChat) {
-            WorkoutEditChatView(workoutService: workoutService)
+            WorkoutEditChatView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingExerciseHistory) {
             ExerciseHistoryListView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
         }
         .sheet(isPresented: $showingAIChat) {
-            AIChatView(workoutService: workoutService)
+            AIChatView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
         }
         .sheet(isPresented: $showingMacroChat) {
             MacroChatView(userId: authService.user?.id)

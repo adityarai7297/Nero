@@ -66,7 +66,7 @@ struct MacroChatView: View {
                     // Input Area
                     VStack(spacing: 8) {
                         if let errorMessage = errorMessage {
-                            ErrorMessageView(message: errorMessage) { self.errorMessage = nil }
+                            ErrorMessageView(message: errorMessage, isDarkMode: false) { self.errorMessage = nil }
                         }
                         HStack(spacing: 12) {
                             TextField("e.g. 2 eggs scrambled in 1 tsp butter with toast and coffee", text: $messageText, axis: .vertical)

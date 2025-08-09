@@ -17,6 +17,7 @@ struct AIChatMessage: Identifiable, Equatable {
 
 struct AIChatView: View {
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     
     @Environment(\.dismiss) private var dismiss
     @State private var messages: [AIChatMessage] = []
@@ -28,7 +29,7 @@ struct AIChatView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Chat messages area
@@ -37,18 +38,18 @@ struct AIChatView: View {
                             LazyVStack(spacing: 16) {
                                 // Welcome message
                                 if messages.isEmpty && !isLoading {
-                                    AIChatWelcomeMessageView()
+                                    AIChatWelcomeMessageView(isDarkMode: isDarkMode)
                                 }
                                 
                                 // Chat messages
                                 ForEach(messages) { message in
-                                    AIChatMessageView(message: message)
+                                    AIChatMessageView(message: message, isDarkMode: isDarkMode)
                                         .id(message.id)
                                 }
                                 
                                 // Loading indicator
                                 if isLoading {
-                                    TypingIndicatorView()
+                                    TypingIndicatorView(isDarkMode: isDarkMode)
                                         .id("typing")
                                 }
                             }
@@ -78,7 +79,7 @@ struct AIChatView: View {
                     // Input area
                     VStack(spacing: 12) {
                         if let errorMessage = errorMessage {
-                            ErrorMessageView(message: errorMessage) {
+                            ErrorMessageView(message: errorMessage, isDarkMode: isDarkMode) {
                                 self.errorMessage = nil
                             }
                         }
@@ -86,17 +87,20 @@ struct AIChatView: View {
                         AIChatMessageInputView(
                             messageText: $messageText,
                             isLoading: isLoading,
-                            onSend: sendMessage
+                            onSend: sendMessage,
+                            isDarkMode: isDarkMode
                         )
                         .focused($isTextFieldFocused)
                     }
                     .padding(.horizontal, 16)
                     .padding(.bottom, 16)
-                    .background(Color.offWhite)
+                    .background(isDarkMode ? Color.black : Color.offWhite)
                 }
             }
             .navigationTitle("AI Fitness Coach")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -173,6 +177,8 @@ struct AIChatView: View {
 // MARK: - Supporting Views
 
 struct AIChatWelcomeMessageView: View {
+    let isDarkMode: Bool
+    
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "brain.head.profile")
@@ -182,11 +188,11 @@ struct AIChatWelcomeMessageView: View {
             Text("Your AI Fitness Coach")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.primary)
+                .foregroundColor(isDarkMode ? .white : .primary)
             
             Text("Ask me anything about your workouts, progress, form, or training strategies. I'm here to help you reach your fitness goals!")
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 20)
         }
@@ -196,6 +202,7 @@ struct AIChatWelcomeMessageView: View {
 
 struct AIChatMessageView: View {
     let message: AIChatMessage
+    let isDarkMode: Bool
     
     var body: some View {
         HStack {
@@ -220,7 +227,7 @@ struct AIChatMessageView: View {
                     
                     Text(formatMessageTime(message.timestamp))
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
                 .frame(maxWidth: .infinity * 0.8, alignment: .trailing)
             } else {
@@ -240,10 +247,10 @@ struct AIChatMessageView: View {
                     
                     Text(parseMarkdown(message.content))
                         .font(.body)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color.white)
+                        .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                         .clipShape(
                             .rect(
                                 topLeadingRadius: 4,
@@ -252,11 +259,11 @@ struct AIChatMessageView: View {
                                 topTrailingRadius: 16
                             )
                         )
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                     
                     Text(formatMessageTime(message.timestamp))
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
                 .frame(maxWidth: .infinity * 0.8, alignment: .leading)
                 
@@ -287,6 +294,7 @@ struct AIChatMessageView: View {
 }
 
 struct TypingIndicatorView: View {
+    let isDarkMode: Bool
     @State private var animationOffset: CGFloat = 0
     
     var body: some View {
@@ -321,7 +329,7 @@ struct TypingIndicatorView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color.white)
+                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                 .clipShape(
                     .rect(
                         topLeadingRadius: 4,
@@ -330,7 +338,7 @@ struct TypingIndicatorView: View {
                         topTrailingRadius: 16
                     )
                 )
-                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
             }
             .frame(maxWidth: .infinity * 0.8, alignment: .leading)
             
@@ -346,6 +354,7 @@ struct AIChatMessageInputView: View {
     @Binding var messageText: String
     let isLoading: Bool
     let onSend: () -> Void
+    let isDarkMode: Bool
     
     var body: some View {
         HStack(spacing: 12) {
@@ -353,9 +362,9 @@ struct AIChatMessageInputView: View {
                 .font(.body)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color.white)
+                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
-                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                 .lineLimit(1...5)
                 .onSubmit {
                     onSend()
@@ -373,6 +382,7 @@ struct AIChatMessageInputView: View {
 
 struct ErrorMessageView: View {
     let message: String
+    let isDarkMode: Bool
     let onDismiss: () -> Void
     
     var body: some View {
