@@ -291,7 +291,8 @@ struct ExerciseView: View {
         .sheet(isPresented: $showingSetsModal) {
             SetsModalView(
                 allSets: workoutService.todaySets,
-                workoutService: workoutService
+                workoutService: workoutService,
+                isDarkMode: menuDarkModeEnabled
             )
             .environmentObject(themeManager)
         }
@@ -1224,6 +1225,7 @@ struct ExerciseView: View {
 struct SetsModalView: View {
     let allSets: [WorkoutSet]
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var themeManager: ThemeManager
     
@@ -1233,22 +1235,25 @@ struct SetsModalView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            ZStack {
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
+                
+                VStack {
                 if allSets.isEmpty {
                     // Empty state
                     VStack(spacing: 16) {
                         Image(systemName: "list.bullet.clipboard")
                             .font(.system(size: 48))
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                         
                         Text("No sets completed today")
                             .font(.title2)
                             .fontWeight(.medium)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .gray)
                         
                         Text("Complete a set to see it here")
                             .font(.body)
-                            .foregroundColor(.gray.opacity(0.8))
+                            .foregroundColor(isDarkMode ? .white.opacity(0.5) : .gray.opacity(0.8))
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
@@ -1258,6 +1263,7 @@ struct SetsModalView: View {
                             SetRowView(
                                 set: set,
                                 isDeleting: deletingSetIds.contains(set.id),
+                                isDarkMode: isDarkMode,
                                 onEdit: {
                                     editingSet = set
                                     showingEditSheet = true
@@ -1269,11 +1275,15 @@ struct SetsModalView: View {
                         }
                     }
                     .listStyle(PlainListStyle())
+                    .scrollContentBackground(.hidden)
                 }
+            }
             }
             .navigationTitle("Today's Sets")
             .navigationBarTitleDisplayMode(.large)
             .navigationBarBackButtonHidden(true)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") {
@@ -1288,6 +1298,7 @@ struct SetsModalView: View {
                 EditSetView(
                     set: editingSet,
                     workoutService: workoutService,
+                    isDarkMode: isDarkMode,
                     onSave: { updatedSet in
                         updateSet(updatedSet)
                         showingEditSheet = false
@@ -1338,6 +1349,7 @@ struct SetsModalView: View {
 struct SetRowView: View {
     let set: WorkoutSet
     let isDeleting: Bool
+    let isDarkMode: Bool
     let onEdit: () -> Void
     let onDelete: () -> Void
     
@@ -1349,11 +1361,11 @@ struct SetRowView: View {
                         .font(.headline)
                         .fontWeight(.semibold)
                         .lineLimit(1)
-                        .foregroundColor(isDeleting ? .gray : .primary)
+                        .foregroundColor(isDeleting ? .gray : (isDarkMode ? .white : .primary))
                     
                     Text(set.formattedTime)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                         .padding(.leading, 8)
                 }
                 
@@ -1362,30 +1374,30 @@ struct SetRowView: View {
                         Text("\(Int(set.weight))")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(isDeleting ? .gray : .primary)
+                            .foregroundColor(isDeleting ? .gray : (isDarkMode ? .white : .primary))
                         Text("lbs")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                     }
                     
                     HStack(spacing: 4) {
                         Text("\(Int(set.reps))")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(isDeleting ? .gray : .primary)
+                            .foregroundColor(isDeleting ? .gray : (isDarkMode ? .white : .primary))
                         Text(set.exerciseType == "static_hold" ? "seconds" : "reps")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                     }
                     
                     HStack(spacing: 4) {
                         Text("\(Int(set.rpe))")
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(isDeleting ? .gray : .primary)
+                            .foregroundColor(isDeleting ? .gray : (isDarkMode ? .white : .primary))
                         Text("% RPE")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                     }
                     
                     Spacer()
@@ -1441,6 +1453,7 @@ struct SetRowView: View {
 struct EditSetView: View {
     let set: WorkoutSet
     let workoutService: WorkoutService
+    let isDarkMode: Bool
     let onSave: (WorkoutSet) -> Void
     let onCancel: () -> Void
     
@@ -1448,9 +1461,10 @@ struct EditSetView: View {
     @State private var repsText: String
     @State private var rpeText: String
     
-    init(set: WorkoutSet, workoutService: WorkoutService, onSave: @escaping (WorkoutSet) -> Void, onCancel: @escaping () -> Void) {
+    init(set: WorkoutSet, workoutService: WorkoutService, isDarkMode: Bool, onSave: @escaping (WorkoutSet) -> Void, onCancel: @escaping () -> Void) {
         self.set = set
         self.workoutService = workoutService
+        self.isDarkMode = isDarkMode
         self.onSave = onSave
         self.onCancel = onCancel
         self._weightText = State(initialValue: "\(Int(set.weight))")
@@ -1478,7 +1492,7 @@ struct EditSetView: View {
                             .keyboardType(.numberPad)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         Text("lbs")
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                     }
                     
                     HStack {
@@ -1488,7 +1502,7 @@ struct EditSetView: View {
                             .keyboardType(.numberPad)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         Text(set.exerciseType == "static_hold" ? "seconds" : "reps")
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                     }
                     
                     HStack {
@@ -1498,7 +1512,7 @@ struct EditSetView: View {
                             .keyboardType(.numberPad)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                         Text("% RPE")
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                     }
                 }
                 
@@ -1507,13 +1521,15 @@ struct EditSetView: View {
                         Text("Time")
                             .frame(width: 60, alignment: .leading)
                         Text(set.formattedTime)
-                            .foregroundColor(.gray)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .gray)
                         Spacer()
                     }
                 }
             }
             .navigationTitle("Edit Set")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {

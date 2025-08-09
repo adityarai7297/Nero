@@ -42,17 +42,7 @@ struct ExerciseDetailView: View {
             }
             .navigationTitle(exerciseName)
             .navigationBarTitleDisplayMode(.large)
-            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
             .preferredColorScheme(isDarkMode ? .dark : .light)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                    .foregroundColor(Color.accentBlue)
-                }
-            }
         }
         .onAppear {
             loadHistory()
@@ -65,6 +55,7 @@ struct ExerciseDetailView: View {
                 EditSetView(
                     set: editingSet,
                     workoutService: workoutService,
+                    isDarkMode: isDarkMode,
                     onSave: { updatedSet in
                         updateSet(updatedSet)
                         showingEditSheet = false
