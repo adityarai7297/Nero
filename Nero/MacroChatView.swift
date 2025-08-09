@@ -11,6 +11,7 @@ struct MacroChatView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject var macroService = MacroService()
     let userId: UUID?
+    let isDarkMode: Bool
     
     @State private var messages: [MacroChatMessage] = []
     @State private var messageText: String = ""
@@ -22,29 +23,29 @@ struct MacroChatView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.offWhite.ignoresSafeArea()
+                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // Top summary bar
-                    MacroTotalsHeader(totals: macroService.todayTotals)
+                    MacroTotalsHeader(totals: macroService.todayTotals, isDarkMode: isDarkMode)
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
                         
-                    Divider().opacity(0.2)
+                    Divider().opacity(isDarkMode ? 0.3 : 0.2)
                     
                     // Chat Area
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(spacing: 16) {
                                 if messages.isEmpty && !isLoading {
-                                    MacroChatWelcome()
+                                    MacroChatWelcome(isDarkMode: isDarkMode)
                                 }
                                 ForEach(messages) { message in
-                                    MacroChatBubble(message: message)
+                                    MacroChatBubble(message: message, isDarkMode: isDarkMode)
                                         .id(message.id)
                                 }
                                 if isLoading {
-                                    MacroTypingIndicatorView()
+                                    MacroTypingIndicatorView(isDarkMode: isDarkMode)
                                         .id("typing")
                                 }
                             }
@@ -66,7 +67,7 @@ struct MacroChatView: View {
                     // Input Area
                     VStack(spacing: 8) {
                         if let errorMessage = errorMessage {
-                            ErrorMessageView(message: errorMessage, isDarkMode: false) { self.errorMessage = nil }
+                            ErrorMessageView(message: errorMessage, isDarkMode: isDarkMode) { self.errorMessage = nil }
                         }
                         HStack(spacing: 12) {
                             TextField("e.g. 2 eggs scrambled in 1 tsp butter with toast and coffee", text: $messageText, axis: .vertical)
@@ -74,7 +75,7 @@ struct MacroChatView: View {
                                 .font(.body)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 12)
-                                .background(Color.white)
+                                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 20))
                                 .lineLimit(1...5)
                                 .focused($isTextFieldFocused)
@@ -88,12 +89,14 @@ struct MacroChatView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
-                        .background(Color.offWhite)
+                        .background(isDarkMode ? Color.black : Color.offWhite)
                     }
                 }
             }
             .navigationTitle("Macro Tracker")
             .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
@@ -151,13 +154,14 @@ struct MacroChatView: View {
 
 struct MacroTotalsHeader: View {
     let totals: MacroTotals
+    let isDarkMode: Bool
     
     var body: some View {
         HStack(spacing: 12) {
-            MacroTotalPill(title: "Calories", value: Int(totals.calories), unit: "kcal", color: .red)
-            MacroTotalPill(title: "Protein", value: Int(totals.protein), unit: "g", color: .blue)
-            MacroTotalPill(title: "Carbs", value: Int(totals.carbs), unit: "g", color: .orange)
-            MacroTotalPill(title: "Fat", value: Int(totals.fat), unit: "g", color: .purple)
+            MacroTotalPill(title: "Calories", value: Int(totals.calories), unit: "kcal", color: .red, isDarkMode: isDarkMode)
+            MacroTotalPill(title: "Protein", value: Int(totals.protein), unit: "g", color: .blue, isDarkMode: isDarkMode)
+            MacroTotalPill(title: "Carbs", value: Int(totals.carbs), unit: "g", color: .orange, isDarkMode: isDarkMode)
+            MacroTotalPill(title: "Fat", value: Int(totals.fat), unit: "g", color: .purple, isDarkMode: isDarkMode)
         }
     }
 }
@@ -167,25 +171,26 @@ struct MacroTotalPill: View {
     let value: Int
     let unit: String
     let color: Color
+    let isDarkMode: Bool
     
     var body: some View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
             Text("\(value)")
                 .font(.headline)
                 .foregroundColor(color)
             Text(unit)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(10)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
         )
     }
 }
@@ -193,6 +198,8 @@ struct MacroTotalPill: View {
 // MARK: - Chat Bits
 
 struct MacroChatWelcome: View {
+    let isDarkMode: Bool
+    
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "fork.knife")
@@ -201,32 +208,34 @@ struct MacroChatWelcome: View {
             Text("Log your meals in plain English")
                 .font(.title3)
                 .fontWeight(.semibold)
+                .foregroundColor(isDarkMode ? .white : .primary)
             VStack(alignment: .leading, spacing: 6) {
                 Text("Examples:")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                 Text("- greek yogurt with honey and granola")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 Text("- 6oz grilled chicken, 1 cup rice, 1 tbsp olive oil")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 Text("- 2 eggs scrambled in 1 tsp butter + toast")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
             }
         }
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white)
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.gray.opacity(0.15), lineWidth: 1))
+                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15), lineWidth: 1))
         )
     }
 }
 
 struct MacroChatBubble: View {
     let message: MacroChatMessage
+    let isDarkMode: Bool
     
     var body: some View {
         HStack {
@@ -240,19 +249,19 @@ struct MacroChatBubble: View {
                         .padding(.vertical, 12)
                         .background(Color.accentBlue)
                         .clipShape(.rect(topLeadingRadius: 16, bottomLeadingRadius: 16, bottomTrailingRadius: 4, topTrailingRadius: 16))
-                    Text(timeString(message.timestamp)).font(.caption2).foregroundColor(.secondary)
+                    Text(timeString(message.timestamp)).font(.caption2).foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
                 .frame(maxWidth: .infinity * 0.8, alignment: .trailing)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(message.content)
                         .font(.body)
-                        .foregroundColor(.primary)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
-                        .background(Color.white)
+                        .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                         .clipShape(.rect(topLeadingRadius: 4, bottomLeadingRadius: 16, bottomTrailingRadius: 16, topTrailingRadius: 16))
-                    Text(timeString(message.timestamp)).font(.caption2).foregroundColor(.secondary)
+                    Text(timeString(message.timestamp)).font(.caption2).foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
                 .frame(maxWidth: .infinity * 0.8, alignment: .leading)
                 Spacer()
@@ -266,7 +275,9 @@ struct MacroChatBubble: View {
 }
 
 struct MacroTypingIndicatorView: View {
+    let isDarkMode: Bool
     @State private var animationOffset: CGFloat = 0
+    
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 6) {
@@ -296,7 +307,7 @@ struct MacroTypingIndicatorView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(Color.white)
+                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
                 .clipShape(
                     .rect(
                         topLeadingRadius: 4,
@@ -305,7 +316,7 @@ struct MacroTypingIndicatorView: View {
                         topTrailingRadius: 16
                     )
                 )
-                .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
             }
             .frame(maxWidth: .infinity * 0.8, alignment: .leading)
             Spacer()

@@ -343,10 +343,10 @@ struct ExerciseView: View {
             AIChatView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
         }
         .sheet(isPresented: $showingMacroChat) {
-            MacroChatView(userId: authService.user?.id)
+            MacroChatView(userId: authService.user?.id, isDarkMode: menuDarkModeEnabled)
         }
         .sheet(isPresented: $showingMacroHistory) {
-            MacroHistoryView(userId: authService.user?.id)
+            MacroHistoryView(userId: authService.user?.id, isDarkMode: menuDarkModeEnabled)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }

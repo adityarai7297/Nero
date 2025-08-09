@@ -83,10 +83,10 @@ struct ExerciseChart: View {
             .frame(height: 200)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                    .fill(isDarkMode ? Color.white.opacity(0.06) : Color.white)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(isDarkMode ? Color.white.opacity(0.15) : Color.gray.opacity(0.15), lineWidth: 1)
+                            .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15), lineWidth: 1)
                     )
             )
             .padding(8)

@@ -144,7 +144,7 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .fill(isDarkMode ? Color.white.opacity(0.06) : Color.white)
                 .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
@@ -171,7 +171,7 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .fill(isDarkMode ? Color.white.opacity(0.06) : Color.white)
                 .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
@@ -216,7 +216,7 @@ struct ExerciseDetailView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .fill(isDarkMode ? Color.white.opacity(0.06) : Color.white)
                 .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
         )
     }
@@ -316,7 +316,7 @@ struct TimeframeButton: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentBlue : (isDarkMode ? Color.white.opacity(0.12) : Color.white))
+                .fill(isSelected ? Color.accentBlue : (isDarkMode ? Color.white.opacity(0.06) : Color.white))
                 .shadow(
                     color: isSelected ? Color.accentBlue.opacity(0.3) : (isDarkMode ? Color.clear : Color.black.opacity(0.1)),
                     radius: isSelected ? 8 : 2,
@@ -346,7 +346,7 @@ struct ChartTypeButton: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(isSelected ? Color.accentBlue : (isDarkMode ? Color.white.opacity(0.12) : Color.white))
+                .fill(isSelected ? Color.accentBlue : (isDarkMode ? Color.white.opacity(0.06) : Color.white))
                 .shadow(
                     color: isSelected ? Color.accentBlue.opacity(0.3) : (isDarkMode ? Color.clear : Color.black.opacity(0.1)),
                     radius: isSelected ? 8 : 2,
@@ -376,15 +376,15 @@ struct ExerciseHistoryRow: View {
     }
     
     private var statsBackgroundColor: Color {
-        isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.05)
+        isDarkMode ? Color.white.opacity(0.06) : Color.gray.opacity(0.05)
     }
     
     private var statsStrokeColor: Color {
-        isDarkMode ? Color.white.opacity(0.15) : Color.gray.opacity(0.15)
+        isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15)
     }
     
     private var cardBackgroundColor: Color {
-        isDarkMode ? Color.white.opacity(0.12) : Color.white
+        isDarkMode ? Color.white.opacity(0.06) : Color.white
     }
     
     private var cardShadowColor: Color {
