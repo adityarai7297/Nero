@@ -360,6 +360,7 @@ struct ExerciseView: View {
         .overlay {
             if showingLogoutAlert {
                 SignOutGlassPopup(
+                    isDarkMode: menuDarkModeEnabled,
                     confirmAction: {
                         Task {
                             await authService.signOut()
@@ -382,6 +383,7 @@ struct ExerciseView: View {
             if showingDeleteAccountAlert {
                 DeleteAccountConfirmationView(
                     userEmail: authService.user?.email ?? "",
+                    isDarkMode: menuDarkModeEnabled,
                     confirmAction: {
                         Task {
                             let success = await authService.deleteAccount()
@@ -2133,6 +2135,7 @@ struct WorkoutPlanStatusTile: View {
 // MARK: - Glass-Style Sign Out Popup
 
 struct SignOutGlassPopup: View {
+    let isDarkMode: Bool
     let confirmAction: () -> Void
     let cancelAction: () -> Void
 
@@ -2151,16 +2154,17 @@ struct SignOutGlassPopup: View {
                     .font(.headline)
                     .fontWeight(.semibold)
                     .multilineTextAlignment(.center)
-                    .foregroundColor(.primary)
+                    .foregroundColor(isDarkMode ? .white : .primary)
 
                 HStack(spacing: 16) {
                     // Cancel button
                     Button(action: cancelAction) {
                         Text("Cancel")
                             .fontWeight(.bold)
+                            .foregroundColor(isDarkMode ? .white : .primary)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(.thinMaterial)
+                            .background(isDarkMode ? Color.black : Color.white)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -2169,17 +2173,24 @@ struct SignOutGlassPopup: View {
                     Button(action: confirmAction) {
                         Text("Sign Out")
                             .fontWeight(.bold)
-                            .foregroundColor(.red)
+                            .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
-                            .background(.thinMaterial)
+                            .background(Color.red)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(28)
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(isDarkMode ? Color.black : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15), lineWidth: 1)
+                    )
+            )
             .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
             .padding(.horizontal, 40)
         }
@@ -2278,6 +2289,7 @@ struct AccountDeletionSuccessView: View {
 
 struct DeleteAccountConfirmationView: View {
     let userEmail: String
+    let isDarkMode: Bool
     let confirmAction: () -> Void
     let cancelAction: () -> Void
     @State private var confirmationText: String = ""
@@ -2289,144 +2301,166 @@ struct DeleteAccountConfirmationView: View {
 
     var body: some View {
         ZStack {
-            // Darker dimmed background for better contrast
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    if !isDeleting {
-                        cancelAction()
-                    }
-                }
-
-            // Warning card with better contrast
-            VStack(spacing: 24) {
-                // Warning icon
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 48))
-                    .foregroundColor(.red)
-                
-                VStack(spacing: 16) {
-                    Text("Delete Account")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    
-                    VStack(spacing: 12) {
-                        Text("This action cannot be undone.")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.red)
-                        
-                        Text("All your workout data, personal details, and account information will be permanently deleted.")
-                            .font(.body)
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.black)
-                            .lineLimit(nil)
-                        
-                        // Account email with better visibility
-                        VStack(spacing: 4) {
-                            Text("Account:")
-                                .font(.caption)
-                                .fontWeight(.medium)
-                                .foregroundColor(.black.opacity(0.7))
-                            
-                            Text(userEmail)
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.black)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(Color.red.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.red.opacity(0.3), lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
-                
-                // Confirmation text field with better styling
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Type \"delete my account\" to confirm:")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.black)
-                    
-                    TextField("delete my account", text: $confirmationText)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(Color.white)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(isConfirmationValid ? Color.red : Color.gray.opacity(0.3), lineWidth: 2)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                        .disabled(isDeleting)
-                }
-
-                if isDeleting {
-                    HStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .red))
-                            .scaleEffect(1.0)
-                        
-                        Text("Deleting account...")
-                            .font(.body)
-                            .fontWeight(.medium)
-                            .foregroundColor(.red)
-                    }
-                    .padding(.vertical, 16)
-                } else {
-                    HStack(spacing: 12) {
-                        // Cancel button with better styling
-                        Button(action: cancelAction) {
-                            Text("Cancel")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.black)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.white)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-
-                        // Delete button with better styling
-                        Button(action: {
-                            isDeleting = true
-                            confirmAction()
-                        }) {
-                            Text("Delete Account")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(isConfirmationValid ? Color.red : Color.gray)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .disabled(!isConfirmationValid)
-                        .opacity(isConfirmationValid ? 1.0 : 0.6)
-                    }
-                }
-            }
-            .padding(28)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color.white)
-                    .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-            )
-            .padding(.horizontal, 24)
+            dimBackground
+            contentCard
         }
         .transition(.opacity.combined(with: .scale))
+    }
+
+    // MARK: - Subviews to help the compiler
+    private var dimBackground: some View {
+        Color.black.opacity(0.6)
+            .ignoresSafeArea()
+            .onTapGesture {
+                if !isDeleting { cancelAction() }
+            }
+    }
+
+    private var warningIcon: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .font(.system(size: 48))
+            .foregroundColor(.red)
+    }
+
+    private var titleAndDescription: some View {
+        VStack(spacing: 16) {
+            Text("Delete Account")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(isDarkMode ? .white : .black)
+
+            VStack(spacing: 12) {
+                Text("This action cannot be undone.")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.red)
+
+                Text("All your workout data, personal details, and account information will be permanently deleted.")
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.85) : .black)
+                    .lineLimit(nil)
+
+                emailPanel
+            }
+        }
+    }
+
+    private var emailPanel: some View {
+        VStack(spacing: 4) {
+            Text("Account:")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .black.opacity(0.7))
+
+            Text(userEmail)
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isDarkMode ? .white : .black)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(isDarkMode ? Color.red.opacity(0.15) : Color.red.opacity(0.1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.red.opacity(isDarkMode ? 0.4 : 0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var confirmationField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Type \"delete my account\" to confirm:")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(isDarkMode ? .white : .black)
+
+            TextField("delete my account", text: $confirmationText)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isConfirmationValid ? Color.red : Color.gray.opacity(0.3), lineWidth: 2)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .autocapitalization(.none)
+                .disableAutocorrection(true)
+                .disabled(isDeleting)
+        }
+    }
+
+    private var deletingIndicator: some View {
+        HStack(spacing: 12) {
+            ProgressView()
+                .progressViewStyle(CircularProgressViewStyle(tint: .red))
+                .scaleEffect(1.0)
+
+            Text("Deleting account...")
+                .font(.body)
+                .fontWeight(.medium)
+                .foregroundColor(.red)
+        }
+        .padding(.vertical, 16)
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 12) {
+            Button(action: cancelAction) {
+                Text("Cancel")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(PlainButtonStyle())
+
+            Button(action: {
+                isDeleting = true
+                confirmAction()
+            }) {
+                Text("Delete Account")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(isConfirmationValid ? Color.red : Color.gray)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(!isConfirmationValid)
+            .opacity(isConfirmationValid ? 1.0 : 0.6)
+        }
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(isDarkMode ? Color.black : Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(isDarkMode ? Color.white.opacity(0.12) : Color.gray.opacity(0.15), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+    }
+
+    private var contentCard: some View {
+        VStack(spacing: 24) {
+            warningIcon
+            titleAndDescription
+            confirmationField
+            if isDeleting { deletingIndicator } else { actionButtons }
+        }
+        .padding(28)
+        .background(cardBackground)
+        .padding(.horizontal, 24)
     }
 }
 
