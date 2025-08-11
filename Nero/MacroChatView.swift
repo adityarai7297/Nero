@@ -276,52 +276,33 @@ struct MacroChatBubble: View {
 
 struct MacroTypingIndicatorView: View {
     let isDarkMode: Bool
-    @State private var animationOffset: CGFloat = 0
     
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: "fork.knife")
-                        .font(.caption)
-                        .foregroundColor(.orange)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 12) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .orange))
+                        .scaleEffect(0.8)
+                    
                     Text("Calculating macros…")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.orange)
-                    Spacer()
-                }
-                HStack(spacing: 4) {
-                    ForEach(0..<3, id: \.self) { index in
-                        Circle()
-                            .fill(Color.gray.opacity(0.6))
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(animationOffset == CGFloat(index) ? 1.3 : 1.0)
-                            .animation(
-                                .easeInOut(duration: 0.6)
-                                .repeatForever()
-                                .delay(Double(index) * 0.2),
-                                value: animationOffset
-                            )
-                    }
+                        .font(.body)
+                        .foregroundColor(isDarkMode ? .white : .primary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                .clipShape(
-                    .rect(
-                        topLeadingRadius: 4,
-                        bottomLeadingRadius: 16,
-                        bottomTrailingRadius: 16,
-                        topTrailingRadius: 16
-                    )
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
+                        )
                 )
-                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
             }
-            .frame(maxWidth: .infinity * 0.8, alignment: .leading)
+            
             Spacer()
         }
-        .onAppear { animationOffset = 0 }
     }
 }
 

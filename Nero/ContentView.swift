@@ -2881,10 +2881,10 @@ struct DayWorkoutCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(isDarkMode ? Color.white.opacity(0.12) : Color.white)
+                .fill(isDarkMode ? Color.white.opacity(0.06) : Color.white)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(isDarkMode ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.12), lineWidth: 2)
+                        .stroke(isDarkMode ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.12), lineWidth: 1)
                 )
         )
         .animation(.easeInOut(duration: 0.3), value: isExpanded)
@@ -2914,10 +2914,10 @@ struct ExerciseRowCard: View {
             // Exercise Icon
             ZStack {
                 Circle()
-                    .fill(Color.accentBlue.opacity(0.08))
+                    .fill(isDarkMode ? Color.white.opacity(0.06) : Color.accentBlue.opacity(0.08))
                     .overlay(
                         Circle()
-                            .stroke(Color.accentBlue.opacity(0.25), lineWidth: 1.5)
+                            .stroke(isDarkMode ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.25), lineWidth: 1.5)
                     )
                 
                 Image(systemName: "dumbbell.fill")
@@ -2979,10 +2979,10 @@ struct ExerciseRowCard: View {
             .padding(.horizontal, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.03))
+                    .fill(isDarkMode ? Color.white.opacity(0.04) : Color.gray.opacity(0.02))
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.12), lineWidth: 0.5)
+                            .stroke(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.08), lineWidth: 0.5)
                     )
             )
         }
