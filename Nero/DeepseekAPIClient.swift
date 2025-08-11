@@ -112,7 +112,7 @@ class DeepseekAPIClient {
         - "dayOfWeek": Any day of the week (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday)
         - "exerciseName": Specific exercise name
         - "sets": Integer (typically 2-5)
-        - "reps": Integer for repetition exercises (typically 6-15) OR 0 for timed exercises (planks, holds, etc.)
+        - "reps": Integer for repetition exercises (typically 6-15) OR 60 for timed exercises (planks, holds, etc.)
         - "exerciseType": null for regular exercises OR "static_hold" for timed exercises if they exist in plan (planks, wall sits, holds, etc.)
         - Return only the JSON - no markdown, no explanations, no code blocks
 
@@ -124,6 +124,7 @@ class DeepseekAPIClient {
         - Honor the exact session frequency specified by the user—never add or omit training days.
         - For higher frequency splits (5+ days), distribute workout days across the entire week INCLUDING Saturday and Sunday. Do not avoid weekends.
         - For 6-day splits, include at least one weekend day (Saturday or Sunday). For 7-day splits, include both Saturday and Sunday.
+        - Decide whit set/rep range the user would primarily work in for their bigger and main lifts based on their workout goals. Like when should it be 5 sets of 5 reps and when should it be 3 sets of 10 reps, 4 sets of 8 reps, etc
         - Match their equipment access and movement style preferences
         - Consider their experience level and goals
         - Organize each workout around the user's preferred split (full body, push/pull/legs, upper/lower, etc.)

@@ -23,12 +23,12 @@ struct WorkoutPreferences {
 // MARK: - Question Enums
 
 enum PrimaryGoal: String, CaseIterable {
-    case maximalStrength = "Maximal strength"
-    case hypertrophy = "Muscle size (hypertrophy / lean bulk)"
-    case bodyRecomposition = "Body recomposition – lose fat while adding muscle"
-    case muscularEndurance = "Muscular endurance / conditioning"
-    case explosivePower = "Explosive power / athleticism"
-    case notSure = "Not sure / need guidance"
+    case maximalStrength = "Get stronger"
+    case hypertrophy = "Build muscle"
+    case bodyRecomposition = "Lose fat & gain muscle"
+    case muscularEndurance = "Improve endurance"
+    case explosivePower = "Get more athletic"
+    case notSure = "Need guidance"
     
     var icon: String {
         switch self {
@@ -1382,7 +1382,7 @@ struct TileOptionButton: View {
     var body: some View {
         Button(action: action) {
             // Title only
-            Text(title)
+                            Text(title)
                 .font(.system(.subheadline, design: .rounded))
                 .fontWeight(.semibold)
                 .foregroundColor(textColor)
@@ -1391,6 +1391,7 @@ struct TileOptionButton: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity)
                 .frame(height: 80)
+                .padding(.horizontal, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(backgroundColor)
