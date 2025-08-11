@@ -228,7 +228,7 @@ struct MacroDayDetailView: View {
         }
         .sheet(isPresented: $showingManualEditSheet) {
             if let editingMeal = editingMeal {
-                MacroManualEditView(meal: editingMeal) { updated in
+                MacroManualEditView(meal: editingMeal, isDarkMode: isDarkMode) { updated in
                     Task {
                         _ = await macroService.updateMeal(updated)
                         await load()
@@ -236,22 +236,29 @@ struct MacroDayDetailView: View {
                 }
             }
         }
-        .alert("Edit Meal with AI", isPresented: $isEditingWithAI) {
-            TextField("e.g. I used 1 tbsp butter instead of 2 tsp", text: $editPrompt)
-            Button("Apply") {
-                Task {
-                    guard let meal = editingMeal else { return }
-                    await MainActor.run { isAIEditingInProgress = true }
-                    if let updated = await macroService.editMealWithAI(existingMeal: meal, editRequest: editPrompt) {
-                        _ = await macroService.updateMeal(updated)
+        .sheet(isPresented: $isEditingWithAI) {
+            AIEditMealSheet(
+                editPrompt: $editPrompt,
+                isDarkMode: isDarkMode,
+                isProcessing: isAIEditingInProgress,
+                onApply: {
+                    Task {
+                        guard let meal = editingMeal else { return }
+                        await MainActor.run { isAIEditingInProgress = true }
+                        if let updated = await macroService.editMealWithAI(existingMeal: meal, editRequest: editPrompt) {
+                            _ = await macroService.updateMeal(updated)
+                        }
+                        await load()
+                        await MainActor.run { 
+                            isAIEditingInProgress = false
+                        }
                     }
-                    await load()
-                    await MainActor.run { isAIEditingInProgress = false }
+                },
+                onCancel: {
+                    isEditingWithAI = false
+                    editPrompt = ""
                 }
-            }
-            Button("Cancel", role: .cancel) { isEditingWithAI = false }
-        } message: {
-            Text("Describe your change. The AI will adjust the items and totals.")
+            )
         }
         .overlay(alignment: .bottom) {
             if isAIEditingInProgress {
@@ -273,40 +280,301 @@ struct MacroDayDetailView: View {
 struct MacroManualEditView: View {
     @Environment(\.dismiss) private var dismiss
     @State var meal: MacroMeal
+    let isDarkMode: Bool
     let onSave: (MacroMeal) -> Void
     
     var body: some View {
         NavigationView {
-            Form {
-                Section("Meal Title") { TextField("Title", text: $meal.title) }
-                Section("Items") {
-                    ForEach(meal.items.indices, id: \.self) { idx in
-                        VStack(alignment: .leading, spacing: 8) {
-                            TextField("Name", text: $meal.items[idx].name)
-                            TextField("Quantity", text: $meal.items[idx].quantityDescription)
-                            HStack { Text("Calories"); Spacer(); NumberField(value: $meal.items[idx].calories) }
-                            HStack { Text("Protein (g)"); Spacer(); NumberField(value: $meal.items[idx].protein) }
-                            HStack { Text("Carbs (g)"); Spacer(); NumberField(value: $meal.items[idx].carbs) }
-                            HStack { Text("Fat (g)"); Spacer(); NumberField(value: $meal.items[idx].fat) }
-                        }
-                    }
-                    .onDelete { indexSet in meal.items.remove(atOffsets: indexSet) }
-                    Button("Add Item") {
-                        meal.items.append(MacroItem(name: "", quantityDescription: "", calories: 0, protein: 0, carbs: 0, fat: 0))
-                    }
+            ScrollView {
+                VStack(spacing: 20) {
+                    MealTitleSection(meal: $meal, isDarkMode: isDarkMode)
+                    FoodItemsSection(meal: $meal, isDarkMode: isDarkMode)
+                    TotalsSection(meal: meal, isDarkMode: isDarkMode)
                 }
-                Section("Totals") {
-                    Text("Calculated: \(Int(meal.totals.calories)) kcal | P \(Int(meal.totals.protein)) C \(Int(meal.totals.carbs)) F \(Int(meal.totals.fat))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
             }
+            .background(isDarkMode ? Color.black : Color(.systemGroupedBackground))
             .navigationTitle("Edit Meal")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .navigationBarTrailing) { Button("Save") { onSave(meal); dismiss() }.fontWeight(.semibold) }
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") { onSave(meal); dismiss() }
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue)
+                }
             }
         }
+        .preferredColorScheme(isDarkMode ? .dark : .light)
+    }
+}
+
+struct MealTitleSection: View {
+    @Binding var meal: MacroMeal
+    let isDarkMode: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Meal Title")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(isDarkMode ? .white : .primary)
+            
+            TextField("Enter meal title", text: $meal.title)
+                .font(.body)
+                .foregroundColor(isDarkMode ? .white : .primary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                )
+        }
+    }
+}
+
+struct FoodItemsSection: View {
+    @Binding var meal: MacroMeal
+    let isDarkMode: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Food Items")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                
+                Spacer()
+                
+                Button("Add Item") {
+                    meal.items.append(MacroItem(name: "", quantityDescription: "", calories: 0, protein: 0, carbs: 0, fat: 0))
+                }
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(Color.accentBlue)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(Color.accentBlue.opacity(0.08))
+                        .overlay(Capsule().stroke(Color.accentBlue.opacity(0.25), lineWidth: 1))
+                )
+            }
+            
+            ForEach(meal.items.indices, id: \.self) { idx in
+                FoodItemEditCard(
+                    item: $meal.items[idx],
+                    isDarkMode: isDarkMode,
+                    onDelete: {
+                        meal.items.remove(at: idx)
+                    }
+                )
+            }
+        }
+    }
+}
+
+struct TotalsSection: View {
+    let meal: MacroMeal
+    let isDarkMode: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Calculated Totals")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(isDarkMode ? .white : .primary)
+            
+            HStack {
+                Text("\(Int(meal.totals.calories)) kcal")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.red)
+                
+                Spacer()
+                
+                HStack(spacing: 12) {
+                    Text("P \(Int(meal.totals.protein))g").font(.caption).foregroundColor(.blue)
+                    Text("C \(Int(meal.totals.carbs))g").font(.caption).foregroundColor(.orange)
+                    Text("F \(Int(meal.totals.fat))g").font(.caption).foregroundColor(.purple)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isDarkMode ? Color.white.opacity(0.05) : Color.gray.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
+                    )
+            )
+        }
+    }
+}
+
+struct FoodItemEditCard: View {
+    @Binding var item: MacroItem
+    let isDarkMode: Bool
+    let onDelete: () -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with delete button
+            HStack {
+                Text("Food Item")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                
+                Spacer()
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(8)
+                        .background(
+                            Circle()
+                                .fill(Color.red.opacity(0.08))
+                                .overlay(Circle().stroke(Color.red.opacity(0.25), lineWidth: 1))
+                        )
+                }
+            }
+            
+            // Name and Quantity
+            VStack(spacing: 10) {
+                CustomTextField(
+                    title: "Name",
+                    text: $item.name,
+                    placeholder: "e.g. Chicken breast",
+                    isDarkMode: isDarkMode
+                )
+                
+                CustomTextField(
+                    title: "Quantity",
+                    text: $item.quantityDescription,
+                    placeholder: "e.g. 6 oz",
+                    isDarkMode: isDarkMode
+                )
+            }
+            
+            // Macro fields
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Calories")
+                        .font(.subheadline)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.8) : .primary)
+                    Spacer()
+                    DarkModeNumberField(value: $item.calories, isDarkMode: isDarkMode)
+                }
+                
+                HStack {
+                    Text("Protein (g)")
+                        .font(.subheadline)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.8) : .primary)
+                    Spacer()
+                    DarkModeNumberField(value: $item.protein, isDarkMode: isDarkMode)
+                }
+                
+                HStack {
+                    Text("Carbs (g)")
+                        .font(.subheadline)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.8) : .primary)
+                    Spacer()
+                    DarkModeNumberField(value: $item.carbs, isDarkMode: isDarkMode)
+                }
+                
+                HStack {
+                    Text("Fat (g)")
+                        .font(.subheadline)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.8) : .primary)
+                    Spacer()
+                    DarkModeNumberField(value: $item.fat, isDarkMode: isDarkMode)
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isDarkMode ? Color.white.opacity(0.06) : Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+struct CustomTextField: View {
+    let title: String
+    @Binding var text: String
+    let placeholder: String
+    let isDarkMode: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+            
+            TextField(placeholder, text: $text)
+                .font(.body)
+                .foregroundColor(isDarkMode ? .white : .primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                )
+        }
+    }
+}
+
+struct DarkModeNumberField: View {
+    @Binding var value: Double
+    let isDarkMode: Bool
+    
+    var body: some View {
+        TextField("0", value: $value, formatter: numberFormatter)
+            .font(.body)
+            .foregroundColor(isDarkMode ? .white : .primary)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.trailing)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            .frame(width: 80)
+    }
+    
+    private var numberFormatter: NumberFormatter {
+        let nf = NumberFormatter()
+        nf.minimumFractionDigits = 0
+        nf.maximumFractionDigits = 1
+        return nf
     }
 }
 

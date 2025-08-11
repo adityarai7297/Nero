@@ -328,6 +328,10 @@ class DeepseekAPIClient {
         - Keep items granular (bread, eggs, butter separately)
         - Use common nutrition references when unspecified
         - Never include markdown or code fences
+        - If a branded product is mentioned, use typical values for that brand.
+        - Adjust for cooking method (e.g., fried vs. baked) if possible.
+        - For unclear amounts, infer the most likely serving size a person would consume in that context (e.g., "bowl of cereal" = 1 cup cereal + 1 cup milk unless otherwise stated).
+        - Be realistic—avoid overestimation and underestimation.
         - If the user's input is gibberish, unclear, not about food, or impossible (e.g., "1 mountain"), respond with exactly: COULD_NOT_UNDERSTAND_REQUEST
         """
 

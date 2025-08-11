@@ -5,6 +5,14 @@ struct MacroChatMessage: Identifiable, Equatable {
     let content: String
     let isFromUser: Bool
     let timestamp: Date
+    let mealData: MacroMeal?
+    
+    init(content: String, isFromUser: Bool, timestamp: Date, mealData: MacroMeal? = nil) {
+        self.content = content
+        self.isFromUser = isFromUser
+        self.timestamp = timestamp
+        self.mealData = mealData
+    }
 }
 
 struct MacroChatView: View {
@@ -19,6 +27,13 @@ struct MacroChatView: View {
     @State private var errorMessage: String?
     @FocusState private var isTextFieldFocused: Bool
     @State private var textFieldResetId = UUID()
+    
+    // Edit functionality
+    @State private var editingMeal: MacroMeal?
+    @State private var showingManualEditSheet: Bool = false
+    @State private var editPrompt: String = ""
+    @State private var isEditingWithAI: Bool = false
+    @State private var isAIEditingInProgress: Bool = false
     
     var body: some View {
         NavigationView {
@@ -40,10 +55,22 @@ struct MacroChatView: View {
                                 if messages.isEmpty && !isLoading {
                                     MacroChatWelcome(isDarkMode: isDarkMode)
                                 }
-                                ForEach(messages) { message in
-                                    MacroChatBubble(message: message, isDarkMode: isDarkMode)
-                                        .id(message.id)
-                                }
+                                                ForEach(messages) { message in
+                    MacroChatBubble(
+                        message: message, 
+                        isDarkMode: isDarkMode,
+                        onEditManual: { meal in
+                            editingMeal = meal
+                            showingManualEditSheet = true
+                        },
+                        onEditAI: { meal in
+                            editingMeal = meal
+                            editPrompt = ""
+                            isEditingWithAI = true
+                        }
+                    )
+                    .id(message.id)
+                }
                                 if isLoading {
                                     MacroTypingIndicatorView(isDarkMode: isDarkMode)
                                         .id("typing")
@@ -105,9 +132,60 @@ struct MacroChatView: View {
                 }
             }
         }
+        .environment(\.colorScheme, isDarkMode ? .dark : .light)
+        .preferredColorScheme(isDarkMode ? .dark : .light)
         .onAppear {
             macroService.setUser(userId)
             isTextFieldFocused = true
+        }
+        .sheet(isPresented: $showingManualEditSheet) {
+            if let editingMeal = editingMeal {
+                MacroManualEditView(meal: editingMeal, isDarkMode: isDarkMode) { updated in
+                    Task {
+                        _ = await macroService.updateMeal(updated)
+                        // Update the message in the chat
+                        if let index = messages.firstIndex(where: { $0.mealData?.databaseId == editingMeal.databaseId }) {
+                            messages[index] = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: messages[index].timestamp, mealData: updated)
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $isEditingWithAI) {
+            AIEditMealSheet(
+                editPrompt: $editPrompt,
+                isDarkMode: isDarkMode,
+                isProcessing: isAIEditingInProgress,
+                onApply: {
+                    Task {
+                        guard let meal = editingMeal else { return }
+                        await MainActor.run { isAIEditingInProgress = true }
+                        if let updated = await macroService.editMealWithAI(existingMeal: meal, editRequest: editPrompt) {
+                            _ = await macroService.updateMeal(updated)
+                            // Update the message in the chat
+                            if let index = messages.firstIndex(where: { $0.mealData?.databaseId == meal.databaseId }) {
+                                await MainActor.run {
+                                    messages[index] = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: messages[index].timestamp, mealData: updated)
+                                }
+                            }
+                        }
+                        await MainActor.run { 
+                            isAIEditingInProgress = false
+                        }
+                    }
+                },
+                onCancel: {
+                    isEditingWithAI = false
+                    editPrompt = ""
+                }
+            )
+        }
+        .overlay(alignment: .bottom) {
+            if isAIEditingInProgress {
+                AIEditingToast(isDarkMode: isDarkMode)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 80)
+            }
         }
     }
     
@@ -124,9 +202,9 @@ struct MacroChatView: View {
         
         Task {
             do {
-                _ = try await macroService.saveMealFromDescription(trimmed)
+                let savedMeal = try await macroService.saveMealFromDescription(trimmed)
                 await MainActor.run {
-                    let confirmation = MacroChatMessage(content: "Logged your meal. Totals updated above.", isFromUser: false, timestamp: Date())
+                    let confirmation = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: Date(), mealData: savedMeal)
                     messages.append(confirmation)
                     isLoading = false
                 }
@@ -236,6 +314,8 @@ struct MacroChatWelcome: View {
 struct MacroChatBubble: View {
     let message: MacroChatMessage
     let isDarkMode: Bool
+    let onEditManual: (MacroMeal) -> Void
+    let onEditAI: (MacroMeal) -> Void
     
     var body: some View {
         HStack {
@@ -254,16 +334,22 @@ struct MacroChatBubble: View {
                 .frame(maxWidth: .infinity * 0.8, alignment: .trailing)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(message.content)
-                        .font(.body)
-                        .foregroundColor(isDarkMode ? .white : .primary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                        .clipShape(.rect(topLeadingRadius: 4, bottomLeadingRadius: 16, bottomTrailingRadius: 16, topTrailingRadius: 16))
+                    if message.content == "meal_breakdown", let meal = message.mealData {
+                        // Show meal breakdown instead of text
+                        MacroMealBreakdownView(meal: meal, isDarkMode: isDarkMode, onEditManual: onEditManual, onEditAI: onEditAI)
+                    } else {
+                        // Show regular text message
+                        Text(message.content)
+                            .font(.body)
+                            .foregroundColor(isDarkMode ? .white : .primary)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                            .clipShape(.rect(topLeadingRadius: 4, bottomLeadingRadius: 16, bottomTrailingRadius: 16, topTrailingRadius: 16))
+                    }
                     Text(timeString(message.timestamp)).font(.caption2).foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
                 }
-                .frame(maxWidth: .infinity * 0.8, alignment: .leading)
+                .frame(maxWidth: .infinity * 0.85, alignment: .leading)
                 Spacer()
             }
         }
@@ -303,6 +389,226 @@ struct MacroTypingIndicatorView: View {
             
             Spacer()
         }
+    }
+}
+
+// MARK: - Meal Breakdown Component
+
+struct MacroMealBreakdownView: View {
+    let meal: MacroMeal
+    let isDarkMode: Bool
+    let onEditManual: (MacroMeal) -> Void
+    let onEditAI: (MacroMeal) -> Void
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Success message and calories badge
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Meal logged successfully!")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                    Text(meal.title.titleCased)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundColor(isDarkMode ? .white : .primary)
+                }
+                Spacer()
+                Text("\(Int(meal.totals.calories)) kcal")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.red.opacity(0.08)))
+            }
+
+            Divider().padding(.vertical, 2)
+
+            // Items list
+            VStack(spacing: 8) {
+                ForEach(meal.items) { item in
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.name)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(isDarkMode ? .white : .primary)
+                            Text(item.quantityDescription)
+                                .font(.caption)
+                                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(Int(item.calories)) kcal")
+                                .font(.caption)
+                                .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                            HStack(spacing: 6) {
+                                Text("P \(Int(item.protein))g").font(.caption2).foregroundColor(.blue)
+                                Text("C \(Int(item.carbs))g").font(.caption2).foregroundColor(.orange)
+                                Text("F \(Int(item.fat))g").font(.caption2).foregroundColor(.purple)
+                            }
+                        }
+                    }
+                    if item.id != meal.items.last?.id {
+                        Divider().padding(.leading, 0)
+                    }
+                }
+            }
+
+            // Totals row
+            HStack {
+                Text("Totals")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                Spacer()
+                Text("P \(Int(meal.totals.protein)) C \(Int(meal.totals.carbs)) F \(Int(meal.totals.fat))")
+                    .font(.caption)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+            }
+
+            // Action buttons
+            HStack(spacing: 8) {
+                ChatActionButton(title: "Edit Manually", systemImage: "pencil", color: Color.accentBlue, isDarkMode: isDarkMode) {
+                    onEditManual(meal)
+                }
+                ChatActionButton(title: "Edit with AI", systemImage: "sparkles", color: .orange, isDarkMode: isDarkMode) {
+                    onEditAI(meal)
+                }
+            }
+            .padding(.top, 4)
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15), lineWidth: 1)
+                )
+        )
+    }
+}
+
+struct ChatActionButton: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+    let isDarkMode: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                Text(title)
+                    .fontWeight(.semibold)
+            }
+            .font(.caption)
+            .foregroundColor(color)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(color.opacity(0.08))
+                    .overlay(Capsule().stroke(color.opacity(0.25), lineWidth: 1))
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// Extension for title case
+private extension String {
+    var titleCased: String { self.localizedCapitalized }
+}
+
+// MARK: - AI Edit Meal Sheet
+
+struct AIEditMealSheet: View {
+    @Binding var editPrompt: String
+    let isDarkMode: Bool
+    let isProcessing: Bool
+    let onApply: () -> Void
+    let onCancel: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Edit Meal with AI")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(isDarkMode ? .white : .primary)
+                    
+                    Text("Describe your change. The AI will adjust the items and totals.")
+                        .font(.subheadline)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                    
+                    TextField("e.g. I used 1 tbsp butter instead of 2 tsp", text: $editPrompt, axis: .vertical)
+                        .font(.body)
+                        .foregroundColor(isDarkMode ? .white : .primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.1))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.3), lineWidth: 1)
+                                )
+                        )
+                        .lineLimit(3...6)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                
+                Spacer()
+                
+                // Action buttons
+                HStack(spacing: 12) {
+                    Button("Cancel") {
+                        onCancel()
+                        dismiss()
+                    }
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.1))
+                    )
+                    
+                    Button("Apply") {
+                        onApply()
+                        dismiss()
+                    }
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(editPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.gray : Color.orange)
+                    )
+                    .disabled(editPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isProcessing)
+                    .opacity(isProcessing ? 0.6 : 1.0)
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+            }
+            .background(isDarkMode ? Color.black : Color(.systemGroupedBackground))
+            .navigationBarHidden(true)
+        }
+        .preferredColorScheme(isDarkMode ? .dark : .light)
+        .presentationDetents([.height(300)])
+        .presentationDragIndicator(.visible)
     }
 }
 

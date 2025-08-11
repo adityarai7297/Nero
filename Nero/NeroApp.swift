@@ -6,9 +6,18 @@
 //
 
 import SwiftUI
+import UIKit
+
+// AppDelegate for orientation control
+class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        return .portrait
+    }
+}
 
 @main
 struct NeroApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authService = AuthService()
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var preferencesService = WorkoutPreferencesService()
