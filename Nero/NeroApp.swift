@@ -49,6 +49,11 @@ struct NeroApp: App {
                                 print("📝 AFTER: authService.user = \(authService.user?.email ?? "nil")")
                                 print("📝 AFTER: authService.phase = \(authService.phase)")
                                 print("🚀 Force updated AuthService!")
+                                
+                                // Load dark mode preference for OAuth user
+                                Task {
+                                    await themeManager.loadDarkModePreference(for: user.id)
+                                }
                             }
                             
                         } catch {
@@ -75,7 +80,18 @@ struct MainAppView: View {
                 AuthView()
             }
         }
-        .preferredColorScheme(.light) // Force light mode, override system default
+        .preferredColorScheme(themeManager.isDarkMode ? .dark : .light)
+        .onAppear {
+            print("📱 MainAppView onAppear - user: \(authService.user?.email ?? "nil"), hasLoadedPreference: \(themeManager.hasLoadedUserPreference)")
+            
+            // Load theme preferences for existing user on app start
+            if let user = authService.user, !themeManager.hasLoadedUserPreference {
+                print("🚀 Loading theme preferences on app start for user: \(user.email)")
+                Task {
+                    await themeManager.loadDarkModePreference(for: user.id)
+                }
+            }
+        }
     }
 }
 

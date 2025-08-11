@@ -174,14 +174,108 @@ struct ExerciseStats {
     let lastWorkout: Date?
 }
 
-// Simple ThemeManager for the WheelPicker
+// ThemeManager for app-wide dark mode with Supabase persistence
 class ThemeManager: ObservableObject {
     @Published var wheelPickerColor: Color = .black.opacity(0.7)
     @Published var isDarkMode: Bool = false
+    @Published var isLoading: Bool = false
+    @Published var hasLoadedUserPreference: Bool = false
+    
+    private var currentUserId: UUID?
     
     func updateForDarkMode(_ enabled: Bool) {
         isDarkMode = enabled
         wheelPickerColor = enabled ? .white.opacity(0.7) : .black.opacity(0.7)
+    }
+    
+    /// Save dark mode preference to Supabase (background operation)
+    func saveDarkModePreference(_ enabled: Bool, for userId: UUID) async {
+        currentUserId = userId
+        
+        do {
+            try await supabase
+                .from("users")
+                .update(["is_dark_mode": enabled])
+                .eq("id", value: userId.uuidString)
+                .execute()
+            
+            print("✅ Dark mode preference saved to Supabase: \(enabled)")
+        } catch {
+            print("❌ Failed to save dark mode preference: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Load dark mode preference from Supabase
+    func loadDarkModePreference(for userId: UUID) async {
+        currentUserId = userId
+        isLoading = true
+        
+        print("🔍 Loading dark mode preference for user: \(userId)")
+        
+        do {
+            struct UserPreference: Codable {
+                let is_dark_mode: Bool?
+            }
+            
+            let response: UserPreference = try await supabase
+                .from("users")
+                .select("is_dark_mode")
+                .eq("id", value: userId.uuidString)
+                .single()
+                .execute()
+                .value
+            
+            let darkModeEnabled = response.is_dark_mode ?? false
+            print("✅ Found is_dark_mode in database: \(response.is_dark_mode ?? false)")
+            print("✅ Setting dark mode to: \(darkModeEnabled)")
+            
+            await MainActor.run {
+                self.currentUserId = userId
+                self.updateForDarkMode(darkModeEnabled)
+                self.isLoading = false
+                self.hasLoadedUserPreference = true
+                print("✅ UI updated - isDarkMode is now: \(self.isDarkMode)")
+            }
+        } catch {
+            print("❌ Failed to load dark mode preference: \(error)")
+            print("❌ Error details: \(error.localizedDescription)")
+            await MainActor.run {
+                self.currentUserId = userId
+                self.updateForDarkMode(false) // Default to light mode
+                self.isLoading = false
+                self.hasLoadedUserPreference = true
+                print("⚠️ Using default light mode due to error")
+            }
+        }
+    }
+    
+    /// Toggle dark mode (immediate UI update, background save)
+    func toggleDarkMode() {
+        guard let userId = currentUserId else {
+            print("⚠️ No user ID available for dark mode toggle")
+            return
+        }
+        
+        let newValue = !isDarkMode
+        
+        // Update UI immediately
+        updateForDarkMode(newValue)
+        
+        // Save to Supabase in background
+        Task {
+            await saveDarkModePreference(newValue, for: userId)
+        }
+    }
+    
+    /// Set current user ID for theme management
+    func setCurrentUser(_ userId: UUID?) {
+        currentUserId = userId
+        if userId != nil {
+            print("✅ ThemeManager: Current user ID set to \(userId!)")
+        } else {
+            print("🔄 ThemeManager: Current user ID cleared")
+            hasLoadedUserPreference = false
+        }
     }
 }
 
@@ -220,7 +314,7 @@ struct ExerciseView: View {
     @State private var showingAIChat: Bool = false // Control AI chat view presentation
     @State private var showingMacroChat: Bool = false // Macro chat
     @State private var showingMacroHistory: Bool = false // Macro history
-    @State private var menuDarkModeEnabled: Bool = false // Dark mode switch state for menu UI only
+    // Dark mode is now managed by ThemeManager
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
@@ -255,7 +349,7 @@ struct ExerciseView: View {
     
     var body: some View {
         ZStack {
-            (menuDarkModeEnabled ? Color.black : Color.offWhite).ignoresSafeArea()
+            (themeManager.isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Debug the state
@@ -292,12 +386,12 @@ struct ExerciseView: View {
             SetsModalView(
                 allSets: workoutService.todaySets,
                 workoutService: workoutService,
-                isDarkMode: menuDarkModeEnabled
+                isDarkMode: themeManager.isDarkMode
             )
             .environmentObject(themeManager)
         }
         .sheet(isPresented: $showingWorkoutQuestionnaire) {
-                                        WorkoutQuestionnaireView(isDarkMode: menuDarkModeEnabled) {
+                                        WorkoutQuestionnaireView(isDarkMode: themeManager.isDarkMode) {
                 // Show side menu after completion
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     withAnimation(.easeInOut(duration: 0.3)) {
@@ -313,7 +407,7 @@ struct ExerciseView: View {
             }
         }
         .sheet(isPresented: $showingPersonalDetails) {
-                                        PersonalDetailsView(isDarkMode: menuDarkModeEnabled)
+                                        PersonalDetailsView(isDarkMode: themeManager.isDarkMode)
         }
         .sheet(isPresented: $showingWorkoutPlan) {
             WorkoutPlanView(
@@ -329,25 +423,25 @@ struct ExerciseView: View {
                     showingWorkoutPlan = false
                 },
                 workoutService: workoutService,
-                isDarkMode: menuDarkModeEnabled
+                isDarkMode: themeManager.isDarkMode
             )
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingWorkoutEditChat) {
-            WorkoutEditChatView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
+            WorkoutEditChatView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
                 .environmentObject(preferencesService)
         }
         .sheet(isPresented: $showingExerciseHistory) {
-            ExerciseHistoryListView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
+            ExerciseHistoryListView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
         }
         .sheet(isPresented: $showingAIChat) {
-            AIChatView(workoutService: workoutService, isDarkMode: menuDarkModeEnabled)
+            AIChatView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
         }
         .sheet(isPresented: $showingMacroChat) {
-            MacroChatView(userId: authService.user?.id, isDarkMode: menuDarkModeEnabled)
+            MacroChatView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
         }
         .sheet(isPresented: $showingMacroHistory) {
-            MacroHistoryView(userId: authService.user?.id, isDarkMode: menuDarkModeEnabled)
+            MacroHistoryView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
         }
         .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
             Button("OK") { workoutService.errorMessage = nil }
@@ -360,7 +454,7 @@ struct ExerciseView: View {
         .overlay {
             if showingLogoutAlert {
                 SignOutGlassPopup(
-                    isDarkMode: menuDarkModeEnabled,
+                    isDarkMode: themeManager.isDarkMode,
                     confirmAction: {
                         Task {
                             await authService.signOut()
@@ -383,7 +477,7 @@ struct ExerciseView: View {
             if showingDeleteAccountAlert {
                 DeleteAccountConfirmationView(
                     userEmail: authService.user?.email ?? "",
-                    isDarkMode: menuDarkModeEnabled,
+                    isDarkMode: themeManager.isDarkMode,
                     confirmAction: {
                         Task {
                             let success = await authService.deleteAccount()
@@ -454,6 +548,8 @@ struct ExerciseView: View {
             }
         }
         .onAppear {
+            print("🎯 ContentView onAppear - user: \(authService.user?.email ?? "nil"), hasLoadedPreference: \(themeManager.hasLoadedUserPreference)")
+            
             // Initialize workout service on appear
             setButtonFeedback.prepare()
             navigationFeedback.prepare()
@@ -461,10 +557,30 @@ struct ExerciseView: View {
             if authService.user != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
+                
+                // Load dark mode preference if not already loaded
+                if let user = authService.user, !themeManager.hasLoadedUserPreference {
+                    print("🔄 Loading dark mode preference in ContentView onAppear")
+                    Task {
+                        await themeManager.loadDarkModePreference(for: user.id)
+                    }
+                }
             }
         }
-        .onChange(of: menuDarkModeEnabled) { oldValue, newValue in
-            themeManager.updateForDarkMode(newValue)
+        .onChange(of: authService.user) { oldUser, newUser in
+            print("🔄 User changed - oldUser: \(oldUser?.email ?? "nil"), newUser: \(newUser?.email ?? "nil")")
+            // Load dark mode preference when user logs in
+            if let user = newUser {
+                print("🎯 Loading dark mode preference for logged in user: \(user.email)")
+                Task {
+                    await themeManager.loadDarkModePreference(for: user.id)
+                }
+            } else {
+                // Reset to light mode and clear user ID when user logs out
+                print("👋 User logged out - resetting to light mode")
+                themeManager.updateForDarkMode(false)
+                themeManager.setCurrentUser(nil)
+            }
         }
         .onTapGesture {
             // Close side menu when tapping outside
@@ -633,8 +749,8 @@ struct ExerciseView: View {
                 Text(currentExercise.name)
                     .font(.title3)
                     .fontWeight(.bold)
-                    .foregroundColor(menuDarkModeEnabled ? .white : .black)
-                    .shadow(color: menuDarkModeEnabled ? .black.opacity(0.8) : .white.opacity(0.8), radius: 1, x: 0, y: 0)
+                    .foregroundColor(themeManager.isDarkMode ? .white : .black)
+                    .shadow(color: themeManager.isDarkMode ? .black.opacity(0.8) : .white.opacity(0.8), radius: 1, x: 0, y: 0)
                     .animation(.easeInOut(duration: 0.3), value: currentExercise.name)
                 
                 Spacer()
@@ -708,7 +824,7 @@ struct ExerciseView: View {
                 type: .weight, 
                 recommendations: currentRecommendations,
                 exerciseType: currentExercise.exerciseType,
-                isDarkMode: menuDarkModeEnabled
+                isDarkMode: themeManager.isDarkMode
             )
                 .environmentObject(themeManager)
             ExerciseComponent(
@@ -716,7 +832,7 @@ struct ExerciseView: View {
                 type: .repetitions, 
                 recommendations: currentRecommendations,
                 exerciseType: currentExercise.exerciseType,
-                isDarkMode: menuDarkModeEnabled
+                isDarkMode: themeManager.isDarkMode
             )
                 .environmentObject(themeManager)
             ExerciseComponent(
@@ -724,7 +840,7 @@ struct ExerciseView: View {
                 type: .rpe, 
                 recommendations: currentRecommendations,
                 exerciseType: currentExercise.exerciseType,
-                isDarkMode: menuDarkModeEnabled
+                isDarkMode: themeManager.isDarkMode
             )
                 .environmentObject(themeManager)
         }
@@ -762,10 +878,10 @@ struct ExerciseView: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(menuDarkModeEnabled ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.06))
+                        .fill(themeManager.isDarkMode ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.06))
                         .overlay(
                             Circle()
-                                .stroke(menuDarkModeEnabled ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.2), lineWidth: 1)
+                                .stroke(themeManager.isDarkMode ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.2), lineWidth: 1)
                         )
                 )
         }
@@ -809,10 +925,10 @@ struct ExerciseView: View {
                 .frame(width: 44, height: 44)
                 .background(
                     Circle()
-                        .fill(menuDarkModeEnabled ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.06))
+                        .fill(themeManager.isDarkMode ? Color.white.opacity(0.12) : Color.accentBlue.opacity(0.06))
                         .overlay(
                             Circle()
-                                .stroke(menuDarkModeEnabled ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.2), lineWidth: 1)
+                                .stroke(themeManager.isDarkMode ? Color.white.opacity(0.25) : Color.accentBlue.opacity(0.2), lineWidth: 1)
                         )
                 )
         }
@@ -998,9 +1114,9 @@ struct ExerciseView: View {
     private func SideMenuView() -> some View {
         ZStack {
             // Blur background overlay - dynamic based on dark mode
-            (menuDarkModeEnabled ? Color.black.opacity(0.8) : Color.white.opacity(0.1))
+            (themeManager.isDarkMode ? Color.black.opacity(0.8) : Color.white.opacity(0.1))
                 .ignoresSafeArea()
-                .background(menuDarkModeEnabled ? AnyShapeStyle(Color.black.opacity(0.9)) : AnyShapeStyle(Material.ultraThinMaterial))
+                .background(themeManager.isDarkMode ? AnyShapeStyle(Color.black.opacity(0.9)) : AnyShapeStyle(Material.ultraThinMaterial))
                 .onTapGesture {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         showingSideMenu = false
@@ -1020,7 +1136,7 @@ struct ExerciseView: View {
                             // Show status indicator while generating
                             WorkoutPlanStatusTile(
                                 status: preferencesService.generationStatus,
-                                isDarkMode: menuDarkModeEnabled
+                                isDarkMode: themeManager.isDarkMode
                             )
                         } else if preferencesService.generationStatus == .completed || workoutService.hasWorkoutPlan {
                             // Show "View Workout Plan" button when completed or plan exists
@@ -1028,7 +1144,7 @@ struct ExerciseView: View {
                                 title: "View Plan",
                                 icon: "doc.text.fill",
                                 color: Color.green,
-                                isDarkMode: menuDarkModeEnabled
+                                isDarkMode: themeManager.isDarkMode
                             ) {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     showingSideMenu = false
@@ -1046,7 +1162,7 @@ struct ExerciseView: View {
                                 title: "Edit Plan",
                                 icon: "bubble.left.and.bubble.right.fill",
                                 color: Color.mint,
-                                isDarkMode: menuDarkModeEnabled
+                                isDarkMode: themeManager.isDarkMode
                             ) {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     showingSideMenu = false
@@ -1063,7 +1179,7 @@ struct ExerciseView: View {
                             title: "Create Plan",
                             icon: "dumbbell.fill",
                             color: Color.accentBlue,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1079,7 +1195,7 @@ struct ExerciseView: View {
                             title: "Personal",
                             icon: "person.fill",
                             color: Color.accentBlue,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1097,7 +1213,7 @@ struct ExerciseView: View {
                             title: "History",
                             icon: "chart.xyaxis.line",
                             color: Color.blue,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1113,7 +1229,7 @@ struct ExerciseView: View {
                             title: "AI Chat",
                             icon: "bubble.left.and.bubble.right.fill",
                             color: Color.mint,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1129,7 +1245,7 @@ struct ExerciseView: View {
                             title: "Macro Tracker",
                             icon: "fork.knife",
                             color: Color.orange,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1144,7 +1260,7 @@ struct ExerciseView: View {
                             title: "Macro History",
                             icon: "chart.pie.fill",
                             color: Color.orange,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1159,7 +1275,7 @@ struct ExerciseView: View {
                             title: "Sign Out",
                             icon: "power",
                             color: .red,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1175,7 +1291,7 @@ struct ExerciseView: View {
                             title: "Delete Account",
                             icon: "trash.fill",
                             color: .red,
-                            isDarkMode: menuDarkModeEnabled
+                            isDarkMode: themeManager.isDarkMode
                         ) {
                             withAnimation(.easeInOut(duration: 0.3)) {
                                 showingSideMenu = false
@@ -1195,16 +1311,25 @@ struct ExerciseView: View {
         }
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 8) {
-                Image(systemName: menuDarkModeEnabled ? "moon.fill" : "sun.max.fill")
+                Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(menuDarkModeEnabled ? .yellow : .orange)
-                Toggle("", isOn: $menuDarkModeEnabled)
+                    .foregroundColor(themeManager.isDarkMode ? .yellow : .orange)
+                Toggle("", isOn: Binding(
+                    get: { themeManager.isDarkMode },
+                    set: { _ in
+                        // Ensure user ID is set before toggling
+                        if let userId = authService.user?.id {
+                            themeManager.setCurrentUser(userId)
+                        }
+                        themeManager.toggleDarkMode()
+                    }
+                ))
                     .labelsHidden()
                     .toggleStyle(SwitchToggleStyle(tint: .blue))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(menuDarkModeEnabled ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(Material.ultraThinMaterial), in: Capsule())
+            .background(themeManager.isDarkMode ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(Material.ultraThinMaterial), in: Capsule())
             .padding(.trailing, 16)
             .padding(.top, 16)
         }
