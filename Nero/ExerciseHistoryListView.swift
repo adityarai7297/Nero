@@ -42,7 +42,11 @@ struct ExerciseHistoryListView: View {
         .onAppear {
             loadExercises()
         }
-        .sheet(isPresented: $showingExerciseDetail) {
+        .sheet(isPresented: $showingExerciseDetail, onDismiss: {
+            // Refresh the exercise list when returning from detail view
+            // This ensures that exercises with no remaining sets are removed
+            loadExercises()
+        }) {
             if let selectedExercise = selectedExercise {
                 ExerciseDetailView(
                     exerciseName: selectedExercise,
@@ -117,14 +121,19 @@ struct ExerciseHistoryListView: View {
             
             // Load stats for each exercise
             var stats: [String: ExerciseStats] = [:]
+            var validExercises: [String] = []
+            
             for exerciseName in exerciseNames {
                 if let exerciseStat = await workoutService.getExerciseStats(exerciseName: exerciseName) {
                     stats[exerciseName] = exerciseStat
+                    validExercises.append(exerciseName)
                 }
+                // If getExerciseStats returns nil, it means no sets exist for this exercise
+                // so we don't include it in the list to avoid ghost data
             }
             
             await MainActor.run {
-                self.exercises = exerciseNames
+                self.exercises = validExercises
                 self.exerciseStats = stats
                 self.isLoading = false
             }
