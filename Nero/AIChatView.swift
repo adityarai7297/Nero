@@ -49,46 +49,7 @@ struct AIChatView: View {
                                         .id(message.id)
                                 }
                                 
-                                // Audio transcription states
-                                switch audioTranscription.recordingState {
-                                case .recording:
-                                    RecordingChatMessage(
-                                        isDarkMode: isDarkMode,
-                                        onStop: {
-                                            Task {
-                                                await audioTranscription.stopRecording()
-                                            }
-                                        }
-                                    )
-                                    .id("recording")
-                                    
-                                case .processing:
-                                    ProcessingChatMessage(isDarkMode: isDarkMode)
-                                        .id("processing_audio")
-                                        
-                                case .completed(let text):
-                                    TranscriptionCompletedMessage(
-                                        transcribedText: text,
-                                        isDarkMode: isDarkMode,
-                                        onAccept: {
-                                            // Add transcribed text to message field if not empty
-                                            if !text.isEmpty {
-                                                if messageText.isEmpty {
-                                                    messageText = text
-                                                } else {
-                                                    messageText += " " + text
-                                                }
-                                            }
-                                            Task {
-                                                await audioTranscription.cancelRecording()
-                                            }
-                                        }
-                                    )
-                                    .id("transcription_completed")
-                                    
-                                default:
-                                    EmptyView()
-                                }
+                                // (Recording UI now shows in the input field, not as chat bubbles)
                                 
                                 // Loading indicator
                                 if isLoading {
@@ -375,19 +336,34 @@ struct AIChatMessageInputView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            TextField("Ask about your workouts, nutrition, macros...", text: $messageText, axis: .vertical)
-                .font(.body)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
-                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                .lineLimit(1...5)
-                .onSubmit {
-                    onSend()
+            ZStack(alignment: .leading) {
+                // Text field background (fixed compact height)
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                    .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                    .frame(height: 40)
+                
+                // Content overlay: either wavelet while recording, or multiline text field
+                if case .recording = audioTranscription.recordingState {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mic.fill").foregroundColor(.red)
+                        AudioWaveletVisualization(isDarkMode: isDarkMode)
+                            .frame(height: 18)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                } else {
+                    TextField("Ask about your workouts, nutrition, macros...", text: $messageText, axis: .vertical)
+                        .font(.body)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .lineLimit(1...5)
+                        .onSubmit { onSend() }
                 }
+            }
             
-            // Audio recording button with shared transcription service
+            // Audio recording button
             SharedAudioRecordingButton(
                 messageText: $messageText,
                 isDarkMode: isDarkMode,
@@ -401,6 +377,15 @@ struct AIChatMessageInputView: View {
                     .foregroundColor(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading ? .gray : Color.accentBlue)
             }
             .disabled(messageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
+        }
+        .onChange(of: audioTranscription.recordingState) { _, newValue in
+            // When transcription completes, populate the input field and reset
+            if case .completed(let text) = newValue {
+                if !text.isEmpty {
+                    if messageText.isEmpty { messageText = text } else { messageText += " " + text }
+                }
+                Task { await audioTranscription.cancelRecording() }
+            }
         }
     }
 }

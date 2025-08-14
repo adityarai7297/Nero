@@ -72,46 +72,7 @@ struct MacroChatView: View {
                     )
                     .id(message.id)
                 }
-                                // Audio transcription states
-                                switch audioTranscription.recordingState {
-                                case .recording:
-                                    RecordingChatMessage(
-                                        isDarkMode: isDarkMode,
-                                        onStop: {
-                                            Task {
-                                                await audioTranscription.stopRecording()
-                                            }
-                                        }
-                                    )
-                                    .id("recording")
-                                    
-                                case .processing:
-                                    ProcessingChatMessage(isDarkMode: isDarkMode)
-                                        .id("processing_audio")
-                                        
-                                case .completed(let text):
-                                    TranscriptionCompletedMessage(
-                                        transcribedText: text,
-                                        isDarkMode: isDarkMode,
-                                        onAccept: {
-                                            // Add transcribed text to message field if not empty
-                                            if !text.isEmpty {
-                                                if messageText.isEmpty {
-                                                    messageText = text
-                                                } else {
-                                                    messageText += " " + text
-                                                }
-                                            }
-                                            Task {
-                                                await audioTranscription.cancelRecording()
-                                            }
-                                        }
-                                    )
-                                    .id("transcription_completed")
-                                    
-                                default:
-                                    EmptyView()
-                                }
+                                // (Recording UI now shows in the input field)
                                 
                                 if isLoading {
                                     MacroTypingIndicatorView(isDarkMode: isDarkMode)
@@ -139,16 +100,32 @@ struct MacroChatView: View {
                             ErrorMessageView(message: errorMessage, isDarkMode: isDarkMode) { self.errorMessage = nil }
                         }
                         HStack(spacing: 12) {
-                            TextField("e.g. 2 eggs scrambled in 1 tsp butter with toast and coffee", text: $messageText, axis: .vertical)
-                                .id(textFieldResetId)
-                                .font(.body)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 12)
-                                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 20))
-                                .lineLimit(1...5)
-                                .focused($isTextFieldFocused)
-                                .onSubmit { sendMessage() }
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                                    .frame(height: 40)
+                                if case .recording = audioTranscription.recordingState {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "mic.fill").foregroundColor(.red)
+                                        AudioWaveletVisualization(isDarkMode: isDarkMode)
+                                            .frame(height: 18)
+                                        Spacer(minLength: 0)
+                                        // inner stop removed; external stop button remains
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 4)
+                                } else {
+                                    TextField("e.g. 2 eggs scrambled in 1 tsp butter with toast and coffee", text: $messageText, axis: .vertical)
+                                        .id(textFieldResetId)
+                                        .font(.body)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .lineLimit(1...5)
+                                        .focused($isTextFieldFocused)
+                                        .onSubmit { sendMessage() }
+                                }
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
                             
                             // Audio recording button with shared transcription service
                             SharedAudioRecordingButton(
@@ -188,6 +165,15 @@ struct MacroChatView: View {
         .onAppear {
             macroService.setUser(userId)
             isTextFieldFocused = true
+        }
+        .onChange(of: audioTranscription.recordingState) { _, newValue in
+            if case .completed(let text) = newValue {
+                if !text.isEmpty {
+                    messageText = messageText.isEmpty ? text : (messageText + " " + text)
+                    textFieldResetId = UUID()
+                }
+                Task { await audioTranscription.cancelRecording() }
+            }
         }
         .sheet(isPresented: $showingManualEditSheet) {
             if let editingMeal = editingMeal {

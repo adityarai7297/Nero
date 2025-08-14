@@ -13,16 +13,13 @@ struct AudioRecordingButton: View {
     var body: some View {
         Group {
             switch transcriptionService.recordingState {
-            case .idle:
+            case .idle, .error(_), .completed(_):
                 microphoneButton
             case .recording:
-                recordingButton
+                // Hide in-button stop to avoid duplicate control; stop is inside the input field UI
+                EmptyView()
             case .processing:
                 processingButton
-            case .completed(let text):
-                completedButtons(text: text)
-            case .error(_):
-                microphoneButton // Reset to microphone on error
             }
         }
         .onAppear {
@@ -63,26 +60,6 @@ struct AudioRecordingButton: View {
             .scaleEffect(0.8)
     }
     
-    private func completedButtons(text: String) -> some View {
-        HStack(spacing: 8) {
-            // Cancel button with proper SF Symbol
-            Button(action: cancelTranscription) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.red)
-            }
-            
-            // Accept button with proper SF Symbol
-            Button(action: {
-                acceptTranscription(text)
-            }) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.green)
-            }
-        }
-    }
-    
     // MARK: - Actions
     
     private func startRecording() {
@@ -107,25 +84,7 @@ struct AudioRecordingButton: View {
         }
     }
     
-    private func cancelTranscription() {
-        Task {
-            await transcriptionService.cancelRecording()
-        }
-    }
-    
-    private func acceptTranscription(_ text: String) {
-        // Add transcribed text to the message text
-        if messageText.isEmpty {
-            messageText = text
-        } else {
-            messageText += " " + text
-        }
-        
-        // Reset transcription service
-        Task {
-            await transcriptionService.cancelRecording()
-        }
-    }
+    // (No longer need cancel/accept helpers; handled in parent input views)
     
     private func handleStateChange(_ state: AudioTranscriptionService.RecordingState) {
         switch state {
@@ -188,184 +147,8 @@ struct AudioWaveletVisualization: View {
     }
 }
 
-// MARK: - Recording Chat Message View
-
-struct RecordingChatMessage: View {
-    let isDarkMode: Bool
-    let onStop: () -> Void
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "mic.fill")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    
-                    Text("Recording...")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.red)
-                    
-                    Spacer()
-                    
-                    // Stop button with clear label
-                    Button(action: onStop) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "stop.circle.fill")
-                                .font(.title3)
-                            Text("Stop")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundColor(.red)
-                    }
-                }
-                
-                AudioWaveletVisualization(isDarkMode: isDarkMode)
-                    .frame(height: 30)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.red.opacity(0.3), lineWidth: 2)
-                    )
-            )
-            .onTapGesture {
-                // Make the entire recording area tappable to stop
-                onStop()
-            }
-            
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Processing Chat Message View
-
-struct ProcessingChatMessage: View {
-    let isDarkMode: Bool
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: Color.accentBlue))
-                        .scaleEffect(0.7)
-                    
-                    Text("Transcribing...")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(isDarkMode ? .white : .primary)
-                    
-                    Spacer()
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.accentBlue.opacity(0.3), lineWidth: 2)
-                    )
-            )
-            
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Transcription Completed Chat Message View
-
-struct TranscriptionCompletedMessage: View {
-    let transcribedText: String
-    let isDarkMode: Bool
-    let onAccept: () -> Void
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "mic.fill")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                    
-                    Text(transcribedText.isEmpty ? "No speech detected - try again" : "Transcription Complete")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(transcribedText.isEmpty ? .orange : .green)
-                    
-                    Spacer()
-                }
-                
-                if !transcribedText.isEmpty {
-                    Text(transcribedText)
-                        .font(.body)
-                        .foregroundColor(isDarkMode ? .white : .primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isDarkMode ? Color.white.opacity(0.05) : Color.gray.opacity(0.1))
-                        )
-                    
-                    HStack(spacing: 12) {
-                        Button(action: onAccept) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "checkmark")
-                                Text("Use Text")
-                            }
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(Color.green)
-                            )
-                        }
-                        
-                        Spacer()
-                    }
-                } else {
-                    // No text detected - just show a message and auto-dismiss
-                    Text("Try speaking louder or closer to the microphone")
-                        .font(.caption)
-                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
-                        .italic()
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke((transcribedText.isEmpty ? Color.orange : Color.green).opacity(0.3), lineWidth: 2)
-                    )
-            )
-            
-            Spacer()
-        }
-        .onAppear {
-            // Auto-dismiss if no text was detected after 3 seconds
-            if transcribedText.isEmpty {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    onAccept() // This will reset the state
-                }
-            }
-        }
-    }
-}
+// NOTE: Recording/Processing/Completed chat bubble components removed;
+// wavelet UI now lives inside the input field.
 
 // MARK: - Shared Audio Recording Button Component (for use with external transcription service)
 
@@ -380,11 +163,12 @@ struct SharedAudioRecordingButton: View {
     var body: some View {
         Group {
             switch transcriptionService.recordingState {
-            case .idle, .error(_):
+            case .idle, .error(_), .completed(_):
                 microphoneButton
-            case .recording, .processing, .completed(_):
-                // Hide button during recording - user uses stop button in chat
-                EmptyView()
+            case .recording:
+                recordingButton
+            case .processing:
+                processingButton
             }
         }
         .onAppear {
@@ -423,26 +207,6 @@ struct SharedAudioRecordingButton: View {
         ProgressView()
             .progressViewStyle(CircularProgressViewStyle(tint: Color.accentBlue))
             .scaleEffect(0.8)
-    }
-    
-    private func completedButtons(text: String) -> some View {
-        HStack(spacing: 8) {
-            // Cancel button with proper SF Symbol
-            Button(action: cancelTranscription) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.red)
-            }
-            
-            // Accept button with proper SF Symbol
-            Button(action: {
-                acceptTranscription(text)
-            }) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.green)
-            }
-        }
     }
     
     // MARK: - Actions
@@ -510,20 +274,6 @@ struct AudioRecordingButton_Previews: PreviewProvider {
                 isDarkMode: false,
                 isDisabled: false
             )
-            
-            RecordingChatMessage(isDarkMode: false, onStop: {})
-            
-            ProcessingChatMessage(isDarkMode: false)
-            
-            TranscriptionCompletedMessage(
-                transcribedText: "This is a sample transcribed text from voice recording",
-                isDarkMode: false,
-                onAccept: {}
-            )
-            
-            AudioWaveletVisualization(isDarkMode: false)
-                .frame(height: 30)
-                .padding()
         }
         .padding()
         .background(Color.gray.opacity(0.1))

@@ -48,49 +48,7 @@ struct WorkoutEditChatView: View {
                                         .id(message.id)
                                 }
                                 
-                                // Audio transcription states
-                                switch audioTranscription.recordingState {
-                                case .recording:
-                                    RecordingChatMessage(
-                                        isDarkMode: isDarkMode,
-                                        onStop: {
-                                            Task {
-                                                await audioTranscription.stopRecording()
-                                            }
-                                        }
-                                    )
-                                    .padding(.horizontal, 16)
-                                    .id("recording")
-                                    
-                                case .processing:
-                                    ProcessingChatMessage(isDarkMode: isDarkMode)
-                                        .padding(.horizontal, 16)
-                                        .id("processing_audio")
-                                        
-                                case .completed(let text):
-                                    TranscriptionCompletedMessage(
-                                        transcribedText: text,
-                                        isDarkMode: isDarkMode,
-                                        onAccept: {
-                                            // Add transcribed text to message field if not empty
-                                            if !text.isEmpty {
-                                                if messageText.isEmpty {
-                                                    messageText = text
-                                                } else {
-                                                    messageText += " " + text
-                                                }
-                                            }
-                                            Task {
-                                                await audioTranscription.cancelRecording()
-                                            }
-                                        }
-                                    )
-                                    .padding(.horizontal, 16)
-                                    .id("transcription_completed")
-                                    
-                                default:
-                                    EmptyView()
-                                }
+                                // (Recording UI now shows in the input field)
                                 
                                 // Processing indicator
                                 if isProcessing && !preferencesService.generationStatus.isActive {
@@ -528,21 +486,34 @@ struct MessageInputView: View {
                 .background(isDarkMode ? Color.white.opacity(0.2) : Color.gray.opacity(0.3))
             
             HStack(spacing: 12) {
-                TextField("Describe what you'd like to change...", text: $messageText, axis: .vertical)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .font(.body)
-                    .lineLimit(1...4)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
-                            )
-                    )
-                    .disabled(isProcessing)
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white.opacity(0.8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                        .frame(height: 40)
+                    if case .recording = audioTranscription.recordingState {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mic.fill").foregroundColor(.red)
+                            AudioWaveletVisualization(isDarkMode: isDarkMode)
+                                .frame(height: 18)
+                            Spacer(minLength: 0)
+                            // inner stop removed; external stop button remains
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                    } else {
+                        TextField("Describe what you'd like to change...", text: $messageText, axis: .vertical)
+                            .textFieldStyle(PlainTextFieldStyle())
+                            .font(.body)
+                            .lineLimit(1...4)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                    }
+                }
+                .disabled(isProcessing)
                 
                 // Audio recording button with shared transcription service
                 SharedAudioRecordingButton(
@@ -563,5 +534,13 @@ struct MessageInputView: View {
             .padding(.vertical, 12)
         }
         .background(isDarkMode ? Color.black : Color.offWhite)
+        .onChange(of: audioTranscription.recordingState) { _, newValue in
+            if case .completed(let text) = newValue {
+                if !text.isEmpty {
+                    if messageText.isEmpty { messageText = text } else { messageText += " " + text }
+                }
+                Task { await audioTranscription.cancelRecording() }
+            }
+        }
     }
 } 
