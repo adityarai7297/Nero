@@ -304,7 +304,7 @@ class MacroService: ObservableObject {
     
     // MARK: - Save / Update
     
-    func saveMealFromDescription(_ userText: String) async throws -> MacroMeal {
+    func saveMealFromDescription(_ userText: String, forDate date: Date = Date()) async throws -> MacroMeal {
         guard let userId = currentUserId else {
             throw NSError(domain: "MacroService", code: 0, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
         }
@@ -312,7 +312,7 @@ class MacroService: ObservableObject {
         // Use Deepseek to parse into a meal
         let deepseekMeal = try await DeepseekAPIClient.shared.getMealFromDescription(userText: userText)
         let title = deepseekMeal.mealTitle.isEmpty ? "Meal" : deepseekMeal.mealTitle
-        let createdAt = Date()
+        let createdAt = date
         
         // Insert meal
         let dbMeal = DBMacroMeal(
@@ -364,10 +364,14 @@ class MacroService: ObservableObject {
         let macroItems = deepseekMeal.items.map { MacroItem(name: $0.name, quantityDescription: $0.quantity, calories: $0.calories, protein: $0.protein, carbs: $0.carbs, fat: $0.fat) }
         let newMeal = MacroMeal(databaseId: mealId, title: title, createdAt: createdAt, items: macroItems)
         
-        await MainActor.run {
-            self.todayMeals.append(newMeal)
-            self.recalculateTodayTotals()
+        // Only update todayMeals if the date is today
+        if Calendar.current.isDate(date, inSameDayAs: Date()) {
+            await MainActor.run {
+                self.todayMeals.append(newMeal)
+                self.recalculateTodayTotals()
+            }
         }
+        
         // Notify listeners that macro data changed
         NotificationCenter.default.post(name: NSNotification.Name("MacroDataChanged"), object: nil)
         

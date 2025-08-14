@@ -29,6 +29,11 @@ struct MacroChatView: View {
     @State private var textFieldResetId = UUID()
     @StateObject private var audioTranscription = AudioTranscriptionService()
     
+    // Date navigation
+    @State private var selectedDate: Date = Date()
+    @State private var currentDateMeals: [MacroMeal] = []
+    @State private var currentDateTotals: MacroTotals = MacroTotals(calories: 0, protein: 0, carbs: 0, fat: 0)
+    
     // Edit functionality
     @State private var editingMeal: MacroMeal?
     @State private var showingManualEditSheet: Bool = false
@@ -42,10 +47,17 @@ struct MacroChatView: View {
                 (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
+                    // Date Navigation
+                    DateNavigationBar(selectedDate: $selectedDate, isDarkMode: isDarkMode) {
+                        loadMealsForSelectedDate()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    
                     // Top summary bar
-                    MacroTotalsHeader(totals: macroService.todayTotals, isDarkMode: isDarkMode)
+                    MacroTotalsHeader(totals: currentDateTotals, isDarkMode: isDarkMode)
                         .padding(.horizontal, 16)
-                        .padding(.top, 12)
+                        .padding(.top, 8)
                         
                     Divider().opacity(isDarkMode ? 0.3 : 0.2)
                     
@@ -110,10 +122,6 @@ struct MacroChatView: View {
                                         AudioWaveletVisualization(isDarkMode: isDarkMode)
                                             .frame(height: 18)
                                         Spacer(minLength: 0)
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.green)
-                                            .font(.title3)
-                                            .opacity(0.6)
                                     }
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 4)
@@ -167,6 +175,7 @@ struct MacroChatView: View {
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .onAppear {
             macroService.setUser(userId)
+            loadMealsForSelectedDate()
             isTextFieldFocused = true
         }
         .onChange(of: audioTranscription.recordingState) { _, newValue in
@@ -187,6 +196,11 @@ struct MacroChatView: View {
                         if let index = messages.firstIndex(where: { $0.mealData?.databaseId == editingMeal.databaseId }) {
                             messages[index] = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: messages[index].timestamp, mealData: updated)
                         }
+                        // Update current date meals
+                        if let mealIndex = currentDateMeals.firstIndex(where: { $0.databaseId == editingMeal.databaseId }) {
+                            currentDateMeals[mealIndex] = updated
+                            recalculateCurrentDateTotals()
+                        }
                     }
                 }
             }
@@ -206,6 +220,11 @@ struct MacroChatView: View {
                             if let index = messages.firstIndex(where: { $0.mealData?.databaseId == meal.databaseId }) {
                                 await MainActor.run {
                                     messages[index] = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: messages[index].timestamp, mealData: updated)
+                                    // Update current date meals
+                                    if let mealIndex = currentDateMeals.firstIndex(where: { $0.databaseId == meal.databaseId }) {
+                                        currentDateMeals[mealIndex] = updated
+                                        recalculateCurrentDateTotals()
+                                    }
                                 }
                             }
                         }
@@ -242,10 +261,12 @@ struct MacroChatView: View {
         
         Task {
             do {
-                let savedMeal = try await macroService.saveMealFromDescription(trimmed)
+                let savedMeal = try await macroService.saveMealFromDescription(trimmed, forDate: selectedDate)
                 await MainActor.run {
                     let confirmation = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: Date(), mealData: savedMeal)
                     messages.append(confirmation)
+                    currentDateMeals.append(savedMeal)
+                    recalculateCurrentDateTotals()
                     isLoading = false
                 }
             } catch let deepseekError as DeepseekError {
@@ -264,6 +285,29 @@ struct MacroChatView: View {
                     errorMessage = "Failed to log meal: \(error.localizedDescription)"
                 }
             }
+        }
+    }
+    
+    private func loadMealsForSelectedDate() {
+        Task {
+            let meals = await macroService.fetchMeals(for: selectedDate)
+            await MainActor.run {
+                currentDateMeals = meals
+                recalculateCurrentDateTotals()
+                // Clear chat messages - don't show historical meals, keep it clean
+                messages = []
+            }
+        }
+    }
+    
+    private func recalculateCurrentDateTotals() {
+        currentDateTotals = currentDateMeals.reduce(MacroTotals(calories: 0, protein: 0, carbs: 0, fat: 0)) { acc, meal in
+            MacroTotals(
+                calories: acc.calories + meal.totals.calories,
+                protein: acc.protein + meal.totals.protein,
+                carbs: acc.carbs + meal.totals.carbs,
+                fat: acc.fat + meal.totals.fat
+            )
         }
     }
 }
@@ -557,6 +601,90 @@ struct ChatActionButton: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Date Navigation
+
+struct DateNavigationBar: View {
+    @Binding var selectedDate: Date
+    let isDarkMode: Bool
+    let onDateChanged: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                    onDateChanged()
+                }
+            }) {
+                Image(systemName: "chevron.left")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.accentBlue)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                            .overlay(Circle().stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15), lineWidth: 1))
+                    )
+            }
+            
+            VStack(spacing: 4) {
+                Text(dateTitle(selectedDate))
+                    .font(.headline)
+                    .fontWeight(.bold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                    .animation(.easeInOut(duration: 0.2), value: selectedDate)
+                
+                if Calendar.current.isDateInToday(selectedDate) {
+                    Text("Today")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.green.opacity(0.08)))
+                } else {
+                    Text(weekdayString(selectedDate))
+                        .font(.caption)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                    onDateChanged()
+                }
+            }) {
+                Image(systemName: "chevron.right")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.accentBlue)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+                            .overlay(Circle().stroke(isDarkMode ? Color.white.opacity(0.1) : Color.gray.opacity(0.15), lineWidth: 1))
+                    )
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private func dateTitle(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: date)
+    }
+    
+    private func weekdayString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: date)
     }
 }
 
