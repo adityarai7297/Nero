@@ -21,7 +21,7 @@ enum DeepseekError: Error, LocalizedError, Equatable {
     }
 }
 
-struct DeepseekWorkoutPlanDay: Codable {
+struct DeepseekWorkoutPlanDay: Codable, Equatable {
     let dayOfWeek: String
     let exerciseName: String
     let sets: Int

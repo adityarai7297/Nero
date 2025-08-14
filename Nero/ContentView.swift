@@ -2686,6 +2686,7 @@ struct WorkoutPlanView: View {
     @State private var workoutPlan: DeepseekWorkoutPlan?
     @State private var isLoading = true
     @State private var groupedExercises: [String: [DeepseekWorkoutPlanDay]] = [:]
+    @State private var isEditMode = false
     let onExerciseSelected: (String) -> Void
     let workoutService: WorkoutService
     let isDarkMode: Bool
@@ -2700,7 +2701,24 @@ struct WorkoutPlanView: View {
                 if isLoading {
                     LoadingStateView(isDarkMode: isDarkMode)
                 } else if let plan = workoutPlan {
-                    WorkoutPlanContentView(groupedExercises: groupedExercises, isDarkMode: isDarkMode)
+                    if isEditMode {
+                        WorkoutPlanEditView(
+                            workoutPlan: plan,
+                            groupedExercises: $groupedExercises,
+                            isDarkMode: isDarkMode,
+                            onSave: { updatedPlan in
+                                Task {
+                                    await saveUpdatedPlan(updatedPlan)
+                                }
+                            },
+                            onCancel: {
+                                isEditMode = false
+                            }
+                        )
+                        .navigationBarHidden(true)
+                    } else {
+                        WorkoutPlanContentView(groupedExercises: groupedExercises, isDarkMode: isDarkMode)
+                    }
                 } else {
                     EmptyPlanStateView(isDarkMode: isDarkMode)
                 }
@@ -2710,9 +2728,25 @@ struct WorkoutPlanView: View {
             .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
             .preferredColorScheme(isDarkMode ? .dark : .light)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if !isEditMode && workoutPlan != nil {
+                        Button("Edit") {
+                            print("🔍 Edit button pressed - groupedExercises count: \(groupedExercises.count)")
+                            print("🔍 Edit button pressed - groupedExercises: \(groupedExercises)")
+                            isEditMode = true
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundColor(Color.accentBlue)
+                    }
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                    Button(isEditMode ? "Cancel" : "Done") {
+                        if isEditMode {
+                            isEditMode = false
+                        } else {
+                            dismiss()
+                        }
                     }
                     .fontWeight(.semibold)
                     .foregroundColor(Color.accentBlue)
@@ -2739,6 +2773,19 @@ struct WorkoutPlanView: View {
     
     private func groupExercisesByDay(_ exercises: [DeepseekWorkoutPlanDay]) -> [String: [DeepseekWorkoutPlanDay]] {
         return Dictionary(grouping: exercises) { $0.dayOfWeek }
+    }
+    
+    private func saveUpdatedPlan(_ updatedPlan: DeepseekWorkoutPlan) async {
+        let success = await preferencesService.saveWorkoutPlan(updatedPlan)
+        await MainActor.run {
+            if success {
+                self.workoutPlan = updatedPlan
+                self.groupedExercises = groupExercisesByDay(updatedPlan.plan)
+                
+                // Notify WorkoutService to reload exercises
+                NotificationCenter.default.post(name: NSNotification.Name("WorkoutPlanUpdated"), object: nil)
+            }
+        }
     }
     
     @ViewBuilder
@@ -2990,6 +3037,429 @@ struct ExerciseRowCard: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+}
+
+// MARK: - Workout Plan Edit View
+
+struct WorkoutPlanEditView: View {
+    let workoutPlan: DeepseekWorkoutPlan
+    @Binding var groupedExercises: [String: [DeepseekWorkoutPlanDay]]
+    let isDarkMode: Bool
+    let onSave: (DeepseekWorkoutPlan) -> Void
+    let onCancel: () -> Void
+    
+    @State private var showingAddExerciseSheet = false
+    @State private var selectedDay = "Monday"
+    @State private var hasUnsavedChanges = false
+    @State private var draggedExercise: DeepseekWorkoutPlanDay?
+    @State private var draggedFromDay: String?
+    
+    private let daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                LazyVStack(spacing: 24) {
+                    ForEach(daysOfWeek, id: \.self) { day in
+                        EditableDayCard(
+                            day: day,
+                            exercises: groupedExercises[day] ?? [],
+                            isDarkMode: isDarkMode,
+                            draggedExercise: $draggedExercise,
+                            draggedFromDay: $draggedFromDay,
+                            onRemoveExercise: { exercise in
+                                removeExercise(exercise, fromDay: day)
+                            },
+                            onAddExercise: {
+                                selectedDay = day
+                                showingAddExerciseSheet = true
+                            },
+                            onReorderExercises: { reorderedExercises in
+                                reorderExercises(reorderedExercises, inDay: day)
+                            },
+                            onMoveExercise: { exercise, targetDay in
+                                moveExercise(exercise, fromDay: draggedFromDay ?? day, toDay: targetDay)
+                            }
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+            }
+            .navigationTitle("Edit Workout Plan")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        // Auto-save on dismiss if there are unsaved changes
+                        if hasUnsavedChanges {
+                            saveChanges()
+                        }
+                        // Small delay to allow save to complete before dismissing
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            onCancel()
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.accentBlue)
+                }
+            }
+            .onAppear {
+                print("🔍 EditView onAppear - groupedExercises count: \(groupedExercises.count)")
+                print("🔍 EditView onAppear - groupedExercises: \(groupedExercises)")
+            }
+            .sheet(isPresented: $showingAddExerciseSheet) {
+                AddExerciseSheet(
+                    selectedDay: selectedDay,
+                    isDarkMode: isDarkMode,
+                    onAddExercise: { exercise in
+                        addExercise(exercise, toDay: selectedDay)
+                    }
+                )
+            }
+        }
+    }
+    
+    private func removeExercise(_ exercise: DeepseekWorkoutPlanDay, fromDay day: String) {
+        groupedExercises[day]?.removeAll { $0.exerciseName == exercise.exerciseName }
+        hasUnsavedChanges = true
+        // Auto-save after removal
+        saveChanges()
+    }
+    
+    private func addExercise(_ exercise: DeepseekWorkoutPlanDay, toDay day: String) {
+        if groupedExercises[day] == nil {
+            groupedExercises[day] = []
+        }
+        groupedExercises[day]?.append(exercise)
+        hasUnsavedChanges = true
+        // Auto-save after addition
+        saveChanges()
+    }
+    
+    private func reorderExercises(_ reorderedExercises: [DeepseekWorkoutPlanDay], inDay day: String) {
+        groupedExercises[day] = reorderedExercises
+        hasUnsavedChanges = true
+        // Auto-save after reordering
+        saveChanges()
+    }
+    
+    private func moveExercise(_ exercise: DeepseekWorkoutPlanDay, fromDay: String, toDay: String) {
+        // Remove from source day
+        groupedExercises[fromDay]?.removeAll { $0.exerciseName == exercise.exerciseName }
+        
+        // Add to target day with updated dayOfWeek
+        let movedExercise = DeepseekWorkoutPlanDay(
+            dayOfWeek: toDay,
+            exerciseName: exercise.exerciseName,
+            sets: exercise.sets,
+            reps: exercise.reps,
+            exerciseType: exercise.exerciseType
+        )
+        
+        if groupedExercises[toDay] == nil {
+            groupedExercises[toDay] = []
+        }
+        groupedExercises[toDay]?.append(movedExercise)
+        
+        hasUnsavedChanges = true
+        // Auto-save after moving
+        saveChanges()
+    }
+    
+    private func saveChanges() {
+        let flattenedExercises = groupedExercises.values.flatMap { $0 }
+        let updatedPlan = DeepseekWorkoutPlan(plan: flattenedExercises)
+        
+        // Save to Supabase
+        onSave(updatedPlan)
+        hasUnsavedChanges = false
+    }
+}
+
+struct EditableDayCard: View {
+    let day: String
+    let exercises: [DeepseekWorkoutPlanDay]
+    let isDarkMode: Bool
+    @Binding var draggedExercise: DeepseekWorkoutPlanDay?
+    @Binding var draggedFromDay: String?
+    let onRemoveExercise: (DeepseekWorkoutPlanDay) -> Void
+    let onAddExercise: () -> Void
+    let onReorderExercises: ([DeepseekWorkoutPlanDay]) -> Void
+    let onMoveExercise: (DeepseekWorkoutPlanDay, String) -> Void // exercise, target day
+    
+    @State private var isExpanded = true
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // Day Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(day)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(isDarkMode ? .white : .primary)
+                    
+                    Text("\(exercises.count) exercises")
+                        .font(.subheadline)
+                        .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                }
+                
+                Spacer()
+                
+                Button(action: onAddExercise) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(Color.accentBlue)
+                }
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 20)
+            
+            // Exercises List
+            if isExpanded {
+                VStack(spacing: 12) {
+                    if exercises.isEmpty {
+                        Text("No exercises for this day")
+                            .font(.body)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.6) : .secondary)
+                            .padding(.vertical, 20)
+                            .onDrop(of: [.text], isTargeted: nil) { providers in
+                                return handleDrop(providers: providers)
+                            }
+                    } else {
+                        ForEach(exercises, id: \.exerciseName) { exercise in
+                            EditableExerciseRow(
+                                exercise: exercise,
+                                isDarkMode: isDarkMode,
+                                onRemove: {
+                                    onRemoveExercise(exercise)
+                                }
+                            )
+                            .onDrag {
+                                draggedExercise = exercise
+                                draggedFromDay = day
+                                return NSItemProvider(object: exercise.exerciseName as NSString)
+                            }
+                            .onDrop(of: [.text], delegate: ExerciseDropDelegate(
+                                exercise: exercise,
+                                exercises: exercises,
+                                draggedExercise: $draggedExercise,
+                                onReorder: onReorderExercises,
+                                onMoveToDay: { movedExercise in
+                                    onMoveExercise(movedExercise, day)
+                                }
+                            ))
+                            
+                            if exercise.exerciseName != exercises.last?.exerciseName {
+                                Divider()
+                                    .padding(.horizontal, 24)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 20)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(isDarkMode ? Color.white.opacity(0.05) : Color.white)
+                .shadow(color: isDarkMode ? Color.clear : Color.black.opacity(0.03), radius: 8, x: 0, y: 2)
+        )
+    }
+    
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard let draggedExercise = draggedExercise else { return false }
+        
+        // Move the dragged exercise to this day
+        onMoveExercise(draggedExercise, day)
+        
+        // Haptic feedback for dropping on empty day
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+        
+        self.draggedExercise = nil
+        return true
+    }
+}
+
+struct EditableExerciseRow: View {
+    let exercise: DeepseekWorkoutPlanDay
+    let isDarkMode: Bool
+    let onRemove: () -> Void
+    
+    @State private var isDragging = false
+    
+    var body: some View {
+        HStack {
+            // Drag handle
+            Image(systemName: "line.3.horizontal")
+                .font(.title3)
+                .foregroundColor(isDarkMode ? .white.opacity(0.5) : .gray)
+                .padding(.trailing, 8)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text(exercise.exerciseName)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Text("\(exercise.sets)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.accentBlue)
+                        Text("sets")
+                            .font(.caption)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Text("\(exercise.reps)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(Color.accentBlue)
+                        Text(exercise.exerciseType == "static_hold" ? "seconds" : "reps")
+                            .font(.caption)
+                            .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            Button(action: onRemove) {
+                Image(systemName: "minus.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.red)
+            }
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isDragging ? Color.accentBlue.opacity(0.1) : (isDarkMode ? Color.white.opacity(0.04) : Color.gray.opacity(0.02)))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(isDragging ? Color.accentBlue.opacity(0.3) : (isDarkMode ? Color.white.opacity(0.08) : Color.gray.opacity(0.08)), lineWidth: isDragging ? 1.5 : 0.5)
+                )
+        )
+        .scaleEffect(isDragging ? 1.05 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isDragging)
+    }
+}
+
+// MARK: - Exercise Drop Delegate
+
+struct ExerciseDropDelegate: DropDelegate {
+    let exercise: DeepseekWorkoutPlanDay
+    let exercises: [DeepseekWorkoutPlanDay]
+    @Binding var draggedExercise: DeepseekWorkoutPlanDay?
+    let onReorder: ([DeepseekWorkoutPlanDay]) -> Void
+    let onMoveToDay: (DeepseekWorkoutPlanDay) -> Void
+    
+    func performDrop(info: DropInfo) -> Bool {
+        guard let draggedExercise = draggedExercise else { return false }
+        
+        // Check if the dragged exercise is from the same day (same dayOfWeek)
+        let isSameDay = draggedExercise.dayOfWeek == exercise.dayOfWeek
+        
+        if isSameDay {
+            // Reordering within the same day
+            if let draggedIndex = exercises.firstIndex(where: { $0.exerciseName == draggedExercise.exerciseName }),
+               let targetIndex = exercises.firstIndex(where: { $0.exerciseName == exercise.exerciseName }) {
+                
+                var newExercises = exercises
+                let draggedItem = newExercises.remove(at: draggedIndex)
+                newExercises.insert(draggedItem, at: targetIndex)
+                onReorder(newExercises)
+                
+                // Haptic feedback for reordering
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
+            }
+        } else {
+            // Moving to a different day
+            onMoveToDay(draggedExercise)
+            
+            // Haptic feedback for cross-day move
+            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+            impactFeedback.impactOccurred()
+        }
+        
+        self.draggedExercise = nil
+        return true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggedExercise = draggedExercise,
+              draggedExercise.exerciseName != exercise.exerciseName else { return }
+        
+        // Haptic feedback when hovering over a droppable element
+        let selectionFeedback = UISelectionFeedbackGenerator()
+        selectionFeedback.selectionChanged()
+    }
+}
+
+struct AddExerciseSheet: View {
+    let selectedDay: String
+    let isDarkMode: Bool
+    let onAddExercise: (DeepseekWorkoutPlanDay) -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    @State private var exerciseName = ""
+    @State private var sets = 3
+    @State private var reps = 10
+    @State private var exerciseType = "regular"
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Exercise Details") {
+                    TextField("Exercise Name", text: $exerciseName)
+                    
+                    Stepper("Sets: \(sets)", value: $sets, in: 1...10)
+                    
+                    Stepper("Reps: \(reps)", value: $reps, in: 1...50)
+                    
+                    Picker("Type", selection: $exerciseType) {
+                        Text("Regular").tag("regular")
+                        Text("Static Hold").tag("static_hold")
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+                
+                Section {
+                    Button("Add Exercise") {
+                        let exercise = DeepseekWorkoutPlanDay(
+                            dayOfWeek: selectedDay,
+                            exerciseName: exerciseName,
+                            sets: sets,
+                            reps: reps,
+                            exerciseType: exerciseType == "static_hold" ? "static_hold" : nil
+                        )
+                        onAddExercise(exercise)
+                        dismiss()
+                    }
+                    .disabled(exerciseName.isEmpty)
+                }
+            }
+            .navigationTitle("Add Exercise")
+            .navigationBarTitleDisplayMode(.inline)
+            .preferredColorScheme(isDarkMode ? .dark : .light)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
     }
 }
 
