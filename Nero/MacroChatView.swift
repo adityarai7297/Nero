@@ -27,6 +27,7 @@ struct MacroChatView: View {
     @State private var errorMessage: String?
     @FocusState private var isTextFieldFocused: Bool
     @State private var textFieldResetId = UUID()
+    @StateObject private var audioTranscription = AudioTranscriptionService()
     
     // Edit functionality
     @State private var editingMeal: MacroMeal?
@@ -71,6 +72,47 @@ struct MacroChatView: View {
                     )
                     .id(message.id)
                 }
+                                // Audio transcription states
+                                switch audioTranscription.recordingState {
+                                case .recording:
+                                    RecordingChatMessage(
+                                        isDarkMode: isDarkMode,
+                                        onStop: {
+                                            Task {
+                                                await audioTranscription.stopRecording()
+                                            }
+                                        }
+                                    )
+                                    .id("recording")
+                                    
+                                case .processing:
+                                    ProcessingChatMessage(isDarkMode: isDarkMode)
+                                        .id("processing_audio")
+                                        
+                                case .completed(let text):
+                                    TranscriptionCompletedMessage(
+                                        transcribedText: text,
+                                        isDarkMode: isDarkMode,
+                                        onAccept: {
+                                            // Add transcribed text to message field if not empty
+                                            if !text.isEmpty {
+                                                if messageText.isEmpty {
+                                                    messageText = text
+                                                } else {
+                                                    messageText += " " + text
+                                                }
+                                            }
+                                            Task {
+                                                await audioTranscription.cancelRecording()
+                                            }
+                                        }
+                                    )
+                                    .id("transcription_completed")
+                                    
+                                default:
+                                    EmptyView()
+                                }
+                                
                                 if isLoading {
                                     MacroTypingIndicatorView(isDarkMode: isDarkMode)
                                         .id("typing")
@@ -107,6 +149,15 @@ struct MacroChatView: View {
                                 .lineLimit(1...5)
                                 .focused($isTextFieldFocused)
                                 .onSubmit { sendMessage() }
+                            
+                            // Audio recording button with shared transcription service
+                            SharedAudioRecordingButton(
+                                messageText: $messageText,
+                                isDarkMode: isDarkMode,
+                                isDisabled: isLoading,
+                                transcriptionService: audioTranscription
+                            )
+                            
                             Button(action: sendMessage) {
                                 Image(systemName: "arrow.up.circle.fill")
                                     .font(.title2)

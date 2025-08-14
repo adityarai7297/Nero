@@ -27,5 +27,9 @@
 	<string>1.1</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app uses the microphone to record voice messages for workout planning, nutrition tracking, and AI assistance.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>This app uses speech recognition to convert your voice messages to text for easier input in chat.</string>
 </dict>
 </plist>

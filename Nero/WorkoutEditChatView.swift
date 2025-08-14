@@ -23,6 +23,7 @@ struct WorkoutEditChatView: View {
     @State private var messages: [ChatMessage] = []
     @State private var isProcessing = false
     @State private var showingWorkoutPlan = false
+    @StateObject private var audioTranscription = AudioTranscriptionService()
     
     var body: some View {
         NavigationView {
@@ -45,6 +46,50 @@ struct WorkoutEditChatView: View {
                                     MessageBubbleView(message: message, isDarkMode: isDarkMode)
                                         .padding(.horizontal, 16)
                                         .id(message.id)
+                                }
+                                
+                                // Audio transcription states
+                                switch audioTranscription.recordingState {
+                                case .recording:
+                                    RecordingChatMessage(
+                                        isDarkMode: isDarkMode,
+                                        onStop: {
+                                            Task {
+                                                await audioTranscription.stopRecording()
+                                            }
+                                        }
+                                    )
+                                    .padding(.horizontal, 16)
+                                    .id("recording")
+                                    
+                                case .processing:
+                                    ProcessingChatMessage(isDarkMode: isDarkMode)
+                                        .padding(.horizontal, 16)
+                                        .id("processing_audio")
+                                        
+                                case .completed(let text):
+                                    TranscriptionCompletedMessage(
+                                        transcribedText: text,
+                                        isDarkMode: isDarkMode,
+                                        onAccept: {
+                                            // Add transcribed text to message field if not empty
+                                            if !text.isEmpty {
+                                                if messageText.isEmpty {
+                                                    messageText = text
+                                                } else {
+                                                    messageText += " " + text
+                                                }
+                                            }
+                                            Task {
+                                                await audioTranscription.cancelRecording()
+                                            }
+                                        }
+                                    )
+                                    .padding(.horizontal, 16)
+                                    .id("transcription_completed")
+                                    
+                                default:
+                                    EmptyView()
                                 }
                                 
                                 // Processing indicator
@@ -128,7 +173,8 @@ struct WorkoutEditChatView: View {
                         messageText: $messageText,
                         isProcessing: isProcessing || preferencesService.generationStatus.isActive,
                         onSend: sendMessage,
-                        isDarkMode: isDarkMode
+                        isDarkMode: isDarkMode,
+                        audioTranscription: audioTranscription
                     )
                 }
             }
@@ -474,6 +520,7 @@ struct MessageInputView: View {
     let isProcessing: Bool
     let onSend: () -> Void
     let isDarkMode: Bool
+    @ObservedObject var audioTranscription: AudioTranscriptionService
     
     var body: some View {
         VStack(spacing: 0) {
@@ -496,6 +543,14 @@ struct MessageInputView: View {
                             )
                     )
                     .disabled(isProcessing)
+                
+                // Audio recording button with shared transcription service
+                SharedAudioRecordingButton(
+                    messageText: $messageText,
+                    isDarkMode: isDarkMode,
+                    isDisabled: isProcessing,
+                    transcriptionService: audioTranscription
+                )
                 
                 Button(action: onSend) {
                     Image(systemName: "arrow.up.circle.fill")

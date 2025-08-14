@@ -26,6 +26,7 @@ struct AIChatView: View {
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
     @FocusState private var isTextFieldFocused: Bool
+    @StateObject private var audioTranscription = AudioTranscriptionService()
     
     var body: some View {
         NavigationView {
@@ -46,6 +47,47 @@ struct AIChatView: View {
                                 ForEach(messages) { message in
                                     AIChatMessageView(message: message, isDarkMode: isDarkMode)
                                         .id(message.id)
+                                }
+                                
+                                // Audio transcription states
+                                switch audioTranscription.recordingState {
+                                case .recording:
+                                    RecordingChatMessage(
+                                        isDarkMode: isDarkMode,
+                                        onStop: {
+                                            Task {
+                                                await audioTranscription.stopRecording()
+                                            }
+                                        }
+                                    )
+                                    .id("recording")
+                                    
+                                case .processing:
+                                    ProcessingChatMessage(isDarkMode: isDarkMode)
+                                        .id("processing_audio")
+                                        
+                                case .completed(let text):
+                                    TranscriptionCompletedMessage(
+                                        transcribedText: text,
+                                        isDarkMode: isDarkMode,
+                                        onAccept: {
+                                            // Add transcribed text to message field if not empty
+                                            if !text.isEmpty {
+                                                if messageText.isEmpty {
+                                                    messageText = text
+                                                } else {
+                                                    messageText += " " + text
+                                                }
+                                            }
+                                            Task {
+                                                await audioTranscription.cancelRecording()
+                                            }
+                                        }
+                                    )
+                                    .id("transcription_completed")
+                                    
+                                default:
+                                    EmptyView()
                                 }
                                 
                                 // Loading indicator
@@ -89,7 +131,8 @@ struct AIChatView: View {
                             messageText: $messageText,
                             isLoading: isLoading,
                             onSend: sendMessage,
-                            isDarkMode: isDarkMode
+                            isDarkMode: isDarkMode,
+                            audioTranscription: audioTranscription
                         )
                         .focused($isTextFieldFocused)
                     }
@@ -328,6 +371,7 @@ struct AIChatMessageInputView: View {
     let isLoading: Bool
     let onSend: () -> Void
     let isDarkMode: Bool
+    @ObservedObject var audioTranscription: AudioTranscriptionService
     
     var body: some View {
         HStack(spacing: 12) {
@@ -342,6 +386,14 @@ struct AIChatMessageInputView: View {
                 .onSubmit {
                     onSend()
                 }
+            
+            // Audio recording button with shared transcription service
+            SharedAudioRecordingButton(
+                messageText: $messageText,
+                isDarkMode: isDarkMode,
+                isDisabled: isLoading,
+                transcriptionService: audioTranscription
+            )
             
             Button(action: onSend) {
                 Image(systemName: "arrow.up.circle.fill")
