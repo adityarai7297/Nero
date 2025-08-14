@@ -1213,7 +1213,7 @@ struct ExerciseView: View {
                         
                         // Exercise History button
                         NeumorphicMenuTile(
-                            title: "History",
+                            title: "Exercise History",
                             icon: "chart.xyaxis.line",
                             color: Color.blue,
                             isDarkMode: themeManager.isDarkMode
