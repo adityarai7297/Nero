@@ -48,9 +48,9 @@ struct AudioRecordingButton: View {
     
     private var recordingButton: some View {
         Button(action: stopRecording) {
-            Image(systemName: "stop.circle.fill")
+            Image(systemName: "checkmark.circle.fill")
                 .font(.title2)
-                .foregroundColor(.red)
+                .foregroundColor(.green)
         }
     }
     
@@ -197,9 +197,9 @@ struct SharedAudioRecordingButton: View {
     
     private var recordingButton: some View {
         Button(action: stopRecording) {
-            Image(systemName: "stop.circle.fill")
+            Image(systemName: "checkmark.circle.fill")
                 .font(.title2)
-                .foregroundColor(.red)
+                .foregroundColor(.green)
         }
     }
     

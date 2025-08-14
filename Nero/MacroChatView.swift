@@ -110,7 +110,10 @@ struct MacroChatView: View {
                                         AudioWaveletVisualization(isDarkMode: isDarkMode)
                                             .frame(height: 18)
                                         Spacer(minLength: 0)
-                                        // inner stop removed; external stop button remains
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                            .font(.title3)
+                                            .opacity(0.6)
                                     }
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 4)
