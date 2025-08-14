@@ -675,7 +675,8 @@ class DeepseekAPIClient {
     
     func getFitnessCoachResponse(
         userMessage: String,
-        workoutService: WorkoutService
+        workoutService: WorkoutService,
+        macroService: MacroService
     ) async throws -> String {
         // Validate API key before making request
         guard Config.validateConfiguration() else {
@@ -688,7 +689,7 @@ class DeepseekAPIClient {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         
         // Gather comprehensive user data
-        let userData = await gatherUserDataForCoaching(workoutService: workoutService)
+        let userData = await gatherUserDataForCoaching(workoutService: workoutService, macroService: macroService)
         
         print("🔄 DeepSeek API: Getting fitness coach response")
         print("💬 User Message: \(userMessage)")
@@ -698,25 +699,26 @@ class DeepseekAPIClient {
 
         Your role:
         - Act as a knowledgeable, encouraging, and supportive fitness coach
-        - Provide evidence-based advice on training, technique, progression, and recovery
+        - Provide evidence-based advice on training, technique, progression, recovery, and nutrition
         - Be conversational, friendly, and motivating
-        - Answer questions about workouts, form, progress, nutrition basics, and training strategies
+        - Answer questions about workouts, form, progress, macros, nutrition, and training strategies
         - Use the user's specific data to give personalized recommendations
         - Keep responses brief and to the point (1-2 short paragraphs maximum)
         - Use encouraging language and celebrate progress
 
         Context:
-        - You have access to their complete workout history and personal information
-        - You can answer questions about any exercise in their program or general fitness topics
-        - Reference their actual workout data, progress trends, and training history when relevant
+        - You have access to their complete workout history, nutrition data, and personal information
+        - You can answer questions about any exercise in their program, nutrition intake, or general fitness topics
+        - Reference their actual workout data, nutrition patterns, progress trends, and training history when relevant
 
         Guidelines:
         - Be encouraging and positive
         - Use their actual data to make specific recommendations
         - If they ask about specific exercises, reference their performance data for those exercises
         - If they ask about form, provide clear, actionable tips
-        - If they ask about progress, analyze their data trends across all exercises
+        - If they ask about progress, analyze their data trends across exercises and nutrition
         - If they ask about programming, consider their experience level and goals
+        - If they ask about nutrition or macros, reference their actual intake data and patterns
         - Always prioritize safety and proper progression
         - You can suggest modifications to their current workout plan
         - Keep medical advice general and suggest consulting professionals for specific issues
@@ -791,7 +793,7 @@ class DeepseekAPIClient {
     }
     
     /// Gather comprehensive user data for fitness coaching context
-    private func gatherUserDataForCoaching(workoutService: WorkoutService) async -> String {
+    private func gatherUserDataForCoaching(workoutService: WorkoutService, macroService: MacroService) async -> String {
         var context = ""
         
         // Get user's personal details
@@ -843,8 +845,25 @@ class DeepseekAPIClient {
             context += "\n"
         }
 
+        // Get user's macro and nutrition data
+        let todayMeals = macroService.todayMeals
+        let todayTotals = macroService.todayTotals
         
-        return context.isEmpty ? "No workout data available yet. This user is just getting started!" : context
+        if !todayMeals.isEmpty || todayTotals.calories > 0 {
+            context += "TODAY'S NUTRITION:\n"
+            context += formatTodayNutrition(meals: todayMeals, totals: todayTotals)
+            context += "\n\n"
+            
+            // Get recent nutrition history
+            let nutritionHistory = await macroService.fetchHistoryDays(limitDays: 30)
+            if !nutritionHistory.isEmpty {
+                context += "RECENT NUTRITION HISTORY (last 30 days):\n"
+                context += formatNutritionHistory(nutritionHistory)
+                context += "\n\n"
+            }
+        }
+        
+        return context.isEmpty ? "No workout or nutrition data available yet. This user is just getting started!" : context
     }
     
     /// Format workout plan specifically for coaching context
@@ -984,5 +1003,96 @@ class DeepseekAPIClient {
         More Focus Muscle Groups: \(moreFocusText)
         Less Focus Muscle Groups: \(lessFocusText)
         """
+    }
+    
+    /// Format today's nutrition data for coaching context
+    private func formatTodayNutrition(meals: [MacroMeal], totals: MacroTotals) -> String {
+        var formatted = ""
+        
+        // Today's totals
+        formatted += "Total for Today:\n"
+        formatted += "- Calories: \(Int(totals.calories))\n"
+        formatted += "- Protein: \(Int(totals.protein))g\n"
+        formatted += "- Carbs: \(Int(totals.carbs))g\n"
+        formatted += "- Fat: \(Int(totals.fat))g\n\n"
+        
+        // Individual meals
+        if !meals.isEmpty {
+            formatted += "Meals Today (\(meals.count) meals):\n"
+            let dateFormatter = DateFormatter()
+            dateFormatter.timeStyle = .short
+            
+            for meal in meals {
+                let timeString = dateFormatter.string(from: meal.createdAt)
+                formatted += "\n\(timeString) - \(meal.title):\n"
+                formatted += "  Calories: \(Int(meal.totals.calories)), "
+                formatted += "Protein: \(Int(meal.totals.protein))g, "
+                formatted += "Carbs: \(Int(meal.totals.carbs))g, "
+                formatted += "Fat: \(Int(meal.totals.fat))g\n"
+                
+                // Show top 3 items for context
+                let topItems = Array(meal.items.prefix(3))
+                if !topItems.isEmpty {
+                    formatted += "  Items: "
+                    formatted += topItems.map { "\($0.name) (\($0.quantityDescription))" }.joined(separator: ", ")
+                    if meal.items.count > 3 {
+                        formatted += " and \(meal.items.count - 3) more"
+                    }
+                    formatted += "\n"
+                }
+            }
+        }
+        
+        return formatted
+    }
+    
+    /// Format nutrition history for coaching context
+    private func formatNutritionHistory(_ history: [MacroDaySummary]) -> String {
+        var formatted = ""
+        
+        // Get recent data (last 7 days for detailed view)
+        let recentDays = Array(history.prefix(7))
+        
+        if !recentDays.isEmpty {
+            formatted += "Last 7 days average:\n"
+            let avgCalories = recentDays.reduce(0) { $0 + $1.totals.calories } / Double(recentDays.count)
+            let avgProtein = recentDays.reduce(0) { $0 + $1.totals.protein } / Double(recentDays.count)
+            let avgCarbs = recentDays.reduce(0) { $0 + $1.totals.carbs } / Double(recentDays.count)
+            let avgFat = recentDays.reduce(0) { $0 + $1.totals.fat } / Double(recentDays.count)
+            
+            formatted += "- Calories: \(Int(avgCalories))/day\n"
+            formatted += "- Protein: \(Int(avgProtein))g/day\n"
+            formatted += "- Carbs: \(Int(avgCarbs))g/day\n"
+            formatted += "- Fat: \(Int(avgFat))g/day\n\n"
+        }
+        
+        // Show daily breakdown for last few days
+        formatted += "Recent daily breakdown:\n"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .short
+        
+        for summary in recentDays {
+            let dateString = dateFormatter.string(from: summary.date)
+            formatted += "- \(dateString): \(Int(summary.totals.calories)) cal, "
+            formatted += "\(Int(summary.totals.protein))p, "
+            formatted += "\(Int(summary.totals.carbs))c, "
+            formatted += "\(Int(summary.totals.fat))f "
+            formatted += "(\(summary.mealsCount) meals)\n"
+        }
+        
+        // Nutrition patterns and insights
+        if history.count >= 7 {
+            let totalDays = min(history.count, 30)
+            let monthlyData = Array(history.prefix(totalDays))
+            let avgDailyCalories = monthlyData.reduce(0) { $0 + $1.totals.calories } / Double(totalDays)
+            let avgMealsPerDay = monthlyData.reduce(0) { $0 + $1.mealsCount } / totalDays
+            
+            formatted += "\nMonthly patterns (last \(totalDays) days):\n"
+            formatted += "- Average daily calories: \(Int(avgDailyCalories))\n"
+            formatted += "- Average meals per day: \(String(format: "%.1f", avgMealsPerDay))\n"
+            formatted += "- Total days tracked: \(totalDays)\n"
+        }
+        
+        return formatted
     }
 } 

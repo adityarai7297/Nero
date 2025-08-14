@@ -300,6 +300,7 @@ struct ExerciseView: View {
     @State private var currentExerciseIndex: Int = 0
     @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var macroService = MacroService()
     @State private var showRadialBurst: Bool = false
     @State private var showingSetsModal: Bool = false // Control modal presentation
     @State private var showingLogoutAlert: Bool = false
@@ -435,7 +436,7 @@ struct ExerciseView: View {
             ExerciseHistoryListView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
         }
         .sheet(isPresented: $showingAIChat) {
-            AIChatView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
+            AIChatView(workoutService: workoutService, macroService: macroService, isDarkMode: themeManager.isDarkMode)
         }
         .sheet(isPresented: $showingMacroChat) {
             MacroChatView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
@@ -542,6 +543,7 @@ struct ExerciseView: View {
         .onChange(of: authService.user) { _, newUser in
             // Initialize workout service when user changes
             workoutService.setUser(newUser?.id)
+            macroService.setUser(newUser?.id)
             if newUser != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
@@ -554,6 +556,7 @@ struct ExerciseView: View {
             setButtonFeedback.prepare()
             navigationFeedback.prepare()
             workoutService.setUser(authService.user?.id)
+            macroService.setUser(authService.user?.id)
             if authService.user != nil {
                 loadExerciseData()
                 updateRecommendationsForCurrentExercise()
@@ -1226,7 +1229,7 @@ struct ExerciseView: View {
                         
                         // AI Chat button
                         NeumorphicMenuTile(
-                            title: "AI Chat",
+                            title: "Ask Cerro",
                             icon: "bubble.left.and.bubble.right.fill",
                             color: Color.mint,
                             isDarkMode: themeManager.isDarkMode

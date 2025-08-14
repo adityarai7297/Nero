@@ -17,6 +17,7 @@ struct AIChatMessage: Identifiable, Equatable {
 
 struct AIChatView: View {
     let workoutService: WorkoutService
+    let macroService: MacroService
     let isDarkMode: Bool
     
     @Environment(\.dismiss) private var dismiss
@@ -97,7 +98,7 @@ struct AIChatView: View {
                     .background(isDarkMode ? Color.black : Color.offWhite)
                 }
             }
-            .navigationTitle("AI Fitness Coach")
+            .navigationTitle("Ask Cerro")
             .navigationBarTitleDisplayMode(.large)
             .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
             .preferredColorScheme(isDarkMode ? .dark : .light)
@@ -153,7 +154,8 @@ struct AIChatView: View {
             // This will be implemented when we extend the DeepseekAPIClient
             let response = try await DeepseekAPIClient.shared.getFitnessCoachResponse(
                 userMessage: userMessage,
-                workoutService: workoutService
+                workoutService: workoutService,
+                macroService: macroService
             )
             
             await MainActor.run {
@@ -185,12 +187,8 @@ struct AIChatWelcomeMessageView: View {
                 .font(.system(size: 40))
                 .foregroundColor(Color.mint)
             
-            Text("Your AI Fitness Coach")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundColor(isDarkMode ? .white : .primary)
             
-            Text("Ask me anything about your workouts, progress, form, or training strategies. I'm here to help you reach your fitness goals!")
+            Text("Ask me anything about your workouts, nutrition, macros, progress, form, or training strategies. I'm here to help you reach your fitness goals!")
                 .font(.body)
                 .foregroundColor(isDarkMode ? .white.opacity(0.7) : .secondary)
                 .multilineTextAlignment(.center)
@@ -333,7 +331,7 @@ struct AIChatMessageInputView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            TextField("Ask about your workouts...", text: $messageText, axis: .vertical)
+            TextField("Ask about your workouts, nutrition, macros...", text: $messageText, axis: .vertical)
                 .font(.body)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
