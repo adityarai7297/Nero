@@ -844,6 +844,7 @@ class DeepseekAPIClient {
         - Format exercise names in italics (e.g., *Bench Press*, *Squat*)
         - Use **bold** for key points and important advice
         - Use bullet points (•) for lists of tips or recommendations
+        - Be factually correct and don't hallucinate.
         """
         
         let userPrompt = """
