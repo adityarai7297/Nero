@@ -18,12 +18,15 @@ struct WorkoutEditChatView: View {
     let workoutService: WorkoutService
     let isDarkMode: Bool
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var preferencesService: WorkoutPreferencesService
     @State private var messageText = ""
     @State private var messages: [ChatMessage] = []
     @State private var isProcessing = false
     @State private var showingWorkoutPlan = false
+    @State private var currentTaskId: String?
     @StateObject private var audioTranscription = AudioTranscriptionService()
+    @StateObject private var backgroundTaskManager = BackgroundTaskManager.shared
     
     var body: some View {
         NavigationView {
@@ -161,6 +164,38 @@ struct WorkoutEditChatView: View {
             // Reset status when view appears
             if preferencesService.generationStatus == .completed {
                 preferencesService.generationStatus = .idle
+            }
+            checkForCompletedTasks()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // App became active, check for any completed background tasks
+                checkForCompletedTasks()
+            }
+        }
+    }
+    
+    private func checkForCompletedTasks() {
+        guard let taskId = currentTaskId else { return }
+        
+        // Check if the task has completed while we were away
+        if let taskInfo = backgroundTaskManager.getTaskInfo(taskId) {
+            switch taskInfo.status {
+            case .completed:
+                // Check if we have a persisted workout plan result
+                if let result = ResultPersistenceManager.shared.loadWorkoutPlanResult(taskId: taskId) {
+                    // The workout plan was completed, update the status
+                    preferencesService.generationStatus = .completed
+                    isProcessing = false
+                    currentTaskId = nil
+                }
+            case .failed:
+                isProcessing = false
+                preferencesService.generationStatus = .failed("Edit failed while app was in background")
+                currentTaskId = nil
+            case .running:
+                // Task is still running, keep the processing state
+                isProcessing = true
             }
         }
     }

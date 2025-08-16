@@ -17,6 +17,7 @@ struct MacroChatMessage: Identifiable, Equatable {
 
 struct MacroChatView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject var macroService = MacroService()
     let userId: UUID?
     let isDarkMode: Bool
@@ -25,9 +26,11 @@ struct MacroChatView: View {
     @State private var messageText: String = ""
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
+    @State private var currentTaskId: String?
     @FocusState private var isTextFieldFocused: Bool
     @State private var textFieldResetId = UUID()
     @StateObject private var audioTranscription = AudioTranscriptionService()
+    @StateObject private var backgroundTaskManager = BackgroundTaskManager.shared
     
     // Date navigation
     @State private var selectedDate: Date = Date()
@@ -177,6 +180,13 @@ struct MacroChatView: View {
             macroService.setUser(userId)
             loadMealsForSelectedDate()
             isTextFieldFocused = true
+            checkForCompletedTasks()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // App became active, check for any completed background tasks
+                checkForCompletedTasks()
+            }
         }
         .onChange(of: audioTranscription.recordingState) { _, newValue in
             if case .completed(let text) = newValue {
@@ -259,31 +269,62 @@ struct MacroChatView: View {
         errorMessage = nil
         isTextFieldFocused = true
         
-        Task {
-            do {
-                let savedMeal = try await macroService.saveMealFromDescription(trimmed, forDate: selectedDate)
-                await MainActor.run {
+        let taskId = "macro_meal_\(UUID().uuidString)"
+        currentTaskId = taskId
+        
+        macroService.saveMealFromDescriptionInBackground(trimmed, forDate: selectedDate, taskId: taskId) { result in
+            Task { @MainActor in
+                switch result {
+                case .success(let savedMeal):
                     let confirmation = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: Date(), mealData: savedMeal)
                     messages.append(confirmation)
                     currentDateMeals.append(savedMeal)
                     recalculateCurrentDateTotals()
                     isLoading = false
-                }
-            } catch let deepseekError as DeepseekError {
-                await MainActor.run {
+                    currentTaskId = nil
+                    
+                case .failure(let error):
                     isLoading = false
-                    switch deepseekError {
-                    case .couldNotUnderstand:
-                        messages.append(MacroChatMessage(content: "I couldn't understand that. Try describing your meal with ingredients and amounts (e.g., ‘2 eggs scrambled in 1 tsp butter with 1 slice toast’).", isFromUser: false, timestamp: Date()))
-                    default:
-                        errorMessage = deepseekError.localizedDescription
+                    currentTaskId = nil
+                    
+                    if let deepseekError = error as? DeepseekError {
+                        switch deepseekError {
+                        case .couldNotUnderstand:
+                            messages.append(MacroChatMessage(content: "I couldn't understand that. Try describing your meal with ingredients and amounts (e.g., '2 eggs scrambled in 1 tsp butter with 1 slice toast').", isFromUser: false, timestamp: Date()))
+                        default:
+                            errorMessage = deepseekError.localizedDescription
+                        }
+                    } else {
+                        errorMessage = "Failed to log meal: \(error.localizedDescription)"
                     }
                 }
-            } catch {
-                await MainActor.run {
+            }
+        }
+    }
+    
+    private func checkForCompletedTasks() {
+        guard let taskId = currentTaskId else { return }
+        
+        // Check if the task has completed while we were away
+        if let taskInfo = backgroundTaskManager.getTaskInfo(taskId) {
+            switch taskInfo.status {
+            case .completed:
+                // Try to load the persisted result
+                if let result = ResultPersistenceManager.shared.loadMacroMealResult(taskId: taskId) {
+                    let confirmation = MacroChatMessage(content: "meal_breakdown", isFromUser: false, timestamp: result.timestamp, mealData: result.meal)
+                    messages.append(confirmation)
+                    currentDateMeals.append(result.meal)
+                    recalculateCurrentDateTotals()
                     isLoading = false
-                    errorMessage = "Failed to log meal: \(error.localizedDescription)"
+                    currentTaskId = nil
                 }
+            case .failed:
+                isLoading = false
+                errorMessage = "Meal processing failed while app was in background"
+                currentTaskId = nil
+            case .running:
+                // Task is still running, keep the loading state
+                isLoading = true
             }
         }
     }

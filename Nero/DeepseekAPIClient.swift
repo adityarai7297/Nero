@@ -63,8 +63,120 @@ class DeepseekAPIClient {
     static let shared = DeepseekAPIClient()
     private let apiKey = Config.deepseekAPIKey
     private let endpoint = URL(string: "https://api.deepseek.com/chat/completions")!
+    
+    // Background-capable URLSession with extended timeout
+    private lazy var backgroundSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 120 // 2 minutes
+        config.timeoutIntervalForResource = 300 // 5 minutes
+        config.waitsForConnectivity = true
+        config.shouldUseExtendedBackgroundIdleMode = true
+        return URLSession(configuration: config)
+    }()
 
     private init() {}
+    
+    // MARK: - Background-Enabled Wrapper Methods
+    
+    func generateWorkoutPlanInBackground(
+        personalDetails: PersonalDetails,
+        preferences: WorkoutPreferences,
+        taskId: String? = nil,
+        completion: @escaping (Result<DeepseekWorkoutPlan, Error>) -> Void
+    ) {
+        let actualTaskId = taskId ?? "workout_plan_\(UUID().uuidString)"
+        
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: actualTaskId,
+            type: .workoutPlanGeneration,
+            operation: {
+                try await self.generateWorkoutPlan(personalDetails: personalDetails, preferences: preferences)
+            },
+            completion: { result in
+                switch result {
+                case .success(let plan):
+                    ResultPersistenceManager.shared.saveWorkoutPlanResult(plan, taskId: actualTaskId)
+                    completion(.success(plan))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        )
+    }
+    
+    func editWorkoutPlanInBackground(
+        editRequest: String,
+        currentPlan: DeepseekWorkoutPlan,
+        personalDetails: PersonalDetails,
+        preferences: WorkoutPreferences,
+        taskId: String? = nil,
+        completion: @escaping (Result<DeepseekWorkoutPlan, Error>) -> Void
+    ) {
+        let actualTaskId = taskId ?? "workout_edit_\(UUID().uuidString)"
+        
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: actualTaskId,
+            type: .workoutPlanEdit,
+            operation: {
+                try await self.editWorkoutPlan(editRequest: editRequest, currentPlan: currentPlan, personalDetails: personalDetails, preferences: preferences)
+            },
+            completion: { result in
+                switch result {
+                case .success(let plan):
+                    ResultPersistenceManager.shared.saveWorkoutPlanResult(plan, taskId: actualTaskId)
+                    completion(.success(plan))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        )
+    }
+    
+    func getMealFromDescriptionInBackground(
+        userText: String,
+        taskId: String? = nil,
+        completion: @escaping (Result<DeepseekParsedMeal, Error>) -> Void
+    ) {
+        let actualTaskId = taskId ?? "macro_meal_\(UUID().uuidString)"
+        
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: actualTaskId,
+            type: .macroMealParsing,
+            operation: {
+                try await self.getMealFromDescription(userText: userText)
+            },
+            completion: { result in
+                completion(result)
+            }
+        )
+    }
+    
+    func getFitnessCoachResponseInBackground(
+        userMessage: String,
+        workoutService: WorkoutService,
+        macroService: MacroService,
+        taskId: String? = nil,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        let actualTaskId = taskId ?? "fitness_chat_\(UUID().uuidString)"
+        
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: actualTaskId,
+            type: .fitnessCoachChat,
+            operation: {
+                try await self.getFitnessCoachResponse(userMessage: userMessage, workoutService: workoutService, macroService: macroService)
+            },
+            completion: { result in
+                switch result {
+                case .success(let response):
+                    ResultPersistenceManager.shared.saveChatResponse(response, taskId: actualTaskId)
+                    completion(.success(response))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        )
+    }
 
     func generateWorkoutPlan(personalDetails: PersonalDetails, preferences: WorkoutPreferences) async throws -> DeepseekWorkoutPlan {
         // Validate API key before making request
@@ -168,7 +280,7 @@ class DeepseekAPIClient {
         }
 
         print("🌐 Making API request to DeepSeek...")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await backgroundSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             print("❌ Invalid HTTP response type")
@@ -352,7 +464,7 @@ class DeepseekAPIClient {
 
         request.httpBody = try JSONEncoder().encode(chatRequest)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await backgroundSession.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
@@ -424,7 +536,7 @@ class DeepseekAPIClient {
         )
 
         request.httpBody = try JSONEncoder().encode(chatRequest)
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await backgroundSession.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let msg = String(data: data, encoding: .utf8) ?? "Unknown error"
             throw NSError(domain: "DeepseekAPI", code: 1, userInfo: [NSLocalizedDescriptionKey: msg])
@@ -560,7 +672,7 @@ class DeepseekAPIClient {
         }
 
         print("🌐 Making edit API request to DeepSeek...")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await backgroundSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             print("❌ Invalid HTTP response type")
@@ -759,7 +871,7 @@ class DeepseekAPIClient {
         }
         
         print("🌐 Making fitness coach API request to DeepSeek...")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await backgroundSession.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             print("❌ Invalid HTTP response type")

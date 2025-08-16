@@ -75,8 +75,7 @@ class WorkoutPreferencesService: ObservableObject {
     @Published var errorMessage: String?
     @Published var generationStatus: WorkoutPlanGenerationStatus = .idle
     
-    // Background task identifier for iOS background processing
-    private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
+
     
     func saveWorkoutPreferences(_ preferences: WorkoutPreferences) async -> Bool {
         await MainActor.run {
@@ -254,13 +253,28 @@ class WorkoutPreferencesService: ObservableObject {
             self.errorMessage = nil
         }
         
-        // Start background task to prevent iOS from killing the process
-        startBackgroundTask()
+        // Use the new background task manager
+        let taskId = "workout_plan_generation_\(UUID().uuidString)"
         
-        // Perform generation asynchronously without blocking UI
-        Task.detached(priority: .background) {
-            await self.performBackgroundGeneration(preferences)
-        }
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: taskId,
+            type: .workoutPlanGeneration,
+            operation: {
+                await self.performBackgroundGeneration(preferences)
+                return true
+            },
+            completion: { result in
+                switch result {
+                case .success(_):
+                    print("🎉 Background workout plan generation completed successfully")
+                case .failure(let error):
+                    print("❌ Background workout plan generation failed: \(error)")
+                    Task { @MainActor in
+                        self.generationStatus = .failed("Generation failed")
+                    }
+                }
+            }
+        )
     }
     
     private func performBackgroundGeneration(_ preferences: WorkoutPreferences) async {
@@ -274,7 +288,6 @@ class WorkoutPreferencesService: ObservableObject {
         if !preferencesSuccess {
             print("❌ Failed to save preferences, aborting workflow")
             await updateStatus(.failed("Failed to save preferences"))
-            endBackgroundTask()
             return
         }
         print("✅ Preferences saved successfully")
@@ -287,7 +300,6 @@ class WorkoutPreferencesService: ObservableObject {
         guard let personalDetails = await personalDetailsService.loadPersonalDetails() else {
             print("❌ Personal details not found")
             await updateStatus(.failed("Personal details not found"))
-            endBackgroundTask()
             return
         }
         print("✅ Personal details loaded successfully")
@@ -335,29 +347,11 @@ class WorkoutPreferencesService: ObservableObject {
             await updateStatus(.failed("Generation failed"))
         }
         
-        endBackgroundTask()
     }
     
     private func updateStatus(_ status: WorkoutPlanGenerationStatus) async {
         await MainActor.run {
             self.generationStatus = status
-        }
-    }
-    
-    // MARK: - Background Task Management
-    
-    private func startBackgroundTask() {
-        backgroundTaskId = UIApplication.shared.beginBackgroundTask(withName: "WorkoutPlanGeneration") {
-            // This block is called if the system needs to terminate the background task
-            print("⚠️ Background task expired - cleaning up")
-            self.endBackgroundTask()
-        }
-    }
-    
-    private func endBackgroundTask() {
-        if backgroundTaskId != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTaskId)
-            backgroundTaskId = .invalid
         }
     }
     
@@ -398,18 +392,33 @@ class WorkoutPreferencesService: ObservableObject {
             self.errorMessage = nil
         }
         
-        // Start background task to prevent iOS from killing the process
-        startBackgroundTask()
+        // Use the new background task manager
+        let taskId = "workout_plan_edit_\(UUID().uuidString)"
         
-        // Perform editing asynchronously without blocking UI
-        Task.detached(priority: .background) {
-            await self.performBackgroundEdit(
-                editRequest: editRequest,
-                currentPlan: currentPlan,
-                personalDetails: personalDetails,
-                preferences: preferences
-            )
-        }
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: taskId,
+            type: .workoutPlanEdit,
+            operation: {
+                await self.performBackgroundEdit(
+                    editRequest: editRequest,
+                    currentPlan: currentPlan,
+                    personalDetails: personalDetails,
+                    preferences: preferences
+                )
+                return true
+            },
+            completion: { result in
+                switch result {
+                case .success(_):
+                    print("🎉 Background workout plan edit completed successfully")
+                case .failure(let error):
+                    print("❌ Background workout plan edit failed: \(error)")
+                    Task { @MainActor in
+                        self.generationStatus = .failed("Edit failed")
+                    }
+                }
+            }
+        )
     }
     
     private func performBackgroundEdit(editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
@@ -462,8 +471,6 @@ class WorkoutPreferencesService: ObservableObject {
                 await updateStatus(.failed("Edit failed"))
             }
         }
-        
-        endBackgroundTask()
     }
     
     // MARK: - Legacy Blocking Method (kept for backwards compatibility)

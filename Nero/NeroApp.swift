@@ -21,6 +21,8 @@ struct NeroApp: App {
     @StateObject private var authService = AuthService()
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var preferencesService = WorkoutPreferencesService()
+    @StateObject private var backgroundTaskManager = BackgroundTaskManager.shared
+    @StateObject private var appLifecycleManager = AppLifecycleManager.shared
     
     var body: some Scene {
         WindowGroup {
@@ -28,6 +30,12 @@ struct NeroApp: App {
                 .environmentObject(authService)
                 .environmentObject(themeManager)
                 .environmentObject(preferencesService)
+                .environmentObject(backgroundTaskManager)
+                .environmentObject(appLifecycleManager)
+                .onAppear {
+                    // Recover any incomplete tasks on app startup
+                    TaskRecoveryHelper.recoverIncompleteTasks()
+                }
                 .onOpenURL { url in
                     print("🚨 onOpenURL FIRED with URL: \(url)")
                     print("🔍 URL scheme: \(url.scheme ?? "no scheme")")

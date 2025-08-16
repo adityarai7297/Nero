@@ -104,13 +104,35 @@ class AudioTranscriptionService: NSObject, ObservableObject {
         // Stop any existing recording
         await stopRecording()
         
-        do {
-            try await setupAudioSession()
-            try await startSpeechRecognition()
-            latestTranscribedText = ""
-            recordingState = .recording
-        } catch {
-            recordingState = .error("Failed to start recording: \(error.localizedDescription)")
+        // Request background processing for audio transcription
+        let taskId = "audio_transcription_\(UUID().uuidString)"
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: taskId,
+            type: .audioTranscription,
+            operation: {
+                try await self.performRecordingSetup()
+                return true
+            },
+            completion: { result in
+                switch result {
+                case .success(_):
+                    print("✅ Audio transcription background task setup successful")
+                case .failure(let error):
+                    print("❌ Audio transcription background task failed: \(error)")
+                    Task { @MainActor in
+                        self.recordingState = .error("Failed to start recording: \(error.localizedDescription)")
+                    }
+                }
+            }
+        )
+    }
+    
+    private func performRecordingSetup() async throws {
+        try await setupAudioSession()
+        try await startSpeechRecognition()
+        await MainActor.run {
+            self.latestTranscribedText = ""
+            self.recordingState = .recording
         }
     }
     

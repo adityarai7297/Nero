@@ -21,12 +21,15 @@ struct AIChatView: View {
     let isDarkMode: Bool
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var messages: [AIChatMessage] = []
     @State private var messageText: String = ""
     @State private var isLoading: Bool = false
     @State private var errorMessage: String?
+    @State private var currentTaskId: String?
     @FocusState private var isTextFieldFocused: Bool
     @StateObject private var audioTranscription = AudioTranscriptionService()
+    @StateObject private var backgroundTaskManager = BackgroundTaskManager.shared
     
     var body: some View {
         NavigationView {
@@ -118,6 +121,13 @@ struct AIChatView: View {
         }
         .onAppear {
             setupWelcomeMessage()
+            checkForCompletedTasks()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // App became active, check for any completed background tasks
+                checkForCompletedTasks()
+            }
         }
     }
     
@@ -127,6 +137,35 @@ struct AIChatView: View {
         // Add a slight delay for better UX
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isTextFieldFocused = true
+        }
+    }
+    
+    private func checkForCompletedTasks() {
+        guard let taskId = currentTaskId else { return }
+        
+        // Check if the task has completed while we were away
+        if let taskInfo = backgroundTaskManager.getTaskInfo(taskId) {
+            switch taskInfo.status {
+            case .completed:
+                // Try to load the persisted result
+                if let result = ResultPersistenceManager.shared.loadChatResponse(taskId: taskId) {
+                    let aiMessage = AIChatMessage(
+                        content: result.response,
+                        isFromUser: false,
+                        timestamp: result.timestamp
+                    )
+                    messages.append(aiMessage)
+                    isLoading = false
+                    currentTaskId = nil
+                }
+            case .failed:
+                isLoading = false
+                errorMessage = "AI response failed while app was in background"
+                currentTaskId = nil
+            case .running:
+                // Task is still running, keep the loading state
+                isLoading = true
+            }
         }
     }
     
@@ -154,27 +193,32 @@ struct AIChatView: View {
     }
     
     private func getAIResponse(for userMessage: String) async {
-        do {
-            // This will be implemented when we extend the DeepseekAPIClient
-            let response = try await DeepseekAPIClient.shared.getFitnessCoachResponse(
-                userMessage: userMessage,
-                workoutService: workoutService,
-                macroService: macroService
-            )
-            
-            await MainActor.run {
-                let aiMessage = AIChatMessage(
-                    content: response,
-                    isFromUser: false,
-                    timestamp: Date()
-                )
-                messages.append(aiMessage)
-                isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                isLoading = false
-                errorMessage = "Failed to get AI response: \(error.localizedDescription)"
+        let taskId = "fitness_chat_\(UUID().uuidString)"
+        currentTaskId = taskId
+        
+        DeepseekAPIClient.shared.getFitnessCoachResponseInBackground(
+            userMessage: userMessage,
+            workoutService: workoutService,
+            macroService: macroService,
+            taskId: taskId
+        ) { result in
+            Task { @MainActor in
+                switch result {
+                case .success(let response):
+                    let aiMessage = AIChatMessage(
+                        content: response,
+                        isFromUser: false,
+                        timestamp: Date()
+                    )
+                    messages.append(aiMessage)
+                    isLoading = false
+                    currentTaskId = nil
+                    
+                case .failure(let error):
+                    isLoading = false
+                    errorMessage = "Failed to get AI response: \(error.localizedDescription)"
+                    currentTaskId = nil
+                }
             }
         }
     }

@@ -302,6 +302,54 @@ class MacroService: ObservableObject {
         }
     }
     
+    // MARK: - Background-Enabled Methods
+    
+    func saveMealFromDescriptionInBackground(
+        _ userText: String,
+        forDate date: Date = Date(),
+        taskId: String? = nil,
+        completion: @escaping (Result<MacroMeal, Error>) -> Void
+    ) {
+        let actualTaskId = taskId ?? "macro_meal_\(UUID().uuidString)"
+        
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: actualTaskId,
+            type: .macroMealParsing,
+            operation: {
+                try await self.saveMealFromDescription(userText, forDate: date)
+            },
+            completion: { result in
+                switch result {
+                case .success(let meal):
+                    ResultPersistenceManager.shared.saveMacroMealResult(meal, taskId: actualTaskId)
+                    completion(.success(meal))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        )
+    }
+    
+    func editMealWithAIInBackground(
+        existingMeal: MacroMeal,
+        editRequest: String,
+        taskId: String? = nil,
+        completion: @escaping (Result<MacroMeal?, Error>) -> Void
+    ) {
+        let actualTaskId = taskId ?? "macro_meal_edit_\(UUID().uuidString)"
+        
+        BackgroundTaskManager.shared.startBackgroundTask(
+            id: actualTaskId,
+            type: .macroMealEdit,
+            operation: {
+                await self.editMealWithAI(existingMeal: existingMeal, editRequest: editRequest)
+            },
+            completion: { result in
+                completion(result)
+            }
+        )
+    }
+    
     // MARK: - Save / Update
     
     func saveMealFromDescription(_ userText: String, forDate date: Date = Date()) async throws -> MacroMeal {
