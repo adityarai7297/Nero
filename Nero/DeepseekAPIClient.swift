@@ -820,9 +820,10 @@ class DeepseekAPIClient {
         - Be to the point and don't unnessarily produce more text than needed.
 
         Context:
-        - You have access to their complete workout history, nutrition data, and personal information
+        - You have access to their complete workout history, workout plan, nutrition data, and personal information
         - You can answer questions about any exercise in their program, nutrition intake, or general fitness topics
-        - Reference their actual workout data, nutrition patterns, progress trends, and training history when relevant
+        - Reference their actual workout data, nutrition patterns, progress trends, and training history
+        - Keep context of what todays date is and answer questions with chronological words (today, tomorrow, yesterday, last week, etc.) withhout hallucinating.
 
         Guidelines:
         - Be encouraging and positive
