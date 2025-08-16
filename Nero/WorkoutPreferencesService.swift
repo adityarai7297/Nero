@@ -385,15 +385,12 @@ class WorkoutPreferencesService: ObservableObject {
     // MARK: - Workout Plan Editing
     
     /// Starts background workout plan editing - non-blocking
-    func startWorkoutPlanEdit(editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
+    func startWorkoutPlanEdit(taskId: String, editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
         // Immediately update status
         await MainActor.run {
             self.generationStatus = .editingPlan
             self.errorMessage = nil
         }
-        
-        // Use the new background task manager
-        let taskId = "workout_plan_edit_\(UUID().uuidString)"
         
         BackgroundTaskManager.shared.startBackgroundTask(
             id: taskId,

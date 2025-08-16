@@ -301,6 +301,7 @@ struct ExerciseView: View {
     @State private var weights: [CGFloat] = [50, 8, 60] // Will be updated based on current exercise
     @StateObject private var themeManager = ThemeManager()
     @StateObject private var macroService = MacroService()
+    @StateObject private var backgroundTaskManager = BackgroundTaskManager.shared
     @State private var showRadialBurst: Bool = false
     @State private var showingSetsModal: Bool = false // Control modal presentation
     @State private var showingLogoutAlert: Bool = false
@@ -319,6 +320,11 @@ struct ExerciseView: View {
     
     // Target completion state
     @State private var showTargetCompletion: Bool = false
+    
+    // Completed task states that persist until clicked
+    @State private var aiChatCompleted: Bool = false
+    @State private var macroTrackerCompleted: Bool = false
+    @State private var workoutEditCompleted: Bool = false
 
     // Dynamic recommendation state
     @State private var currentRecommendations: NextSetRecommendations = NextSetRecommendations(
@@ -349,6 +355,225 @@ struct ExerciseView: View {
     }
     
     var body: some View {
+        mainContent
+            .overlay(RadialBurstOverlay())
+            .sheet(isPresented: $showingSetsModal) {
+                SetsModalView(
+                    allSets: workoutService.todaySets,
+                    workoutService: workoutService,
+                    isDarkMode: themeManager.isDarkMode
+                )
+                .environmentObject(themeManager)
+            }
+            .sheet(isPresented: $showingWorkoutQuestionnaire) {
+                WorkoutQuestionnaireView(isDarkMode: themeManager.isDarkMode) {
+                    // Show side menu after completion
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = true
+                        }
+                    }
+                }
+                .onDisappear {
+                    // Reload workout plan when questionnaire is dismissed
+                    if let userId = authService.user?.id {
+                        workoutService.setUser(userId)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingPersonalDetails) {
+                PersonalDetailsView(isDarkMode: themeManager.isDarkMode)
+            }
+            .sheet(isPresented: $showingWorkoutPlan) {
+                WorkoutPlanView(
+                    onExerciseSelected: { exerciseName in
+                        // Find the exercise index and navigate to it
+                        if let index = workoutService.exercises.firstIndex(where: { $0.name == exerciseName }) {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                currentExerciseIndex = index
+                                loadExerciseData()
+                            }
+                        }
+                        // Dismiss the workout plan sheet
+                        showingWorkoutPlan = false
+                    },
+                    workoutService: workoutService,
+                    isDarkMode: themeManager.isDarkMode
+                )
+                .environmentObject(preferencesService)
+            }
+            .sheet(isPresented: $showingWorkoutEditChat) {
+                WorkoutEditChatView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
+                    .environmentObject(preferencesService)
+            }
+            .sheet(isPresented: $showingExerciseHistory) {
+                ExerciseHistoryListView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
+            }
+            .sheet(isPresented: $showingAIChat) {
+                AIChatView(workoutService: workoutService, macroService: macroService, isDarkMode: themeManager.isDarkMode)
+            }
+            .sheet(isPresented: $showingMacroChat) {
+                MacroChatView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
+            }
+            .sheet(isPresented: $showingMacroHistory) {
+                MacroHistoryView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
+            }
+            .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
+                Button("OK") { workoutService.errorMessage = nil }
+            } message: {
+                if let errorMessage = workoutService.errorMessage {
+                    Text(errorMessage)
+                }
+            }
+            .overlay {
+                if showingLogoutAlert {
+                    SignOutGlassPopup(
+                        isDarkMode: themeManager.isDarkMode,
+                        confirmAction: {
+                            Task {
+                                await authService.signOut()
+                            }
+                            // Dismiss popup
+                            showingLogoutAlert = false
+                        },
+                        cancelAction: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showingLogoutAlert = false
+                            }
+                        }
+                    )
+                    .transition(.opacity.combined(with: .scale))
+                    .zIndex(1000)
+                }
+            }
+            .overlay {
+                if showingDeleteAccountAlert {
+                    DeleteAccountConfirmationView(
+                        userEmail: authService.user?.email ?? "",
+                        isDarkMode: themeManager.isDarkMode,
+                        confirmAction: {
+                            Task {
+                                let success = await authService.deleteAccount()
+                                await MainActor.run {
+                                    showingDeleteAccountAlert = false
+                                    if success {
+                                        // Show success screen
+                                        showingDeleteAccountSuccess = true
+                                    } else {
+                                        // Error handling is done in AuthService
+                                        // Could add additional UI feedback here if needed
+                                    }
+                                }
+                            }
+                        },
+                        cancelAction: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showingDeleteAccountAlert = false
+                            }
+                        }
+                    )
+                    .transition(.opacity.combined(with: .scale))
+                    .zIndex(1001)
+                }
+            }
+            .overlay {
+                if showingDeleteAccountSuccess {
+                    AccountDeletionSuccessView {
+                        // Complete the cleanup and sign out after showing success
+                        Task {
+                            await authService.completeAccountDeletionCleanup()
+                            await MainActor.run {
+                                showingDeleteAccountSuccess = false
+                            }
+                        }
+                    }
+                    .transition(.opacity.combined(with: .scale))
+                    .zIndex(1002)
+                }
+            }
+            .onChange(of: workoutService.todaySets) { oldSets, newSets in
+                updateRecommendationsForCurrentExercise()
+                // Check for target completion when sets data changes
+                checkForTargetCompletion()
+            }
+            .onChange(of: workoutService.exercises) { oldExercises, newExercises in
+                // Reset currentExerciseIndex if it's out of bounds
+                if !newExercises.isEmpty && currentExerciseIndex >= newExercises.count {
+                    currentExerciseIndex = 0
+                    print("🔄 ContentView: Reset currentExerciseIndex to 0 due to exercises array change")
+                }
+                
+                // Check for target completion when exercises data changes
+                if !newExercises.isEmpty {
+                    checkForTargetCompletion()
+                    // Reload exercise data for the current (potentially new) exercise
+                    loadExerciseData()
+                    updateRecommendationsForCurrentExercise()
+                }
+            }
+            .onChange(of: backgroundTaskManager.activeTasks) { oldTasks, newTasks in
+                // Monitor task completion and immediately set persistent states
+                checkForTaskCompletions(oldTasks: oldTasks, newTasks: newTasks)
+            }
+            .onChange(of: authService.user) { _, newUser in
+                // Initialize workout service when user changes
+                workoutService.setUser(newUser?.id)
+                macroService.setUser(newUser?.id)
+                if newUser != nil {
+                    loadExerciseData()
+                    updateRecommendationsForCurrentExercise()
+                }
+            }
+            .onAppear {
+                print("🎯 ContentView onAppear - user: \(authService.user?.email ?? "nil"), hasLoadedPreference: \(themeManager.hasLoadedUserPreference)")
+                
+                // Initialize workout service on appear
+                setButtonFeedback.prepare()
+                navigationFeedback.prepare()
+                workoutService.setUser(authService.user?.id)
+                macroService.setUser(authService.user?.id)
+                if authService.user != nil {
+                    loadExerciseData()
+                    updateRecommendationsForCurrentExercise()
+                    
+                    // Load dark mode preference if not already loaded
+                    if let user = authService.user, !themeManager.hasLoadedUserPreference {
+                        print("🔄 Loading dark mode preference in ContentView onAppear")
+                        Task {
+                            await themeManager.loadDarkModePreference(for: user.id)
+                        }
+                    }
+                }
+            }
+            .onChange(of: authService.user) { oldUser, newUser in
+                print("🔄 User changed - oldUser: \(oldUser?.email ?? "nil"), newUser: \(newUser?.email ?? "nil")")
+                // Load dark mode preference when user logs in
+                if let user = newUser {
+                    print("🎯 Loading dark mode preference for logged in user: \(user.email)")
+                    Task {
+                        await themeManager.loadDarkModePreference(for: user.id)
+                    }
+                } else {
+                    // Reset to light mode and clear user ID when user logs out
+                    print("👋 User logged out - resetting to light mode")
+                    themeManager.updateForDarkMode(false)
+                    themeManager.setCurrentUser(nil)
+                }
+            }
+            .onTapGesture {
+                // Close side menu when tapping outside
+                if showingSideMenu {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingSideMenu = false
+                    }
+                }
+            }
+    }
+    
+    // MARK: - Computed Properties for Body Components
+    
+    @ViewBuilder
+    private var mainContent: some View {
         ZStack {
             (themeManager.isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
             
@@ -382,218 +607,9 @@ struct ExerciseView: View {
                     .zIndex(999)
             }
         }
-        .overlay(RadialBurstOverlay())
-        .sheet(isPresented: $showingSetsModal) {
-            SetsModalView(
-                allSets: workoutService.todaySets,
-                workoutService: workoutService,
-                isDarkMode: themeManager.isDarkMode
-            )
-            .environmentObject(themeManager)
-        }
-        .sheet(isPresented: $showingWorkoutQuestionnaire) {
-                                        WorkoutQuestionnaireView(isDarkMode: themeManager.isDarkMode) {
-                // Show side menu after completion
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showingSideMenu = true
-                    }
-                }
-            }
-            .onDisappear {
-                // Reload workout plan when questionnaire is dismissed
-                if let userId = authService.user?.id {
-                    workoutService.setUser(userId)
-                }
-            }
-        }
-        .sheet(isPresented: $showingPersonalDetails) {
-                                        PersonalDetailsView(isDarkMode: themeManager.isDarkMode)
-        }
-        .sheet(isPresented: $showingWorkoutPlan) {
-            WorkoutPlanView(
-                onExerciseSelected: { exerciseName in
-                    // Find the exercise index and navigate to it
-                    if let index = workoutService.exercises.firstIndex(where: { $0.name == exerciseName }) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            currentExerciseIndex = index
-                            loadExerciseData()
-                        }
-                    }
-                    // Dismiss the workout plan sheet
-                    showingWorkoutPlan = false
-                },
-                workoutService: workoutService,
-                isDarkMode: themeManager.isDarkMode
-            )
-                .environmentObject(preferencesService)
-        }
-        .sheet(isPresented: $showingWorkoutEditChat) {
-            WorkoutEditChatView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
-                .environmentObject(preferencesService)
-        }
-        .sheet(isPresented: $showingExerciseHistory) {
-            ExerciseHistoryListView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
-        }
-        .sheet(isPresented: $showingAIChat) {
-            AIChatView(workoutService: workoutService, macroService: macroService, isDarkMode: themeManager.isDarkMode)
-        }
-        .sheet(isPresented: $showingMacroChat) {
-            MacroChatView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
-        }
-        .sheet(isPresented: $showingMacroHistory) {
-            MacroHistoryView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
-        }
-        .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
-            Button("OK") { workoutService.errorMessage = nil }
-        } message: {
-            if let errorMessage = workoutService.errorMessage {
-                Text(errorMessage)
-            }
-        }
-        // Custom glass-style sign-out confirmation overlay replaces the default alert
-        .overlay {
-            if showingLogoutAlert {
-                SignOutGlassPopup(
-                    isDarkMode: themeManager.isDarkMode,
-                    confirmAction: {
-                        Task {
-                            await authService.signOut()
-                        }
-                        // Dismiss popup
-                        showingLogoutAlert = false
-                    },
-                    cancelAction: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showingLogoutAlert = false
-                        }
-                    }
-                )
-                .transition(.opacity.combined(with: .scale))
-                .zIndex(1000)
-            }
-        }
-        // Custom delete account confirmation overlay
-        .overlay {
-            if showingDeleteAccountAlert {
-                DeleteAccountConfirmationView(
-                    userEmail: authService.user?.email ?? "",
-                    isDarkMode: themeManager.isDarkMode,
-                    confirmAction: {
-                        Task {
-                            let success = await authService.deleteAccount()
-                            await MainActor.run {
-                                showingDeleteAccountAlert = false
-                                if success {
-                                    // Show success screen
-                                    showingDeleteAccountSuccess = true
-                                } else {
-                                    // Error handling is done in AuthService
-                                    // Could add additional UI feedback here if needed
-                                }
-                            }
-                        }
-                    },
-                    cancelAction: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showingDeleteAccountAlert = false
-                        }
-                    }
-                )
-                .transition(.opacity.combined(with: .scale))
-                .zIndex(1001)
-            }
-        }
-        // Account deletion success screen
-        .overlay {
-            if showingDeleteAccountSuccess {
-                AccountDeletionSuccessView {
-                    // Complete the cleanup and sign out after showing success
-                    Task {
-                        await authService.completeAccountDeletionCleanup()
-                        await MainActor.run {
-                            showingDeleteAccountSuccess = false
-                        }
-                    }
-                }
-                .transition(.opacity.combined(with: .scale))
-                .zIndex(1002)
-            }
-        }
-        .onChange(of: workoutService.todaySets) { oldSets, newSets in
-            updateRecommendationsForCurrentExercise()
-            // Check for target completion when sets data changes
-            checkForTargetCompletion()
-        }
-        .onChange(of: workoutService.exercises) { oldExercises, newExercises in
-            // Reset currentExerciseIndex if it's out of bounds
-            if !newExercises.isEmpty && currentExerciseIndex >= newExercises.count {
-                currentExerciseIndex = 0
-                print("🔄 ContentView: Reset currentExerciseIndex to 0 due to exercises array change")
-            }
-            
-            // Check for target completion when exercises data changes
-            if !newExercises.isEmpty {
-                checkForTargetCompletion()
-                // Reload exercise data for the current (potentially new) exercise
-                loadExerciseData()
-                updateRecommendationsForCurrentExercise()
-            }
-        }
-        .onChange(of: authService.user) { _, newUser in
-            // Initialize workout service when user changes
-            workoutService.setUser(newUser?.id)
-            macroService.setUser(newUser?.id)
-            if newUser != nil {
-                loadExerciseData()
-                updateRecommendationsForCurrentExercise()
-            }
-        }
-        .onAppear {
-            print("🎯 ContentView onAppear - user: \(authService.user?.email ?? "nil"), hasLoadedPreference: \(themeManager.hasLoadedUserPreference)")
-            
-            // Initialize workout service on appear
-            setButtonFeedback.prepare()
-            navigationFeedback.prepare()
-            workoutService.setUser(authService.user?.id)
-            macroService.setUser(authService.user?.id)
-            if authService.user != nil {
-                loadExerciseData()
-                updateRecommendationsForCurrentExercise()
-                
-                // Load dark mode preference if not already loaded
-                if let user = authService.user, !themeManager.hasLoadedUserPreference {
-                    print("🔄 Loading dark mode preference in ContentView onAppear")
-                    Task {
-                        await themeManager.loadDarkModePreference(for: user.id)
-                    }
-                }
-            }
-        }
-        .onChange(of: authService.user) { oldUser, newUser in
-            print("🔄 User changed - oldUser: \(oldUser?.email ?? "nil"), newUser: \(newUser?.email ?? "nil")")
-            // Load dark mode preference when user logs in
-            if let user = newUser {
-                print("🎯 Loading dark mode preference for logged in user: \(user.email)")
-                Task {
-                    await themeManager.loadDarkModePreference(for: user.id)
-                }
-            } else {
-                // Reset to light mode and clear user ID when user logs out
-                print("👋 User logged out - resetting to light mode")
-                themeManager.updateForDarkMode(false)
-                themeManager.setCurrentUser(nil)
-            }
-        }
-        .onTapGesture {
-            // Close side menu when tapping outside
-            if showingSideMenu {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    showingSideMenu = false
-                }
-            }
-        }
     }
+    
+
     
     // MARK: - Component Views
     
@@ -1113,6 +1129,128 @@ struct ExerciseView: View {
         }
     }
     
+    // Helper functions to check task states
+    private func getAIChatTaskState() -> TaskState {
+        // First check active tasks for current status
+        for (_, taskInfo) in backgroundTaskManager.activeTasks {
+            if taskInfo.type == .fitnessCoachChat {
+                switch taskInfo.status {
+                case .running:
+                    // Clear completed state when new task starts
+                    aiChatCompleted = false
+                    return .processing
+                case .completed:
+                    // Set persistent completed state
+                    aiChatCompleted = true
+                    return .completed
+                case .failed:
+                    aiChatCompleted = false
+                    return .idle
+                }
+            }
+        }
+        
+        // If no active task but we have a persistent completed state, keep it
+        if aiChatCompleted {
+            return .completed
+        }
+        
+        // Default to idle
+        return .idle
+    }
+    
+    private func getMacroTaskState() -> TaskState {
+        // First check active tasks for current status
+        for (_, taskInfo) in backgroundTaskManager.activeTasks {
+            if taskInfo.type == .macroMealParsing || taskInfo.type == .macroMealEdit {
+                switch taskInfo.status {
+                case .running:
+                    // Clear completed state when new task starts
+                    macroTrackerCompleted = false
+                    return .processing
+                case .completed:
+                    // Set persistent completed state
+                    macroTrackerCompleted = true
+                    return .completed
+                case .failed:
+                    macroTrackerCompleted = false
+                    return .idle
+                }
+            }
+        }
+        
+        // If no active task but we have a persistent completed state, keep it
+        if macroTrackerCompleted {
+            return .completed
+        }
+        
+        // Default to idle
+        return .idle
+    }
+    
+    private func getWorkoutEditTaskState() -> TaskState {
+        // First check active tasks for current status
+        for (_, taskInfo) in backgroundTaskManager.activeTasks {
+            if taskInfo.type == .workoutPlanEdit {
+                switch taskInfo.status {
+                case .running:
+                    // Clear completed state when new task starts
+                    workoutEditCompleted = false
+                    return .processing
+                case .completed:
+                    // Set persistent completed state
+                    workoutEditCompleted = true
+                    return .completed
+                case .failed:
+                    workoutEditCompleted = false
+                    return .idle
+                }
+            }
+        }
+        
+        // If no active task but we have a persistent completed state, keep it
+        if workoutEditCompleted {
+            return .completed
+        }
+        
+        // Default to idle
+        return .idle
+    }
+    
+    enum TaskState {
+        case idle
+        case processing
+        case completed
+    }
+    
+    // Function to check for task completions and immediately set persistent states
+    private func checkForTaskCompletions(oldTasks: [String: BackgroundTaskInfo], newTasks: [String: BackgroundTaskInfo]) {
+        // Check each task in newTasks for status changes
+        for (taskId, newTaskInfo) in newTasks {
+            if let oldTaskInfo = oldTasks[taskId] {
+                // Task existed before, check for status change to completed
+                if oldTaskInfo.status == .running && newTaskInfo.status == .completed {
+                    print("🎉 ContentView: Task '\(taskId)' completed! Setting persistent state for type: \(newTaskInfo.type)")
+                    
+                    // Immediately set the appropriate persistent state
+                    switch newTaskInfo.type {
+                    case .fitnessCoachChat:
+                        aiChatCompleted = true
+                        print("✅ ContentView: Set aiChatCompleted = true")
+                    case .macroMealParsing, .macroMealEdit:
+                        macroTrackerCompleted = true
+                        print("✅ ContentView: Set macroTrackerCompleted = true")
+                    case .workoutPlanEdit:
+                        workoutEditCompleted = true
+                        print("✅ ContentView: Set workoutEditCompleted = true")
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+    }
+    
     @ViewBuilder
     private func SideMenuView() -> some View {
         ZStack {
@@ -1228,33 +1366,89 @@ struct ExerciseView: View {
                         }
                         
                         // AI Chat button
-                        NeumorphicMenuTile(
-                            title: "Ask Cerro",
-                            icon: "bubble.left.and.bubble.right.fill",
-                            color: Color.mint,
-                            isDarkMode: themeManager.isDarkMode
-                        ) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingSideMenu = false
+                        // Ask Cerro button with state-based display
+                        switch getAIChatTaskState() {
+                        case .processing:
+                            AIChatStatusTile(isDarkMode: themeManager.isDarkMode) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingAIChat = true
+                                }
                             }
-                            // Small delay to let menu close animation finish
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingAIChat = true
+                        case .completed:
+                            AIChatCompletedTile(isDarkMode: themeManager.isDarkMode) {
+                                // Clear the persistent completed state when clicked
+                                aiChatCompleted = false
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingAIChat = true
+                                }
+                            }
+                        case .idle:
+                            NeumorphicMenuTile(
+                                title: "Ask Cerro",
+                                icon: "bubble.left.and.bubble.right.fill",
+                                color: Color.mint,
+                                isDarkMode: themeManager.isDarkMode
+                            ) {
+                                // Clear any completed state when starting new chat
+                                aiChatCompleted = false
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingAIChat = true
+                                }
                             }
                         }
                         
-                        // Macro Tracker button
-                        NeumorphicMenuTile(
-                            title: "Macro Tracker",
-                            icon: "fork.knife",
-                            color: Color.orange,
-                            isDarkMode: themeManager.isDarkMode
-                        ) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingSideMenu = false
+                        // Macro Tracker button with state-based display
+                        switch getMacroTaskState() {
+                        case .processing:
+                            MacroTrackerStatusTile(isDarkMode: themeManager.isDarkMode) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingMacroChat = true
+                                }
                             }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingMacroChat = true
+                        case .completed:
+                            MacroTrackerCompletedTile(isDarkMode: themeManager.isDarkMode) {
+                                // Clear the persistent completed state when clicked
+                                macroTrackerCompleted = false
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingMacroChat = true
+                                }
+                            }
+                        case .idle:
+                            NeumorphicMenuTile(
+                                title: "Macro Tracker",
+                                icon: "fork.knife",
+                                color: Color.orange,
+                                isDarkMode: themeManager.isDarkMode
+                            ) {
+                                // Clear any completed state when starting new chat
+                                macroTrackerCompleted = false
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    showingSideMenu = false
+                                }
+                                // Small delay to let menu close animation finish
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    showingMacroChat = true
+                                }
                             }
                         }
                         
@@ -2257,6 +2451,180 @@ struct WorkoutPlanStatusTile: View {
                         .stroke(isDarkMode ? Color.white.opacity(0.25) : Color.gray.opacity(0.15), lineWidth: 1)
                 )
         )
+    }
+}
+
+struct AIChatStatusTile: View {
+    let isDarkMode: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                // Status icon with animation
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: Color.mint))
+                    .scaleEffect(0.8)
+                
+                // Status text
+                Text("AI Thinking...")
+                    .font(.system(.footnote, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 90)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isDarkMode ? Color.white.opacity(0.12) : Color.offWhite)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.mint.opacity(0.3), lineWidth: 2)
+                    )
+            )
+            .shadow(
+                color: isDarkMode ? Color.clear : Color.black.opacity(0.1),
+                radius: isDarkMode ? 0 : 2,
+                x: 0,
+                y: isDarkMode ? 0 : 1
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct MacroTrackerStatusTile: View {
+    let isDarkMode: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                // Status icon with animation
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: Color.orange))
+                    .scaleEffect(0.8)
+                
+                // Status text
+                Text("Parsing Meal...")
+                    .font(.system(.footnote, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 90)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isDarkMode ? Color.white.opacity(0.12) : Color.offWhite)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.orange.opacity(0.3), lineWidth: 2)
+                    )
+            )
+            .shadow(
+                color: isDarkMode ? Color.clear : Color.black.opacity(0.1),
+                radius: isDarkMode ? 0 : 2,
+                x: 0,
+                y: isDarkMode ? 0 : 1
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct AIChatCompletedTile: View {
+    let isDarkMode: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                // Completed icon
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+                
+                // Status text
+                Text("AI Response Ready")
+                    .font(.system(.footnote, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 90)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isDarkMode ? Color.white.opacity(0.12) : Color.offWhite)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.green.opacity(0.3), lineWidth: 2)
+                    )
+            )
+            .shadow(
+                color: isDarkMode ? Color.clear : Color.black.opacity(0.1),
+                radius: isDarkMode ? 0 : 2,
+                x: 0,
+                y: isDarkMode ? 0 : 1
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct MacroTrackerCompletedTile: View {
+    let isDarkMode: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 12) {
+                // Completed icon
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.green)
+                
+                // Status text
+                Text("Meal Parsed")
+                    .font(.system(.footnote, design: .rounded))
+                    .fontWeight(.semibold)
+                    .foregroundColor(isDarkMode ? .white : .primary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 90)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(isDarkMode ? Color.white.opacity(0.12) : Color.offWhite)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.green.opacity(0.3), lineWidth: 2)
+                    )
+            )
+            .shadow(
+                color: isDarkMode ? Color.clear : Color.black.opacity(0.1),
+                radius: isDarkMode ? 0 : 2,
+                x: 0,
+                y: isDarkMode ? 0 : 1
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 

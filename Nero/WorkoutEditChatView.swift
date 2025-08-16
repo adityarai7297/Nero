@@ -7,11 +7,15 @@
 
 import SwiftUI
 
-struct ChatMessage: Identifiable {
+struct ChatMessage: Identifiable, Equatable {
     let id = UUID()
     let text: String
     let isFromUser: Bool
     let timestamp: Date
+    
+    static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
 struct WorkoutEditChatView: View {
@@ -30,152 +34,270 @@ struct WorkoutEditChatView: View {
     
     var body: some View {
         NavigationView {
-            ZStack {
-                (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    // Messages List
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(spacing: 16) {
-                                // Welcome message
-                                if messages.isEmpty {
-                                    WelcomeMessageView(isDarkMode: isDarkMode)
-                                        .padding(.horizontal, 16)
-                                        .padding(.top, 20)
-                                }
-                                
-                                ForEach(messages) { message in
-                                    MessageBubbleView(message: message, isDarkMode: isDarkMode)
-                                        .padding(.horizontal, 16)
-                                        .id(message.id)
-                                }
-                                
-                                // (Recording UI now shows in the input field)
-                                
-                                // Processing indicator
-                                if isProcessing && !preferencesService.generationStatus.isActive {
-                                    ProcessingMessageView(isDarkMode: isDarkMode)
-                                        .padding(.horizontal, 16)
-                                        .id("processing")
-                                } else if preferencesService.generationStatus.isActive {
-                                    StatusMessageView(status: preferencesService.generationStatus, isDarkMode: isDarkMode)
-                                        .padding(.horizontal, 16)
-                                        .id("status")
-                                } else if preferencesService.generationStatus == .completed {
-                                    CompletedMessageView(isDarkMode: isDarkMode) {
-                                        showingWorkoutPlan = true
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .id("completed")
-                                }
-                            }
-                            .padding(.bottom, 20)
+            mainContent
+                .navigationTitle("Edit Workout Plan")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
+                .preferredColorScheme(isDarkMode ? .dark : .light)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Cancel") {
+                            dismiss()
                         }
-                        .onChange(of: messages.count) { _ in
-                            if let lastMessage = messages.last {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                                }
-                            }
-                        }
-                        .onChange(of: isProcessing) { processing in
-                            if processing {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo("processing", anchor: .bottom)
-                                }
-                            }
-                        }
-                        .onChange(of: preferencesService.generationStatus) { status in
-                            if status.isActive {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo("status", anchor: .bottom)
-                                }
-                            } else if status == .completed {
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo("completed", anchor: .bottom)
-                                }
-                            } else if case .failed(let error) = status, error == "Could not understand" {
-                                // Handle "could not understand" error specifically
-                                isProcessing = false
-                                messages.append(ChatMessage(
-                                    text: "I couldn't understand your request. Please try rephrasing with more specific details about what you'd like to change in your workout plan.",
-                                    isFromUser: false,
-                                    timestamp: Date()
-                                ))
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo(messages.last?.id, anchor: .bottom)
-                                }
-                                // Reset status so user can try again
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    preferencesService.generationStatus = .idle
-                                }
-                            } else if case .failed(_) = status {
-                                // Handle other failures
-                                isProcessing = false
-                                messages.append(ChatMessage(
-                                    text: "Sorry, there was an error processing your request. Please try again.",
-                                    isFromUser: false,
-                                    timestamp: Date()
-                                ))
-                                withAnimation(.easeInOut(duration: 0.5)) {
-                                    proxy.scrollTo(messages.last?.id, anchor: .bottom)
-                                }
-                                // Reset status so user can try again
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                    preferencesService.generationStatus = .idle
-                                }
-                            }
-                        }
+                        .foregroundColor(Color.accentBlue)
                     }
-                    
-                    // Input Area
-                    MessageInputView(
-                        messageText: $messageText,
-                        isProcessing: isProcessing || preferencesService.generationStatus.isActive,
-                        onSend: sendMessage,
-                        isDarkMode: isDarkMode,
-                        audioTranscription: audioTranscription
-                    )
                 }
-            }
-            .navigationTitle("Edit Workout Plan")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(isDarkMode ? .dark : .light, for: .navigationBar)
-            .preferredColorScheme(isDarkMode ? .dark : .light)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .foregroundColor(Color.accentBlue)
-                }
-            }
         }
         .sheet(isPresented: $showingWorkoutPlan) {
-            // This will show the workout plan view when editing is complete
             WorkoutPlanView(
-                onExerciseSelected: { _ in }, // Not needed in this context
+                onExerciseSelected: { _ in },
                 workoutService: workoutService,
                 isDarkMode: isDarkMode
             )
         }
         .onAppear {
-            // Reset status when view appears
             if preferencesService.generationStatus == .completed {
                 preferencesService.generationStatus = .idle
             }
+            restoreViewState()
             checkForCompletedTasks()
+            
+            // Additional safety check: if still processing but no active task, clear it
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if isProcessing && currentTaskId == nil {
+                    print("🧹 WorkoutEditChatView: Safety cleanup - clearing orphaned processing state")
+                    isProcessing = false
+                }
+            }
+        }
+        .onDisappear {
+            saveViewState()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
-                // App became active, check for any completed background tasks
+                print("🔄 WorkoutEditChatView: App became active, checking for completed tasks...")
                 checkForCompletedTasks()
+            }
+        }
+        .onChange(of: messages) { _, _ in
+            saveViewState()
+        }
+    }
+    
+    private var mainContent: some View {
+        ZStack {
+            (isDarkMode ? Color.black : Color.offWhite).ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                messagesScrollView
+                inputArea
+            }
+        }
+    }
+    
+    private var messagesScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    welcomeMessageSection
+                    messagesSection
+                    statusIndicatorSection
+                }
+                .padding(.bottom, 20)
+            }
+            .onAppear {
+                // Auto-scroll to bottom when view appears
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        if let lastMessage = messages.last {
+                            proxy.scrollTo(lastMessage.id, anchor: UnitPoint.bottom)
+                        } else if isProcessing {
+                            proxy.scrollTo("processing", anchor: UnitPoint.bottom)
+                        }
+                    }
+                }
+            }
+            .onChange(of: messages.count) { _ in
+                if let lastMessage = messages.last {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo(lastMessage.id, anchor: UnitPoint.bottom)
+                    }
+                }
+            }
+            .onChange(of: isProcessing) { processing in
+                if processing {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo("processing", anchor: UnitPoint.bottom)
+                    }
+                }
+            }
+            .onChange(of: preferencesService.generationStatus) { status in
+                if status.isActive {
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo("status", anchor: UnitPoint.bottom)
+                    }
+                } else if status == .completed {
+                    // Ensure processing state is cleared when completed
+                    isProcessing = false
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo("completed", anchor: UnitPoint.bottom)
+                    }
+                } else if case .failed(let error) = status, error == "Could not understand" {
+                    // Handle "could not understand" error specifically
+                    isProcessing = false
+                    messages.append(ChatMessage(
+                        text: "I couldn't understand your request. Please try rephrasing with more specific details about what you'd like to change in your workout plan.",
+                        isFromUser: false,
+                        timestamp: Date()
+                    ))
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo(messages.last?.id, anchor: UnitPoint.bottom)
+                    }
+                    // Reset status so user can try again
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        preferencesService.generationStatus = .idle
+                    }
+                } else if case .failed(_) = status {
+                    // Handle other failures
+                    isProcessing = false
+                    messages.append(ChatMessage(
+                        text: "Sorry, there was an error processing your request. Please try again.",
+                        isFromUser: false,
+                        timestamp: Date()
+                    ))
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        proxy.scrollTo(messages.last?.id, anchor: UnitPoint.bottom)
+                    }
+                    // Reset status so user can try again
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        preferencesService.generationStatus = .idle
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var welcomeMessageSection: some View {
+        if messages.isEmpty {
+            WelcomeMessageView(isDarkMode: isDarkMode)
+                .padding(.horizontal, 16)
+                .padding(.top, 20)
+        }
+    }
+    
+    private var messagesSection: some View {
+        ForEach(messages) { message in
+            MessageBubbleView(message: message, isDarkMode: isDarkMode)
+                .padding(.horizontal, 16)
+                .id(message.id)
+        }
+    }
+    
+    @ViewBuilder
+    private var statusIndicatorSection: some View {
+        if preferencesService.generationStatus == .completed {
+            CompletedMessageView(isDarkMode: isDarkMode) {
+                showingWorkoutPlan = true
+            }
+            .padding(.horizontal, 16)
+            .id("completed")
+        } else if preferencesService.generationStatus.isActive {
+            StatusMessageView(status: preferencesService.generationStatus, isDarkMode: isDarkMode)
+                .padding(.horizontal, 16)
+                .id("status")
+        } else if isProcessing {
+            ProcessingMessageView(isDarkMode: isDarkMode)
+                .padding(.horizontal, 16)
+                .id("processing")
+        }
+    }
+    
+    private var inputArea: some View {
+        MessageInputView(
+            messageText: $messageText,
+            isProcessing: isProcessing || preferencesService.generationStatus.isActive,
+            onSend: sendMessage,
+            isDarkMode: isDarkMode,
+            audioTranscription: audioTranscription
+        )
+    }
+    
+
+    
+
+    
+    private func saveViewState() {
+        ViewStatePersistenceManager.shared.saveWorkoutEditChatViewState(
+            messages: messages,
+            currentTaskId: currentTaskId,
+            isProcessing: isProcessing
+        )
+        
+        // Associate any active task with this view
+        if let taskId = currentTaskId {
+            ViewStatePersistenceManager.shared.associateTaskWithView(taskId: taskId, viewType: "WorkoutEditChatView")
+        }
+    }
+    
+    private func restoreViewState() {
+        if let savedState = ViewStatePersistenceManager.shared.loadWorkoutEditChatViewState() {
+            messages = savedState.messages
+            currentTaskId = savedState.currentTaskId
+            
+            // Only restore processing state if there's actually a running task
+            if let taskId = savedState.currentTaskId,
+               let taskInfo = backgroundTaskManager.getTaskInfo(taskId),
+               taskInfo.status == .running {
+                isProcessing = savedState.isProcessing
+                print("🔄 WorkoutEditChatView: Restored state with \(messages.count) messages, processing: \(isProcessing) - task \(taskId) is still running")
+            } else {
+                isProcessing = false  // Clear stale processing state
+                if let taskId = savedState.currentTaskId {
+                    print("🧹 WorkoutEditChatView: Cleared stale processing state - task \(taskId) is no longer running")
+                } else {
+                    print("🧹 WorkoutEditChatView: Cleared stale processing state - no current task")
+                }
             }
         }
     }
     
     private func checkForCompletedTasks() {
+        // First check for any orphaned tasks that might belong to this view
+        for (taskId, taskInfo) in backgroundTaskManager.activeTasks {
+            if let viewType = ViewStatePersistenceManager.shared.getViewForTask(taskId: taskId),
+               viewType == "WorkoutEditChatView",
+               taskInfo.status == .completed {
+                
+                // Found a completed task for this view
+                if let result = ResultPersistenceManager.shared.loadWorkoutPlanResult(taskId: taskId) {
+                    // The workout plan was completed, update the status
+                    preferencesService.generationStatus = .completed
+                    isProcessing = false
+                    currentTaskId = nil
+                    
+                    // Clean up the association
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("✅ WorkoutEditChatView: Found completed orphaned task \(taskId), updated UI state (processing: \(isProcessing), status: \(preferencesService.generationStatus))")
+                    return
+                } else {
+                    // Task completed but no result found - show error and clear loading
+                    isProcessing = false
+                    currentTaskId = nil
+                    messages.append(ChatMessage(
+                        text: "Sorry, there was an issue with the workout plan edit. Please try again.",
+                        isFromUser: false,
+                        timestamp: Date()
+                    ))
+                    preferencesService.generationStatus = .failed("No result found")
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("⚠️ WorkoutEditChatView: Task \(taskId) completed but no result found")
+                    return
+                }
+            }
+        }
+        
+        // Then check the current task if we have one
         guard let taskId = currentTaskId else { return }
         
         // Check if the task has completed while we were away
@@ -188,14 +310,62 @@ struct WorkoutEditChatView: View {
                     preferencesService.generationStatus = .completed
                     isProcessing = false
                     currentTaskId = nil
+                    
+                    // Clean up the association
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("✅ WorkoutEditChatView: Current task \(taskId) completed successfully")
+                } else {
+                    // Task completed but no result found - show error and clear loading
+                    isProcessing = false
+                    currentTaskId = nil
+                    messages.append(ChatMessage(
+                        text: "Sorry, there was an issue with the workout plan edit. Please try again.",
+                        isFromUser: false,
+                        timestamp: Date()
+                    ))
+                    preferencesService.generationStatus = .failed("No result found")
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("⚠️ WorkoutEditChatView: Current task \(taskId) completed but no result found")
                 }
             case .failed:
                 isProcessing = false
-                preferencesService.generationStatus = .failed("Edit failed while app was in background")
+                messages.append(ChatMessage(
+                    text: "Sorry, the workout plan edit failed while the view was not active. Please try again.",
+                    isFromUser: false,
+                    timestamp: Date()
+                ))
+                preferencesService.generationStatus = .failed("Edit failed while view was not active")
                 currentTaskId = nil
+                
+                // Clean up the association
+                ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                print("❌ WorkoutEditChatView: Current task \(taskId) failed")
             case .running:
                 // Task is still running, keep the processing state
                 isProcessing = true
+                print("⏳ WorkoutEditChatView: Task \(taskId) still running")
+            }
+        } else {
+            // Task not found in BackgroundTaskManager - it either completed and was cleaned up, or failed
+            // Check if we have a persisted result
+            if let result = ResultPersistenceManager.shared.loadWorkoutPlanResult(taskId: taskId) {
+                preferencesService.generationStatus = .completed
+                isProcessing = false
+                currentTaskId = nil
+                ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                print("✅ WorkoutEditChatView: Found persisted result for cleaned up task \(taskId)")
+            } else {
+                // No task and no result - task likely failed or timed out
+                isProcessing = false
+                currentTaskId = nil
+                messages.append(ChatMessage(
+                    text: "Sorry, the workout plan edit timed out or failed. Please try again.",
+                    isFromUser: false,
+                    timestamp: Date()
+                ))
+                preferencesService.generationStatus = .failed("Task timed out or failed")
+                ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                print("❌ WorkoutEditChatView: Task \(taskId) not found and no result - likely failed or timed out")
             }
         }
     }
@@ -251,12 +421,19 @@ struct WorkoutEditChatView: View {
                 return
             }
             
+            // Generate task ID and store it
+            let taskId = "workout_plan_edit_\(UUID().uuidString)"
             await MainActor.run {
-                isProcessing = false
+                currentTaskId = taskId
             }
+            
+            // Associate this task with the current view
+            ViewStatePersistenceManager.shared.associateTaskWithView(taskId: taskId, viewType: "WorkoutEditChatView")
+            print("🚀 WorkoutEditChatView: Starting task \(taskId) for workout edit")
             
             // Call the edit workout plan API
             await preferencesService.startWorkoutPlanEdit(
+                taskId: taskId,
                 editRequest: editRequest,
                 currentPlan: currentPlan,
                 personalDetails: personalDetails,

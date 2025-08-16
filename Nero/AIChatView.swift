@@ -63,6 +63,18 @@ struct AIChatView: View {
                             .padding(.horizontal, 16)
                             .padding(.vertical, 16)
                         }
+                        .onAppear {
+                            // Auto-scroll to bottom when view appears
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    if let lastMessage = messages.last {
+                                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                                    } else if isLoading {
+                                        proxy.scrollTo("typing", anchor: .bottom)
+                                    }
+                                }
+                            }
+                        }
                         .onChange(of: messages) { _, _ in
                             // Auto-scroll to bottom when new messages arrive
                             withAnimation(.easeInOut(duration: 0.3)) {
@@ -121,13 +133,29 @@ struct AIChatView: View {
         }
         .onAppear {
             setupWelcomeMessage()
+            restoreViewState()
             checkForCompletedTasks()
+            
+            // Additional safety check: if still loading but no active task, clear it
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if isLoading && currentTaskId == nil {
+                    print("🧹 AIChatView: Safety cleanup - clearing orphaned loading state")
+                    isLoading = false
+                }
+            }
+        }
+        .onDisappear {
+            saveViewState()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 // App became active, check for any completed background tasks
                 checkForCompletedTasks()
             }
+        }
+        .onChange(of: messages) { _, _ in
+            // Auto-save state when messages change
+            saveViewState()
         }
     }
     
@@ -140,7 +168,85 @@ struct AIChatView: View {
         }
     }
     
+    private func saveViewState() {
+        ViewStatePersistenceManager.shared.saveAIChatViewState(
+            messages: messages,
+            currentTaskId: currentTaskId,
+            isLoading: isLoading
+        )
+        
+        // Associate any active task with this view
+        if let taskId = currentTaskId {
+            ViewStatePersistenceManager.shared.associateTaskWithView(taskId: taskId, viewType: "AIChatView")
+        }
+    }
+    
+    private func restoreViewState() {
+        if let savedState = ViewStatePersistenceManager.shared.loadAIChatViewState() {
+            messages = savedState.messages
+            currentTaskId = savedState.currentTaskId
+            
+            // Only restore loading state if there's actually a running task
+            if let taskId = savedState.currentTaskId,
+               let taskInfo = backgroundTaskManager.getTaskInfo(taskId),
+               taskInfo.status == .running {
+                isLoading = savedState.isLoading
+                print("🔄 AIChatView: Restored state with \(messages.count) messages, loading: \(isLoading) - task \(taskId) is still running")
+            } else {
+                isLoading = false  // Clear stale loading state
+                if let taskId = savedState.currentTaskId {
+                    print("🧹 AIChatView: Cleared stale loading state - task \(taskId) is no longer running")
+                } else {
+                    print("🧹 AIChatView: Cleared stale loading state - no current task")
+                }
+            }
+            
+            // Don't show welcome message if we have chat history
+            if !messages.isEmpty {
+                isTextFieldFocused = false
+            }
+        }
+    }
+    
     private func checkForCompletedTasks() {
+        // First check for any orphaned tasks that might belong to this view
+        for (taskId, taskInfo) in backgroundTaskManager.activeTasks {
+            if let viewType = ViewStatePersistenceManager.shared.getViewForTask(taskId: taskId),
+               viewType == "AIChatView",
+               taskInfo.status == .completed {
+                
+                // Found a completed task for this view
+                if let result = ResultPersistenceManager.shared.loadChatResponse(taskId: taskId) {
+                    let aiMessage = AIChatMessage(
+                        content: result.response,
+                        isFromUser: false,
+                        timestamp: result.timestamp
+                    )
+                    messages.append(aiMessage)
+                    isLoading = false
+                    currentTaskId = nil
+                    
+                    // Clean up the association
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("✅ AIChatView: Restored completed task result for \(taskId)")
+                    return
+                } else {
+                    // Task completed but no result found - show error and clear loading
+                    isLoading = false
+                    currentTaskId = nil
+                    messages.append(AIChatMessage(
+                        content: "Sorry, there was an issue retrieving the AI response. Please try again.",
+                        isFromUser: false,
+                        timestamp: Date()
+                    ))
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("⚠️ AIChatView: Task \(taskId) completed but no result found")
+                    return
+                }
+            }
+        }
+        
+        // Then check the current task if we have one
         guard let taskId = currentTaskId else { return }
         
         // Check if the task has completed while we were away
@@ -157,14 +263,64 @@ struct AIChatView: View {
                     messages.append(aiMessage)
                     isLoading = false
                     currentTaskId = nil
+                    
+                    // Clean up the association
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("✅ AIChatView: Current task \(taskId) completed successfully")
+                } else {
+                    // Task completed but no result found - show error and clear loading
+                    isLoading = false
+                    currentTaskId = nil
+                    messages.append(AIChatMessage(
+                        content: "Sorry, there was an issue retrieving the AI response. Please try again.",
+                        isFromUser: false,
+                        timestamp: Date()
+                    ))
+                    ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                    print("⚠️ AIChatView: Current task \(taskId) completed but no result found")
                 }
             case .failed:
                 isLoading = false
-                errorMessage = "AI response failed while app was in background"
+                messages.append(AIChatMessage(
+                    content: "Sorry, the AI response failed while the view was not active. Please try again.",
+                    isFromUser: false,
+                    timestamp: Date()
+                ))
                 currentTaskId = nil
+                
+                // Clean up the association
+                ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                print("❌ AIChatView: Current task \(taskId) failed")
             case .running:
                 // Task is still running, keep the loading state
                 isLoading = true
+                print("⏳ AIChatView: Task \(taskId) still running")
+            }
+        } else {
+            // Task not found in BackgroundTaskManager - it either completed and was cleaned up, or failed
+            // Check if we have a persisted result
+            if let result = ResultPersistenceManager.shared.loadChatResponse(taskId: taskId) {
+                let aiMessage = AIChatMessage(
+                    content: result.response,
+                    isFromUser: false,
+                    timestamp: result.timestamp
+                )
+                messages.append(aiMessage)
+                isLoading = false
+                currentTaskId = nil
+                ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                print("✅ AIChatView: Found persisted result for cleaned up task \(taskId)")
+            } else {
+                // No task and no result - task likely failed or timed out
+                isLoading = false
+                currentTaskId = nil
+                messages.append(AIChatMessage(
+                    content: "Sorry, the AI response timed out or failed. Please try again.",
+                    isFromUser: false,
+                    timestamp: Date()
+                ))
+                ViewStatePersistenceManager.shared.clearTaskViewAssociation(taskId: taskId)
+                print("❌ AIChatView: Task \(taskId) not found and no result - likely failed or timed out")
             }
         }
     }

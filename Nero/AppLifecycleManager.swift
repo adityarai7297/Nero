@@ -53,6 +53,7 @@ class AppLifecycleManager: ObservableObject {
         
         // Cleanup old persisted results when app goes to background
         ResultPersistenceManager.shared.cleanupOldResults()
+        ViewStatePersistenceManager.shared.cleanupOldViewStates()
     }
     
     @objc private func appWillEnterForeground() {

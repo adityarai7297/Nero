@@ -86,8 +86,9 @@ class BackgroundTaskManager: ObservableObject {
                     self.activeTasks[id]?.completionTime = Date()
                     completion(.success(result))
                     
-                    // Clean up after a delay to allow UI updates
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Give UI time to detect the completed state and set persistent flags
+                    // Clean up after a longer delay to ensure UI state is properly handled
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                         self.cleanupTask(id)
                     }
                 }
@@ -98,8 +99,8 @@ class BackgroundTaskManager: ObservableObject {
                     self.activeTasks[id]?.completionTime = Date()
                     completion(.failure(error))
                     
-                    // Clean up after a delay to allow UI updates
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    // Clean up after a longer delay to ensure UI state is properly handled
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
                         self.cleanupTask(id)
                     }
                 }
@@ -211,7 +212,7 @@ enum BackgroundTaskStatus: String, Codable {
     case failed = "failed"
 }
 
-struct BackgroundTaskInfo: Codable, Identifiable {
+struct BackgroundTaskInfo: Codable, Identifiable, Equatable {
     let id: String
     let type: BackgroundTaskType
     let startTime: Date
@@ -226,6 +227,15 @@ struct BackgroundTaskInfo: Codable, Identifiable {
     
     var isActive: Bool {
         return status == .running
+    }
+    
+    static func == (lhs: BackgroundTaskInfo, rhs: BackgroundTaskInfo) -> Bool {
+        return lhs.id == rhs.id &&
+               lhs.type == rhs.type &&
+               lhs.startTime == rhs.startTime &&
+               lhs.status == rhs.status &&
+               lhs.completionTime == rhs.completionTime &&
+               lhs.error == rhs.error
     }
 }
 
