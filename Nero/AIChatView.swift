@@ -550,11 +550,6 @@ struct AIChatMessageInputView: View {
                         AudioWaveletVisualization(isDarkMode: isDarkMode)
                             .frame(height: 18)
                         Spacer(minLength: 0)
-                        // Visual hint checkmark to match outer control
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.title3)
-                            .opacity(0.6)
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
