@@ -627,6 +627,7 @@ class DeepseekAPIClient {
 
         Editing Guidelines:
         - Make the requested changes while preserving the overall structure and balance of the plan
+        - Make sure workout plan is complete for the entire weekand no muscle group is overemphasized. For example if user says push, pull, legs, then make sure plan is push pull legs push pull. 
         - For higher frequency splits (5+ days), ensure workout days are distributed across the entire week INCLUDING Saturday and Sunday. Do not avoid weekends.
         - For 6-day splits, include at least one weekend day (Saturday or Sunday). For 7-day splits, include both Saturday and Sunday.
         - If adding exercises, ensure they fit logically with the existing workout split
