@@ -397,6 +397,7 @@ class WorkoutPreferencesService: ObservableObject {
             type: .workoutPlanEdit,
             operation: {
                 await self.performBackgroundEdit(
+                    taskId: taskId,
                     editRequest: editRequest,
                     currentPlan: currentPlan,
                     personalDetails: personalDetails,
@@ -418,7 +419,7 @@ class WorkoutPreferencesService: ObservableObject {
         )
     }
     
-    private func performBackgroundEdit(editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
+    private func performBackgroundEdit(taskId: String, editRequest: String, currentPlan: DeepseekWorkoutPlan, personalDetails: PersonalDetails, preferences: WorkoutPreferences) async {
         print("🎯 Starting background edit workflow")
         
         await updateStatus(.editingPlan)
@@ -442,6 +443,10 @@ class WorkoutPreferencesService: ObservableObject {
             if planSaved {
                 print("🎉 Edit workflow completed successfully!")
                 await updateStatus(.completed)
+                
+                // Save the result for persistence across view navigation
+                ResultPersistenceManager.shared.saveWorkoutPlanResult(editedPlan, taskId: taskId)
+                print("💾 Saved workout plan edit result for task \(taskId)")
                 
                 // Notify that workout plan has been updated
                 await MainActor.run {
