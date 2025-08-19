@@ -1253,25 +1253,32 @@ struct ExerciseView: View {
     
     @ViewBuilder
     private func SideMenuView() -> some View {
-        ZStack {
-            // Blur background overlay - dynamic based on dark mode
-            (themeManager.isDarkMode ? Color.black.opacity(0.8) : Color.white.opacity(0.1))
-                .ignoresSafeArea()
-                .background(themeManager.isDarkMode ? AnyShapeStyle(Color.black.opacity(0.9)) : AnyShapeStyle(Material.ultraThinMaterial))
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        showingSideMenu = false
+        GeometryReader { geometry in
+            ZStack {
+                // Opaque background overlay - dynamic based on dark mode
+                (themeManager.isDarkMode ? Color.black : Color.white)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showingSideMenu = false
+                        }
                     }
-                }
-            
-            // Centered menu content with grid layout
-            VStack(spacing: 16) {
-                Spacer()
                 
-                // Grid of menu tiles
+                // Centered menu content with grid layout
                 VStack(spacing: 16) {
+                    // Dynamic spacing based on screen size to prevent overlap with toggle
+                    let isCompactHeight = geometry.size.height < 870 // iPhone 16 (852pt) vs larger devices
+                    if isCompactHeight {
+                        Spacer()
+                            .frame(height: 60) // Extra space for dark mode toggle on smaller screens
+                    }
+                    
+                    Spacer()
+                    
                     // Grid of menu tiles
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
+                    VStack(spacing: 16) {
+                        // Grid of menu tiles
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
                         // Workout Plan Generation Status Indicator or View Plan Button
                         if preferencesService.generationStatus.isActive {
                             // Show status indicator while generating
@@ -1505,30 +1512,32 @@ struct ExerciseView: View {
                 Spacer()
             }
             .frame(maxWidth: .infinity)
-        }
-        .overlay(alignment: .topTrailing) {
-            HStack(spacing: 8) {
-                Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(themeManager.isDarkMode ? .yellow : .orange)
-                Toggle("", isOn: Binding(
-                    get: { themeManager.isDarkMode },
-                    set: { _ in
-                        // Ensure user ID is set before toggling
-                        if let userId = authService.user?.id {
-                            themeManager.setCurrentUser(userId)
-                        }
-                        themeManager.toggleDarkMode()
-                    }
-                ))
-                    .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(themeManager.isDarkMode ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(Material.ultraThinMaterial), in: Capsule())
-            .padding(.trailing, 16)
-            .padding(.top, 16)
+            .overlay(alignment: .topTrailing) {
+                let isCompactHeight = geometry.size.height < 870 // iPhone 16 (852pt) vs larger devices
+                HStack(spacing: 8) {
+                    Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(themeManager.isDarkMode ? .yellow : .orange)
+                    Toggle("", isOn: Binding(
+                        get: { themeManager.isDarkMode },
+                        set: { _ in
+                            // Ensure user ID is set before toggling
+                            if let userId = authService.user?.id {
+                                themeManager.setCurrentUser(userId)
+                            }
+                            themeManager.toggleDarkMode()
+                        }
+                    ))
+                        .labelsHidden()
+                        .toggleStyle(SwitchToggleStyle(tint: .blue))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(themeManager.isDarkMode ? AnyShapeStyle(Color.white.opacity(0.2)) : AnyShapeStyle(Material.ultraThinMaterial), in: Capsule())
+                .padding(.trailing, 16)
+                .padding(.top, isCompactHeight ? 12 : 16) // Reduce top padding on smaller screens
+            }
         }
     }
     
