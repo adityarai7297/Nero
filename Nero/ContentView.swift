@@ -641,17 +641,17 @@ struct ExerciseView: View {
             VStack(spacing: 24) {
                 Image(systemName: "dumbbell.fill")
                     .font(.system(size: 60, weight: .bold))
-                    .foregroundColor(.blue.opacity(0.6))
+                    .foregroundColor(themeManager.isDarkMode ? Color.accentBlue.opacity(0.8) : Color.accentBlue.opacity(0.6))
                 
                 VStack(spacing: 16) {
                     Text("Create a Workout Plan")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(themeManager.isDarkMode ? .white : .black)
                     
                     Text("Complete the workout questionnaire to see your personalized exercises")
                         .font(.body)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(themeManager.isDarkMode ? .white.opacity(0.7) : .gray)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 40)
                 }
@@ -2871,18 +2871,29 @@ struct DeleteAccountConfirmationView: View {
                 .fontWeight(.medium)
                 .foregroundColor(isDarkMode ? .white : .black)
 
-            TextField("delete my account", text: $confirmationText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(isConfirmationValid ? Color.red : Color.gray.opacity(0.3), lineWidth: 2)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
-                .disabled(isDeleting)
+            ZStack(alignment: .leading) {
+                if confirmationText.isEmpty {
+                    Text("delete my account")
+                        .foregroundColor(isDarkMode ? .gray.opacity(0.6) : .gray)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .allowsHitTesting(false)
+                }
+                
+                TextField("", text: $confirmationText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .foregroundColor(isDarkMode ? .white : .black)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .disabled(isDeleting)
+            }
+            .background(isDarkMode ? Color.white.opacity(0.08) : Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isConfirmationValid ? Color.red : Color.gray.opacity(0.3), lineWidth: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 
