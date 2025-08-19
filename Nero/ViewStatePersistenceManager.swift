@@ -67,7 +67,6 @@ class ViewStatePersistenceManager {
         let messages: [MacroChatMessage]
         let currentTaskId: String?
         let isLoading: Bool
-        let selectedDate: Date
         let lastUpdated: Date
     }
     
@@ -76,7 +75,6 @@ class ViewStatePersistenceManager {
             messages: messages,
             currentTaskId: currentTaskId,
             isLoading: isLoading,
-            selectedDate: selectedDate,
             lastUpdated: Date()
         )
         

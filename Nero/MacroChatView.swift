@@ -348,7 +348,8 @@ struct MacroChatView: View {
         if let savedState = ViewStatePersistenceManager.shared.loadMacroChatViewState() {
             messages = savedState.messages
             currentTaskId = savedState.currentTaskId
-            selectedDate = savedState.selectedDate
+            // Always use current date instead of restoring saved date
+            selectedDate = Date()
             
             // Only restore loading state if there's actually a running task
             if let taskId = savedState.currentTaskId,
