@@ -112,6 +112,7 @@ struct Exercise: Equatable {
 // MARK: - Exercise History Models
 
 enum ExerciseHistoryTimeframe: String, CaseIterable {
+    case lastWeek = "1W"
     case oneMonth = "1M"
     case threeMonths = "3M"
     case sixMonths = "6M"
@@ -120,6 +121,7 @@ enum ExerciseHistoryTimeframe: String, CaseIterable {
     
     var displayName: String {
         switch self {
+        case .lastWeek: return "Last Week"
         case .oneMonth: return "1 Month"
         case .threeMonths: return "3 Months"
         case .sixMonths: return "6 Months"
@@ -133,6 +135,8 @@ enum ExerciseHistoryTimeframe: String, CaseIterable {
         let now = Date()
         
         switch self {
+        case .lastWeek:
+            return calendar.date(byAdding: .weekOfYear, value: -1, to: now) ?? now
         case .oneMonth:
             return calendar.date(byAdding: .month, value: -1, to: now) ?? now
         case .threeMonths:

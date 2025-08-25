@@ -810,23 +810,32 @@ class DeepseekAPIClient {
         let systemPrompt = """
         You are an expert fitness coach and personal trainer and nutritionist with years of experience helping people achieve their fitness goals. You have access to the user's complete workout history, personal details, current training plan, meal, macros and nutrition history.
 
+        CRITICAL ACCURACY REQUIREMENTS:
+        - ONLY use the specific data provided in the user's fitness profile below
+        - NEVER make up or hallucinate workout data, nutrition information, or dates
+        - If specific data is not provided, clearly state "I don't see that information in your data"
+        - When referencing dates, ONLY use the explicit date context provided
+        - When asked about "today", "yesterday", etc., refer ONLY to the date context section
+        - If no data exists for a specific timeframe, say so explicitly
+
         Your role:
         - Act as a knowledgeable, encouraging, and supportive fitness coach
         - Provide evidence-based advice on training, technique, progression, recovery, and nutrition
         - Be conversational, friendly, and motivating
         - Answer questions about workouts, form, progress, macros, nutrition, and training strategies
-        - Use the user's specific data to give personalized recommendations
+        - Use ONLY the user's specific data provided to give personalized recommendations
         - Keep responses brief and to the point (1-2 short paragraphs maximum)
         - Use encouraging language and celebrate progress
-        - Be to the point and don't unnessarily produce more text than needed.
+        - Be to the point and don't unnecessarily produce more text than needed
 
-        Context:
-        - You have access to their complete workout history, workout plan, nutrition data, and personal information
-        - You can answer questions about any exercise in their program, nutrition intake, or general fitness topics
-        - Reference their actual workout data, nutrition patterns, progress trends, and training history
-        - Keep context of what todays date is and answer questions with chronological words (today, tomorrow, yesterday, last week, etc.) withhout hallucinating.
+        Data Usage Guidelines:
+        - Reference ONLY the workout data shown in "TODAY'S COMPLETED WORKOUTS" when asked about today's workouts
+        - Reference ONLY the nutrition data shown in "TODAY'S NUTRITION" when asked about today's meals
+        - Use ONLY the dates and times explicitly provided in the data sections
+        - For historical data, reference ONLY what's shown in "RECENT WORKOUT HISTORY" and "RECENT NUTRITION HISTORY"
+        - If asked about data not provided (e.g., workouts from 2 weeks ago), state that you don't have that information
 
-        Guidelines:
+        Response Guidelines:
         - Be encouraging and positive
         - Use their actual data to make specific recommendations
         - If they ask about specific exercises, reference their performance data for those exercises
@@ -834,7 +843,7 @@ class DeepseekAPIClient {
         - If they ask about progress, analyze their data trends across exercises and nutrition
         - If they ask about programming, consider their experience level and goals
         - If they ask about nutrition or macros, reference their actual intake data and patterns
-        - No need to include nutrition information if the user has only asked about a workout, and vice versa.
+        - No need to include nutrition information if the user has only asked about a workout, and vice versa
         - Always prioritize safety and proper progression
         - You can suggest modifications to their current workout plan
         - Keep medical advice general and suggest consulting professionals for specific issues
@@ -845,7 +854,8 @@ class DeepseekAPIClient {
         - Format exercise names in italics (e.g., *Bench Press*, *Squat*)
         - Use **bold** for key points and important advice
         - Use bullet points (•) for lists of tips or recommendations
-        - Be factually correct and don't hallucinate.
+
+        REMEMBER: Only reference data that is explicitly provided. Never invent or assume data that isn't shown.
         """
         
         let userPrompt = """
@@ -909,14 +919,29 @@ class DeepseekAPIClient {
         }
     }
     
-    /// Gather comprehensive user data for fitness coaching context
+    /// Gather comprehensive user data for fitness coaching context with chronological accuracy
     private func gatherUserDataForCoaching(workoutService: WorkoutService, macroService: MacroService) async -> String {
         var context = ""
+        
+        // Add explicit date context at the beginning
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .full
+        dateFormatter.timeStyle = .short
+        let currentDateTime = dateFormatter.string(from: Date())
+        
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "EEEE" // Day of week
+        let currentDayOfWeek = dayFormatter.string(from: Date())
+        
+        context += "=== CURRENT DATE AND TIME CONTEXT ===\n"
+        context += "Current Date and Time: \(currentDateTime)\n"
+        context += "Today is: \(currentDayOfWeek)\n"
+        context += "Use this as your reference for 'today', 'yesterday', etc.\n\n"
         
         // Get user's personal details
         let personalDetailsService = PersonalDetailsService()
         if let personalDetails = await personalDetailsService.loadPersonalDetails() {
-            context += "PERSONAL PROFILE:\n"
+            context += "=== PERSONAL PROFILE ===\n"
             context += formatPersonalDetails(personalDetails)
             context += "\n\n"
         }
@@ -924,60 +949,62 @@ class DeepseekAPIClient {
         // Get user's workout preferences
         let preferencesService = WorkoutPreferencesService()
         if let preferences = await preferencesService.loadWorkoutPreferences() {
-            context += "WORKOUT PREFERENCES:\n"
+            context += "=== WORKOUT PREFERENCES ===\n"
             context += formatWorkoutPreferences(preferences)
             context += "\n\n"
         }
         
         // Get current workout plan
         if let currentPlan = await preferencesService.loadCurrentWorkoutPlan() {
-            context += "CURRENT WORKOUT PLAN:\n"
+            context += "=== CURRENT WORKOUT PLAN ===\n"
             context += formatWorkoutPlanForCoaching(currentPlan)
             context += "\n\n"
         }
         
-        // Get all user exercises and their data
+        // Get today's specific workout data first
+        let todayWorkoutSets = workoutService.todaySets
+        if !todayWorkoutSets.isEmpty {
+            context += "=== TODAY'S COMPLETED WORKOUTS (\(currentDayOfWeek)) ===\n"
+            context += formatTodayWorkoutSets(todayWorkoutSets)
+            context += "\n\n"
+        } else {
+            context += "=== TODAY'S COMPLETED WORKOUTS (\(currentDayOfWeek)) ===\n"
+            context += "No workouts completed today yet.\n\n"
+        }
+        
+        // Get recent workout history (last 7 days) for context
         let allExercises = await workoutService.fetchAllUserExercises()
         if !allExercises.isEmpty {
-            context += "ALL EXERCISE HISTORY AND STATISTICS:\n"
+            context += "=== RECENT WORKOUT HISTORY (Last 7 Days) ===\n"
             
             for exerciseName in allExercises {
-                context += "\n--- \(exerciseName.uppercased()) ---\n"
-                
-                // Get exercise history
-                let exerciseHistory = await workoutService.fetchExerciseHistory(exerciseName: exerciseName, timeframe: .all)
-                if !exerciseHistory.isEmpty {
-                    context += "Recent History:\n"
-                    context += formatExerciseHistoryForCoaching(exerciseHistory)
-                    context += "\n"
-                }
-                
-                // Get exercise stats
-                if let stats = await workoutService.getExerciseStats(exerciseName: exerciseName) {
-                    context += "Statistics:\n"
-                    context += formatExerciseStats(stats)
-                    context += "\n"
+                let recentHistory = await workoutService.fetchExerciseHistory(exerciseName: exerciseName, timeframe: .lastWeek)
+                if !recentHistory.isEmpty {
+                    context += "\n\(exerciseName.uppercased()):\n"
+                    context += formatExerciseHistoryWithDates(recentHistory)
                 }
             }
-            context += "\n"
+            context += "\n\n"
         }
 
-        // Get user's macro and nutrition data
+        // Get today's nutrition data
         let todayMeals = macroService.todayMeals
         let todayTotals = macroService.todayTotals
         
+        context += "=== TODAY'S NUTRITION (\(currentDayOfWeek)) ===\n"
         if !todayMeals.isEmpty || todayTotals.calories > 0 {
-            context += "TODAY'S NUTRITION:\n"
-            context += formatTodayNutrition(meals: todayMeals, totals: todayTotals)
+            context += formatTodayNutritionWithTimes(meals: todayMeals, totals: todayTotals)
+        } else {
+            context += "No meals logged today yet.\n"
+        }
+        context += "\n\n"
+        
+        // Get recent nutrition history (last 7 days) for context
+        let nutritionHistory = await macroService.fetchHistoryDays(limitDays: 7)
+        if !nutritionHistory.isEmpty {
+            context += "=== RECENT NUTRITION HISTORY (Last 7 Days) ===\n"
+            context += formatRecentNutritionHistory(nutritionHistory)
             context += "\n\n"
-            
-            // Get recent nutrition history
-            let nutritionHistory = await macroService.fetchHistoryDays(limitDays: 30)
-            if !nutritionHistory.isEmpty {
-                context += "RECENT NUTRITION HISTORY (last 30 days):\n"
-                context += formatNutritionHistory(nutritionHistory)
-                context += "\n\n"
-            }
         }
         
         return context.isEmpty ? "No workout or nutrition data available yet. This user is just getting started!" : context
@@ -1158,6 +1185,148 @@ class DeepseekAPIClient {
                     formatted += "\n"
                 }
             }
+        }
+        
+        return formatted
+    }
+    
+    /// Format today's workout sets with chronological accuracy
+    private func formatTodayWorkoutSets(_ sets: [WorkoutSet]) -> String {
+        var formatted = ""
+        
+        // Group sets by exercise
+        let groupedSets = Dictionary(grouping: sets) { $0.exerciseName }
+        
+        let timeFormatter = DateFormatter()
+        timeFormatter.timeStyle = .short
+        
+        for (exerciseName, exerciseSets) in groupedSets.sorted(by: { $0.key < $1.key }) {
+            formatted += "\n\(exerciseName.uppercased()):\n"
+            
+            // Sort sets by timestamp
+            let sortedSets = exerciseSets.sorted { $0.timestamp < $1.timestamp }
+            
+            for (index, set) in sortedSets.enumerated() {
+                let timeString = timeFormatter.string(from: set.timestamp)
+                if set.exerciseType == "static_hold" {
+                    formatted += "  Set \(index + 1) at \(timeString): \(Int(set.weight))lbs x \(Int(set.reps)) seconds @ \(Int(set.rpe))% effort\n"
+                } else {
+                    formatted += "  Set \(index + 1) at \(timeString): \(Int(set.weight))lbs x \(Int(set.reps)) reps @ \(Int(set.rpe))% effort\n"
+                }
+            }
+            formatted += "  Total sets completed: \(sortedSets.count)\n"
+        }
+        
+        return formatted
+    }
+    
+    /// Format exercise history with explicit dates for chronological accuracy
+    private func formatExerciseHistoryWithDates(_ history: [WorkoutSet]) -> String {
+        let sortedHistory = history.sorted { $0.timestamp > $1.timestamp } // Most recent first
+        var formatted = ""
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .short
+        
+        // Group by date for better organization
+        let groupedByDate = Dictionary(grouping: sortedHistory) { set in
+            Calendar.current.startOfDay(for: set.timestamp)
+        }
+        
+        let sortedDates = groupedByDate.keys.sorted { $0 > $1 } // Most recent dates first
+        
+        for date in sortedDates {
+            let sets = groupedByDate[date]!.sorted { $0.timestamp < $1.timestamp }
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateStyle = .medium
+            let dateString = dayFormatter.string(from: date)
+            
+            // Calculate days ago
+            let daysAgo = Calendar.current.dateComponents([.day], from: date, to: Date()).day ?? 0
+            let daysAgoText = daysAgo == 0 ? "Today" : daysAgo == 1 ? "Yesterday" : "\(daysAgo) days ago"
+            
+            formatted += "  \(dateString) (\(daysAgoText)):\n"
+            
+            for set in sets {
+                let timeFormatter = DateFormatter()
+                timeFormatter.timeStyle = .short
+                let timeString = timeFormatter.string(from: set.timestamp)
+                if set.exerciseType == "static_hold" {
+                    formatted += "    \(timeString): \(Int(set.weight))lbs x \(Int(set.reps)) seconds @ \(Int(set.rpe))% effort\n"
+                } else {
+                    formatted += "    \(timeString): \(Int(set.weight))lbs x \(Int(set.reps)) reps @ \(Int(set.rpe))% effort\n"
+                }
+            }
+        }
+        
+        return formatted
+    }
+    
+    /// Format today's nutrition with specific times for chronological accuracy
+    private func formatTodayNutritionWithTimes(meals: [MacroMeal], totals: MacroTotals) -> String {
+        var formatted = ""
+        
+        // Today's totals
+        formatted += "Total consumed today:\n"
+        formatted += "- Calories: \(Int(totals.calories))\n"
+        formatted += "- Protein: \(Int(totals.protein))g\n"
+        formatted += "- Carbs: \(Int(totals.carbs))g\n"
+        formatted += "- Fat: \(Int(totals.fat))g\n\n"
+        
+        // Individual meals with times
+        if !meals.isEmpty {
+            formatted += "Meals consumed today (\(meals.count) meals):\n"
+            let timeFormatter = DateFormatter()
+            timeFormatter.timeStyle = .short
+            
+            // Sort meals by time
+            let sortedMeals = meals.sorted { $0.createdAt < $1.createdAt }
+            
+            for (index, meal) in sortedMeals.enumerated() {
+                let timeString = timeFormatter.string(from: meal.createdAt)
+                formatted += "\nMeal \(index + 1) at \(timeString) - \(meal.title):\n"
+                formatted += "  Calories: \(Int(meal.totals.calories)), "
+                formatted += "Protein: \(Int(meal.totals.protein))g, "
+                formatted += "Carbs: \(Int(meal.totals.carbs))g, "
+                formatted += "Fat: \(Int(meal.totals.fat))g\n"
+                
+                // Show all items for today's meals (more detail for current day)
+                if !meal.items.isEmpty {
+                    formatted += "  Items consumed:\n"
+                    for item in meal.items {
+                        formatted += "    - \(item.name) (\(item.quantityDescription)): \(Int(item.calories)) cal\n"
+                    }
+                }
+            }
+        }
+        
+        return formatted
+    }
+    
+    /// Format recent nutrition history with explicit dates
+    private func formatRecentNutritionHistory(_ history: [MacroDaySummary]) -> String {
+        var formatted = ""
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        
+        // Sort by date (most recent first)
+        let sortedHistory = history.sorted { $0.date > $1.date }
+        
+        for summary in sortedHistory {
+            let dateString = dateFormatter.string(from: summary.date)
+            
+            // Calculate days ago
+            let daysAgo = Calendar.current.dateComponents([.day], from: summary.date, to: Date()).day ?? 0
+            let daysAgoText = daysAgo == 0 ? "Today" : daysAgo == 1 ? "Yesterday" : "\(daysAgo) days ago"
+            
+            formatted += "\(dateString) (\(daysAgoText)):\n"
+            formatted += "  Calories: \(Int(summary.totals.calories)), "
+            formatted += "Protein: \(Int(summary.totals.protein))g, "
+            formatted += "Carbs: \(Int(summary.totals.carbs))g, "
+            formatted += "Fat: \(Int(summary.totals.fat))g "
+            formatted += "(\(summary.mealsCount) meals)\n\n"
         }
         
         return formatted
