@@ -18,7 +18,7 @@ struct MacroChatMessage: Identifiable, Equatable {
 struct MacroChatView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject var macroService = MacroService()
+    @ObservedObject var macroService: MacroService
     let userId: UUID?
     let isDarkMode: Bool
     

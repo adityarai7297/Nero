@@ -444,7 +444,7 @@ struct ExerciseView: View {
                 }
             }
             .sheet(isPresented: $showingMacroChat) {
-                MacroChatView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
+                MacroChatView(macroService: macroService, userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
             }
             .onChange(of: showingMacroChat) { _, isShowing in
                 // When user navigates away from macro chat, check if there are completed tasks
