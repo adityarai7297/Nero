@@ -157,6 +157,8 @@ class MacroService: ObservableObject {
         Task {
             do {
                 let (start, end) = Self.dayBounds(Date())
+                print("🔍 MacroService: Loading meals for today between \(start) and \(end)")
+                
                 // Fetch meals for today
                 let meals: [DBMacroMeal] = try await supabase
                     .from("macro_meals")
@@ -168,9 +170,17 @@ class MacroService: ObservableObject {
                     .execute()
                     .value
                 
+                print("📊 MacroService: Found \(meals.count) meals in database for today")
+                
                 var loadedMeals: [MacroMeal] = []
                 for meal in meals {
-                    guard let mealId = meal.id else { continue }
+                    guard let mealId = meal.id else { 
+                        print("⚠️ MacroService: Meal has no ID, skipping")
+                        continue 
+                    }
+                    
+                    print("🔄 MacroService: Loading items for meal '\(meal.title)' (ID: \(mealId))")
+                    
                     let items: [DBMacroMealItem] = try await supabase
                         .from("macro_meal_items")
                         .select()
@@ -178,6 +188,8 @@ class MacroService: ObservableObject {
                         .order("created_at", ascending: true)
                         .execute()
                         .value
+                    
+                    print("📝 MacroService: Found \(items.count) items for meal '\(meal.title)'")
                     
                     let macroItems = items.map { db in
                         MacroItem(
@@ -197,14 +209,19 @@ class MacroService: ObservableObject {
                         items: macroItems
                     )
                     loadedMeals.append(macroMeal)
+                    print("✅ MacroService: Successfully loaded meal '\(meal.title)' with \(macroItems.count) items")
                 }
+                
+                print("🎯 MacroService: Final result - loaded \(loadedMeals.count) complete meals for today")
                 
                 await MainActor.run {
                     self.todayMeals = loadedMeals
                     self.recalculateTodayTotals()
                     self.isLoading = false
+                    print("📱 MacroService: Updated UI - todayMeals count: \(self.todayMeals.count), todayTotals calories: \(self.todayTotals.calories)")
                 }
             } catch {
+                print("❌ MacroService: Error loading today's meals: \(error)")
                 await MainActor.run {
                     self.errorMessage = "Failed to load today's meals: \(error.localizedDescription)"
                     self.isLoading = false

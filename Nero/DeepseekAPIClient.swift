@@ -834,6 +834,8 @@ class DeepseekAPIClient {
         - Use ONLY the dates and times explicitly provided in the data sections
         - For historical data, reference ONLY what's shown in "RECENT WORKOUT HISTORY" and "RECENT NUTRITION HISTORY"
         - If asked about data not provided (e.g., workouts from 2 weeks ago), state that you don't have that information
+        - NEVER contradict the data sections - if TODAY'S NUTRITION shows totals, acknowledge them; if it says "no meals", don't claim there are meals
+        - Be consistent - don't say "no meals today" while citing calorie totals for today
 
         Response Guidelines:
         - Be encouraging and positive
@@ -991,19 +993,53 @@ class DeepseekAPIClient {
         let todayMeals = macroService.todayMeals
         let todayTotals = macroService.todayTotals
         
+        // Get recent nutrition history (last 7 days) for context
+        let nutritionHistory = await macroService.fetchHistoryDays(limitDays: 7)
+        let todayFromHistory = nutritionHistory.first { summary in
+            Calendar.current.isDate(summary.date, inSameDayAs: Date())
+        }
+        
         context += "=== TODAY'S NUTRITION (\(currentDayOfWeek)) ===\n"
-        if !todayMeals.isEmpty || todayTotals.calories > 0 {
+        
+        // Determine the most accurate today's data
+        let hasDetailedMeals = !todayMeals.isEmpty
+        let hasHistoryTotals = todayFromHistory != nil && todayFromHistory!.totals.calories > 0
+        let hasLiveTotals = todayTotals.calories > 0
+        
+        if hasDetailedMeals {
+            // We have detailed meal data - use it
             context += formatTodayNutritionWithTimes(meals: todayMeals, totals: todayTotals)
+        } else if hasHistoryTotals {
+            // We have aggregate data from history but no detailed meals
+            let historyTotals = todayFromHistory!.totals
+            let mealCount = todayFromHistory!.mealsCount
+            context += "Total consumed today:\n"
+            context += "- Calories: \(Int(historyTotals.calories))\n"
+            context += "- Protein: \(Int(historyTotals.protein))g\n"
+            context += "- Carbs: \(Int(historyTotals.carbs))g\n"
+            context += "- Fat: \(Int(historyTotals.fat))g\n\n"
+            context += "You consumed \(mealCount) meal\(mealCount == 1 ? "" : "s") today, but detailed meal information is not available in the current session.\n"
+        } else if hasLiveTotals {
+            // We have live totals but no detailed meals (edge case)
+            context += "Total consumed today:\n"
+            context += "- Calories: \(Int(todayTotals.calories))\n"
+            context += "- Protein: \(Int(todayTotals.protein))g\n"
+            context += "- Carbs: \(Int(todayTotals.carbs))g\n"
+            context += "- Fat: \(Int(todayTotals.fat))g\n\n"
+            context += "Macro totals are available but detailed meal information is not loaded in the current session.\n"
         } else {
+            // No nutrition data for today
             context += "No meals logged today yet.\n"
         }
         context += "\n\n"
         
-        // Get recent nutrition history (last 7 days) for context
-        let nutritionHistory = await macroService.fetchHistoryDays(limitDays: 7)
-        if !nutritionHistory.isEmpty {
-            context += "=== RECENT NUTRITION HISTORY (Last 7 Days) ===\n"
-            context += formatRecentNutritionHistory(nutritionHistory)
+        // Show recent nutrition history excluding today (to avoid duplication)
+        let historyExcludingToday = nutritionHistory.filter { summary in
+            !Calendar.current.isDate(summary.date, inSameDayAs: Date())
+        }
+        if !historyExcludingToday.isEmpty {
+            context += "=== RECENT NUTRITION HISTORY (Last 7 Days, excluding today) ===\n"
+            context += formatRecentNutritionHistory(historyExcludingToday)
             context += "\n\n"
         }
         

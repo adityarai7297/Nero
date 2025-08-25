@@ -359,8 +359,23 @@ struct ExerciseView: View {
     }
     
     var body: some View {
+        baseView
+    }
+    
+    @ViewBuilder
+    private var baseView: some View {
+        lifecycleModifiers
+    }
+    
+    @ViewBuilder
+    private var contentWithOverlay: some View {
         mainContent
             .overlay(RadialBurstOverlay())
+    }
+    
+    @ViewBuilder
+    private var sheetModifiers: some View {
+        contentWithOverlay
             .sheet(isPresented: $showingSetsModal) {
                 SetsModalView(
                     allSets: workoutService.todaySets,
@@ -410,14 +425,32 @@ struct ExerciseView: View {
                 WorkoutEditChatView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
                     .environmentObject(preferencesService)
             }
+            .onChange(of: showingWorkoutEditChat) { _, isShowing in
+                // When user navigates away from workout edit chat, check if there are completed tasks
+                if !isShowing {
+                    checkForCompletedTasksOnViewDismiss(viewType: .workoutEdit)
+                }
+            }
             .sheet(isPresented: $showingExerciseHistory) {
                 ExerciseHistoryListView(workoutService: workoutService, isDarkMode: themeManager.isDarkMode)
             }
             .sheet(isPresented: $showingAIChat) {
                 AIChatView(workoutService: workoutService, macroService: macroService, isDarkMode: themeManager.isDarkMode)
             }
+            .onChange(of: showingAIChat) { _, isShowing in
+                // When user navigates away from AI chat, check if there are completed tasks
+                if !isShowing {
+                    checkForCompletedTasksOnViewDismiss(viewType: .aiChat)
+                }
+            }
             .sheet(isPresented: $showingMacroChat) {
                 MacroChatView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
+            }
+            .onChange(of: showingMacroChat) { _, isShowing in
+                // When user navigates away from macro chat, check if there are completed tasks
+                if !isShowing {
+                    checkForCompletedTasksOnViewDismiss(viewType: .macroChat)
+                }
             }
             .sheet(isPresented: $showingMacroHistory) {
                 MacroHistoryView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
@@ -429,6 +462,11 @@ struct ExerciseView: View {
                     Text(errorMessage)
                 }
             }
+    }
+    
+    @ViewBuilder
+    private var overlayModifiers: some View {
+        sheetModifiers
             .overlay {
                 if showingLogoutAlert {
                     SignOutGlassPopup(
@@ -495,6 +533,11 @@ struct ExerciseView: View {
                     .zIndex(1002)
                 }
             }
+    }
+    
+    @ViewBuilder
+    private var changeListeners: some View {
+        overlayModifiers
             .onChange(of: workoutService.todaySets) { oldSets, newSets in
                 updateRecommendationsForCurrentExercise()
                 // Check for target completion when sets data changes
@@ -528,6 +571,11 @@ struct ExerciseView: View {
                     updateRecommendationsForCurrentExercise()
                 }
             }
+    }
+    
+    @ViewBuilder
+    private var lifecycleModifiers: some View {
+        changeListeners
             .onAppear {
                 print("🎯 ContentView onAppear - user: \(authService.user?.email ?? "nil"), hasLoadedPreference: \(themeManager.hasLoadedUserPreference)")
                 
@@ -1227,6 +1275,12 @@ struct ExerciseView: View {
         case completed
     }
     
+    enum ViewType {
+        case aiChat
+        case macroChat
+        case workoutEdit
+    }
+    
     // Function to check for task completions and immediately set persistent states
     private func checkForTaskCompletions(oldTasks: [String: BackgroundTaskInfo], newTasks: [String: BackgroundTaskInfo]) {
         // Check each task in newTasks for status changes
@@ -1234,22 +1288,62 @@ struct ExerciseView: View {
             if let oldTaskInfo = oldTasks[taskId] {
                 // Task existed before, check for status change to completed
                 if oldTaskInfo.status == .running && newTaskInfo.status == .completed {
-                    print("🎉 ContentView: Task '\(taskId)' completed! Setting persistent state for type: \(newTaskInfo.type)")
+                    print("🎉 ContentView: Task '\(taskId)' completed! Checking if user is on relevant view for type: \(newTaskInfo.type)")
                     
-                    // Immediately set the appropriate persistent state
+                    // Only set the persistent completed state if the user is NOT currently on the associated view
                     switch newTaskInfo.type {
                     case .fitnessCoachChat:
+                        if !showingAIChat {
                         aiChatCompleted = true
-                        print("✅ ContentView: Set aiChatCompleted = true")
+                            print("✅ ContentView: Set aiChatCompleted = true (user not on AI chat view)")
+                        } else {
+                            print("ℹ️ ContentView: User is on AI chat view, not setting completed state")
+                        }
                     case .macroMealParsing, .macroMealEdit:
+                        if !showingMacroChat {
                         macroTrackerCompleted = true
-                        print("✅ ContentView: Set macroTrackerCompleted = true")
+                            print("✅ ContentView: Set macroTrackerCompleted = true (user not on macro chat view)")
+                        } else {
+                            print("ℹ️ ContentView: User is on macro chat view, not setting completed state")
+                        }
                     case .workoutPlanEdit:
+                        if !showingWorkoutEditChat {
                         workoutEditCompleted = true
-                        print("✅ ContentView: Set workoutEditCompleted = true")
+                            print("✅ ContentView: Set workoutEditCompleted = true (user not on workout edit chat view)")
+                        } else {
+                            print("ℹ️ ContentView: User is on workout edit chat view, not setting completed state")
+                        }
                     default:
                         break
                     }
+                }
+            }
+        }
+    }
+    
+    // Function to check for completed tasks when user navigates away from a view
+    private func checkForCompletedTasksOnViewDismiss(viewType: ViewType) {
+        // Check if there are any completed tasks for this view type that we should now show in the menu
+        for (_, taskInfo) in backgroundTaskManager.activeTasks {
+            if taskInfo.status == .completed {
+                switch (viewType, taskInfo.type) {
+                case (.aiChat, .fitnessCoachChat):
+                    if !aiChatCompleted {
+                        aiChatCompleted = true
+                        print("✅ ContentView: Set aiChatCompleted = true (user navigated away from AI chat)")
+                    }
+                case (.macroChat, .macroMealParsing), (.macroChat, .macroMealEdit):
+                    if !macroTrackerCompleted {
+                        macroTrackerCompleted = true
+                        print("✅ ContentView: Set macroTrackerCompleted = true (user navigated away from macro chat)")
+                    }
+                case (.workoutEdit, .workoutPlanEdit):
+                    if !workoutEditCompleted {
+                        workoutEditCompleted = true
+                        print("✅ ContentView: Set workoutEditCompleted = true (user navigated away from workout edit chat)")
+                    }
+                default:
+                    break
                 }
             }
         }
