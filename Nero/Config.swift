@@ -18,6 +18,35 @@ struct Config {
         return "sk-7b3bb28157654ced84c5906317e3fc0c"
     }()
     
+    // MARK: - Supabase
+    static let supabaseURLString: String = {
+        if let plistURL = Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") as? String,
+           !plistURL.isEmpty, plistURL != "$(SUPABASE_URL)" {
+            return plistURL
+        }
+        if let envURL = ProcessInfo.processInfo.environment["SUPABASE_URL"], !envURL.isEmpty {
+            return envURL
+        }
+        return ""
+    }()
+    
+    static let supabaseAnonKey: String = {
+        if let plistKey = Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String,
+           !plistKey.isEmpty, plistKey != "$(SUPABASE_ANON_KEY)" {
+            return plistKey
+        }
+        if let envKey = ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"], !envKey.isEmpty {
+            return envKey
+        }
+        return ""
+    }()
+    
+    static func isSupabaseConfigured() -> Bool {
+        guard let url = URL(string: supabaseURLString), !supabaseAnonKey.isEmpty else { return false }
+        // Basic URL host check
+        return url.scheme?.hasPrefix("http") == true && (url.host?.isEmpty == false)
+    }
+    
     // MARK: - API Endpoints
     static let deepseekBaseURL = "https://api.deepseek.com"
     
@@ -42,5 +71,12 @@ struct Config {
         } else {
             print("✅ DeepSeek API key configured correctly")
         }
+        
+        // Supabase debug without leaking secrets
+        let urlStatus = URL(string: supabaseURLString) != nil && !supabaseURLString.isEmpty
+        print("🔐 Supabase Config Status:")
+        print("   - URL configured: \(urlStatus)")
+        print("   - Anon key present: \(!supabaseAnonKey.isEmpty)")
+        print("   - Supabase configured: \(isSupabaseConfigured())")
     }
 } 

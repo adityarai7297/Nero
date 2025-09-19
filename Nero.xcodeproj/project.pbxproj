@@ -232,6 +232,8 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvaGpmdXllaGd6eHNjZHRxc29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2ODA0MDYsImV4cCI6MjA2MzI1NjQwNn0.o3RiiCvjC6jIcmFPSbPy_anglAaRyzajNV5DkJnZQls;
+				SUPABASE_URL = "https://zohjfuyehgzxscdtqsoo.supabase.co";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -288,6 +290,8 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvaGpmdXllaGd6eHNjZHRxc29vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDc2ODA0MDYsImV4cCI6MjA2MzI1NjQwNn0.o3RiiCvjC6jIcmFPSbPy_anglAaRyzajNV5DkJnZQls;
+				SUPABASE_URL = "https://zohjfuyehgzxscdtqsoo.supabase.co";
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};

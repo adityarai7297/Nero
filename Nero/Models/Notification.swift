@@ -17,12 +17,20 @@ struct AppNotification: Identifiable, Codable {
         case reminder = "reminder"
         case system = "system"
         
+        // Social notifications
+        case followRequest = "follow_request"
+        case followAccepted = "follow_accepted"
+        case newFollower = "new_follower"
+        
         var color: String {
             switch self {
             case .workoutCompleted: return "green"
             case .achievement: return "orange" 
             case .reminder: return "blue"
             case .system: return "gray"
+            case .followRequest: return "blue"
+            case .followAccepted: return "green"
+            case .newFollower: return "purple"
             }
         }
         
@@ -32,6 +40,9 @@ struct AppNotification: Identifiable, Codable {
             case .achievement: return "trophy.fill"
             case .reminder: return "bell.fill"
             case .system: return "info.circle.fill"
+            case .followRequest: return "person.badge.plus"
+            case .followAccepted: return "checkmark.circle.fill"
+            case .newFollower: return "person.fill.checkmark"
             }
         }
     }
