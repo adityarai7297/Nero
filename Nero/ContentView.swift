@@ -320,7 +320,6 @@ struct ExerciseView: View {
     @State private var showingAIChat: Bool = false // Control AI chat view presentation
     @State private var showingMacroChat: Bool = false // Macro chat
     @State private var showingMacroHistory: Bool = false // Macro history
-    @State private var showingSocial: Bool = false // Social page
     // Dark mode is now managed by ThemeManager
     
     // Target completion state
@@ -455,10 +454,6 @@ struct ExerciseView: View {
             }
             .sheet(isPresented: $showingMacroHistory) {
                 MacroHistoryView(userId: authService.user?.id, isDarkMode: themeManager.isDarkMode)
-            }
-            .sheet(isPresented: $showingSocial) {
-                SocialView(isDarkMode: themeManager.isDarkMode)
-                    .environmentObject(authService)
             }
             .alert("Error", isPresented: .constant(workoutService.errorMessage != nil)) {
                 Button("OK") { workoutService.errorMessage = nil }
@@ -1577,20 +1572,6 @@ struct ExerciseView: View {
                             }
                         }
                         
-                        // Social button
-                        NeumorphicMenuTile(
-                            title: "Social",
-                            icon: "person.2.fill",
-                            color: Color.purple,
-                            isDarkMode: themeManager.isDarkMode
-                        ) {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                showingSideMenu = false
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showingSocial = true
-                            }
-                        }
                         
                         // Sign Out button
                         NeumorphicMenuTile(

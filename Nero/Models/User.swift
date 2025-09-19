@@ -6,65 +6,22 @@ struct User: Codable, Equatable {
     let email: String
     let createdAt: Date
     
-    // Social profile fields
-    var username: String?
-    var displayName: String?
-    var bio: String?
-    var profileImageUrl: String?
-    var isPrivate: Bool
-    var socialSetupCompleted: Bool
-    var followerCount: Int
-    var followingCount: Int
-    
-    // Main initializer with all fields
-    init(id: UUID, email: String, createdAt: Date, username: String? = nil, displayName: String? = nil, bio: String? = nil, profileImageUrl: String? = nil, isPrivate: Bool = false, socialSetupCompleted: Bool = false, followerCount: Int = 0, followingCount: Int = 0) {
+    // Main initializer
+    init(id: UUID, email: String, createdAt: Date) {
         self.id = id
         self.email = email
         self.createdAt = createdAt
-        self.username = username
-        self.displayName = displayName
-        self.bio = bio
-        self.profileImageUrl = profileImageUrl
-        self.isPrivate = isPrivate
-        self.socialSetupCompleted = socialSetupCompleted
-        self.followerCount = followerCount
-        self.followingCount = followingCount
-    }
-    
-    // Convenience initializer for backward compatibility
-    init(id: UUID, email: String, createdAt: Date) {
-        self.init(
-            id: id,
-            email: email,
-            createdAt: createdAt,
-            username: nil,
-            displayName: nil,
-            bio: nil,
-            profileImageUrl: nil,
-            isPrivate: false,
-            socialSetupCompleted: false,
-            followerCount: 0,
-            followingCount: 0
-        )
     }
     
     enum CodingKeys: String, CodingKey {
         case id
         case email
         case createdAt = "created_at"
-        case username
-        case displayName = "display_name"
-        case bio
-        case profileImageUrl = "profile_image_url"
-        case isPrivate = "is_private"
-        case socialSetupCompleted = "social_setup_completed"
-        case followerCount = "follower_count"
-        case followingCount = "following_count"
     }
     
     // Equatable conformance
     static func == (lhs: User, rhs: User) -> Bool {
-        return lhs.id == rhs.id && lhs.email == rhs.email && lhs.username == rhs.username
+        return lhs.id == rhs.id && lhs.email == rhs.email
     }
 }
 
@@ -225,8 +182,8 @@ class AuthService: ObservableObject {
                     print("⚠️ Session restored but profile creation failed for: \(authUser.email ?? "unknown")")
                 }
                 
-                // Load full user profile with social fields
-                let user = await loadUserWithSocialFields(authUser: authUser)
+                // Load user profile
+                let user = await loadUserProfile(authUser: authUser)
                 
                 await MainActor.run {
                     self.user = user
@@ -257,7 +214,7 @@ class AuthService: ObservableObject {
                 print("⚠️ Profile creation failed for OAuth user: \(authUser.email ?? "unknown")")
             }
             
-            let user = await loadUserWithSocialFields(authUser: authUser)
+            let user = await loadUserProfile(authUser: authUser)
             
             await MainActor.run {
                 self.user = user
@@ -296,7 +253,7 @@ class AuthService: ObservableObject {
                 }
             }
             
-            let user = await loadUserWithSocialFields(authUser: authUser)
+            let user = await loadUserProfile(authUser: authUser)
             
             await MainActor.run {
                 self.user = user
@@ -331,7 +288,7 @@ class AuthService: ObservableObject {
                 print("⚠️ Profile issue detected for user: \(email)")
             }
             
-            let user = await loadUserWithSocialFields(authUser: authUser)
+            let user = await loadUserProfile(authUser: authUser)
             
             await MainActor.run {
                 self.user = user
@@ -462,7 +419,7 @@ class AuthService: ObservableObject {
                 print("⚠️ Profile creation failed for OAuth user: \(authUser.email ?? "unknown")")
             }
             
-            let user = await loadUserWithSocialFields(authUser: authUser)
+            let user = await loadUserProfile(authUser: authUser)
             
             // Update state DIRECTLY like email/password does
             await MainActor.run {
@@ -510,7 +467,7 @@ class AuthService: ObservableObject {
                 print("⚠️ Profile creation failed for OAuth user: \(authUser.email ?? "unknown")")
             }
             
-            let user = await loadUserWithSocialFields(authUser: authUser)
+            let user = await loadUserProfile(authUser: authUser)
             
             // Update state DIRECTLY like email/password does
             await MainActor.run {
@@ -635,26 +592,18 @@ class AuthService: ObservableObject {
         }
     }
     
-    /// Load user with social fields from database
-    private func loadUserWithSocialFields(authUser: Auth.User) async -> User {
+    /// Load user profile from database
+    private func loadUserProfile(authUser: Auth.User) async -> User {
         do {
             struct UserResponse: Codable {
                 let id: UUID
                 let email: String
                 let created_at: Date
-                let username: String?
-                let display_name: String?
-                let bio: String?
-                let profile_image_url: String?
-                let is_private: Bool?
-                let social_setup_completed: Bool?
-                let follower_count: Int?
-                let following_count: Int?
             }
             
             let response: UserResponse = try await supabase
                 .from("users")
-                .select("id, email, created_at, username, display_name, bio, profile_image_url, is_private, social_setup_completed, follower_count, following_count")
+                .select("id, email, created_at")
                 .eq("id", value: authUser.id.uuidString)
                 .single()
                 .execute()
@@ -663,18 +612,10 @@ class AuthService: ObservableObject {
             return User(
                 id: response.id,
                 email: response.email,
-                createdAt: response.created_at,
-                username: response.username,
-                displayName: response.display_name,
-                bio: response.bio,
-                profileImageUrl: response.profile_image_url,
-                isPrivate: response.is_private ?? false,
-                socialSetupCompleted: response.social_setup_completed ?? false,
-                followerCount: response.follower_count ?? 0,
-                followingCount: response.following_count ?? 0
+                createdAt: response.created_at
             )
         } catch {
-            print("⚠️ Failed to load social fields, using basic user: \(error.localizedDescription)")
+            print("⚠️ Failed to load user profile, using basic user: \(error.localizedDescription)")
             return User(
                 id: authUser.id,
                 email: authUser.email ?? "",
